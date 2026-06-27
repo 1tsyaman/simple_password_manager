@@ -3,16 +3,24 @@ from pathlib import Path
 import json
 import os
 
-RECORD_KEYS = ["nonce", "ciphertext", "associated_data"]
+from keys import derrive_key
 
-def encrypt_data(data: dict, key: bytes, file_path: str, associated_data: str) -> None:
+NONCE		= "nonce"
+CIPHERTEXT	= "ciphertext"
+ASSOCIATED_DATA	= "associated_data"
+SALT		= "salt"
+
+RECORD_KEYS = [NONCE, CIPHERTEXT, ASSOCIATED_DATA]
+
+def encrypt_data(data: dict, pwd: str, file_path: str, associated_data: str) -> None:
 	path = Path(file_path)
 
 	if (not path.exists()):
 		raise FileNotFoundError(file_path)
 
-	if len(key) != 32:
-		raise ValueError("AES-256 key must be exactly 32 bytes")
+	salt = os.urandom(16)
+
+	key = derrive_key(pwd, salt)
 
 	data_bytes = bytes(json.dumps(data), encoding="utf-8")
 
@@ -24,9 +32,10 @@ def encrypt_data(data: dict, key: bytes, file_path: str, associated_data: str) -
 	encrypted, nonce = __encrypt_data(data=data_bytes, key=key, associated_data=ad)
 
 	record = {
-		"nonce":		nonce.hex(),
-		"ciphertext":		encrypted.hex(),
-		"associated_data":	ad.hex()
+		SALT:			salt.hex(),
+		NONCE:			nonce.hex(),
+		CIPHERTEXT:		encrypted.hex(),
+		ASSOCIATED_DATA:	ad.hex()
 	}
 
 	with open(path, 'w') as fd:
@@ -42,30 +51,31 @@ def __encrypt_data(data: bytes, key: bytes, associated_data: bytes | None) -> tu
 	return encrypted, nonce
 
 
-def decrypt_data(key: bytes, file_path: str) -> dict:
+def decrypt_data(pwd: str, file_path: str) -> dict:
 	path = Path(file_path)
 
 	if (not path.exists()):
 		raise FileNotFoundError(file_path)
-	
-	if len(key) != 32:
-		raise ValueError("AES-256 key must be exactly 32 bytes")
-	
-	aesgcm = AESGCM(key)
-	
+
 	record = {}
 
 	with open(path, 'r') as fd:
 		record = json.load(fd)
 	
-	if not RECORD_KEYS in record.keys():
-		raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
+	for dict_key in RECORD_KEYS:
+		if not dict_key in record.keys():
+			raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
 
-	nonce = bytes.fromhex(record["nonce"])
-	encrypted = bytes.fromhex(record["ciphertext"])
-	associated_data = bytes.fromhex(record["associated_data"])
+	key = derrive_key(pwd, bytes.fromhex(record[SALT]))
+	
+	aesgcm = AESGCM(key)
+
+	nonce = bytes.fromhex(record[NONCE])
+	encrypted = bytes.fromhex(record[CIPHERTEXT])
+	associated_data = bytes.fromhex(record[ASSOCIATED_DATA])
 
 	decrypted_data = aesgcm.decrypt(data=encrypted, associated_data=associated_data, nonce=nonce)
-	
-	#TODO: Should convert the data from bytes to json (same as the original data)
 
+	data = json.loads(decrypted_data.decode("utf-8"))
+
+	return data

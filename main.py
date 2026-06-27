@@ -12,6 +12,6 @@ class PwdManager:
 	@staticmethod
 	def from_encrypted_file(path: str):
 		pwd_manager = PwdManager()
-		# TODO check that the path is valid (probably should have encrypt/decrypt function do it)
+		
 
 		pwd_manager.file_path = Path(path)
