@@ -1,27 +1,37 @@
 class Entry:
-        def __init__(self):
-                self.website            = ""
-                self.username           = ""
-                self.password           = ""
-                self.description        = ""
+	def __init__(self):
+		self.username           = ""
+		self.password           = ""
+		self.description        = ""
 
-        def get_json(self):
-                obj = {
-                        "website":	self.website,
-                        "username":	self.username,
-                        "password":	self.password,
-                        "description":	self.description
-                }
+	def get_json(self):
+		obj = {
+			"username":	self.username,
+			"password":	self.password,
+			"description":	self.description
+		}
 
-                return obj
+		return obj
+	
+	def get_username(self) -> str:
+		return self.username
 
-        @staticmethod
-        def create_entry(website: str, username: str, password: str, description: str):
-                entry = Entry()
+	def get_password(self) -> str:
+		return self.password
 
-                entry.website = website
-                entry.username = username
-                entry.password = password
-                entry.description = description
+	def get_description(self) -> str:
+		return self.description
 
-                return entry
+	@staticmethod
+	def create_entry(username: str, password: str, description: str):
+		entry = Entry()
+
+		entry.username = username
+		entry.password = password
+		entry.description = description
+
+		return entry
+
+	@staticmethod
+	def from_json(entry: dict[str, str]):
+		return Entry.create_entry(entry["username"], entry["password"], entry["description"])

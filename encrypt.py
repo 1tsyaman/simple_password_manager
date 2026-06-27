@@ -1,4 +1,5 @@
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.exceptions import InvalidTag
 from pathlib import Path
 import json
 import os
@@ -73,8 +74,11 @@ def decrypt_data(pwd: str, file_path: str) -> dict:
 	nonce = bytes.fromhex(record[NONCE])
 	encrypted = bytes.fromhex(record[CIPHERTEXT])
 	associated_data = bytes.fromhex(record[ASSOCIATED_DATA])
-
-	decrypted_data = aesgcm.decrypt(data=encrypted, associated_data=associated_data, nonce=nonce)
+	
+	try:
+		decrypted_data = aesgcm.decrypt(data=encrypted, associated_data=associated_data, nonce=nonce)
+	except InvalidTag:
+		raise KeyError("Something went wrong: Ciphertext has been changed, or key/nonce/associated data are wrong.")
 
 	data = json.loads(decrypted_data.decode("utf-8"))
 
