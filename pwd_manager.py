@@ -64,8 +64,10 @@ class PwdManager:
 
 		entry = Entry.create_entry(website, username, "")
 
-		if self.entry_exists(entry):
-			self.__remove_entry(entry)
+		reference = self._get_entry_reference_or_None(entry)
+
+		if reference is not None:
+			self.__remove_entry(reference)
 
 
 	def get_password(self: PwdManager, website: str, username: str) -> str:
@@ -85,11 +87,17 @@ class PwdManager:
 
 		return None
 
-	def entry_exists(self: PwdManager, entry: Entry) -> bool:
+	def _get_entry_reference_or_None(self: PwdManager, entry: Entry) -> Entry | None:
 		for e in self.entries:
 			if e.is_equal(entry):
-				return True
+				return e
+		
+		return None
 
+	def entry_exists(self: PwdManager, entry: Entry) -> bool:
+		if self._get_entry_reference_or_None(entry) is not None:
+			return True
+	
 		return False
 
 	def __remove_entry(self: PwdManager, entry: Entry) -> None:
