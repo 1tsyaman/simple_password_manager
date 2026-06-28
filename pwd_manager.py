@@ -1,6 +1,8 @@
+from __future__ import annotations
+import random as rand
 from getpass import getpass
 from pathlib import Path
-import random as rand
+
 
 from encrypt import encrypt_data, decrypt_data, get_key_from_pwd
 from entry import Entry
@@ -14,7 +16,9 @@ LETTERS =	[
 			'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
 		]
 
-DIGITS =	['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+DIGITS =	[
+			'1', '2', '3', '4', '5', '6', '7', '8', '9', '0'
+		]
 
 SPECIAL_CHARS =	[
 			'!', '"', "'", '§', '$', '%', '&', '/', '(', ')', '=', '?',
@@ -26,68 +30,88 @@ PWD_LENGTH =	24
 class PwdManager:
 
 	"""
-		PwdManager.entries are a dictionary: key=website, value=Entry.
+		PwdManager.entries are a dictionary: key=Entry, value=encrypted_pwd.
 		PwdManager.file_path is a string containing the file path containing the encrypted version.
+		PwdManager._key is the encryption/decryption key.
+		PwdManager._salt is the salt used with the master pwd to create the encryption/decryption key.
 	"""
 
 	def __init__(self, path="", key=bytes(0), salt=bytes(0)):
-		self.entries: dict[str, list[Entry]]	= {}
+		self.entries: dict[Entry, str]		= {}
 		self.file_path: str			= path
 		self._key: bytes			= key
 		self._salt: bytes			= salt
 
-	def add_entry(self: PwdManager, website: str, username: str, password: str, description: str) -> None:
-		entry = Entry.create_entry(username, password, description)
-		self.__add_entry_value_to_key(website, entry)
 
 	"""
-		If username is the empty string, all entries associated with the website will be deleted
+		Does nothing if entry is already in the list (should use modify_entry instead)
 	"""
-	def remove_entry(self: PwdManager, website: str, username: str) -> None:
+	def add_entry(self: PwdManager, website: str, username: str, password: str, description: str) -> None:
+		entry = Entry.create_entry(website, username, description)
+
+		if not self.entry_exists(entry):
+			return self.__add_entry_value_to_key(entry, password)
+
+		print("An entry with the same website-username combination already exists! You can either modify it or remove it and start over.")
+
+
+	"""
+		If no username is provided, all entries associated with the website will be deleted
+	"""
+	def remove_entry(self: PwdManager, website: str, username="") -> None:
 		if username == "":
 			return self.remove_website_entries(website)
-		
-		if website in self.entries:
-			entry = self.__get_entry_with_username_or_None(website, username)
-			if entry:
-				self.__remove_entry(website, entry)
+
+		entry = Entry.create_entry(website, username, "")
+
+		if self.entry_exists(entry):
+			self.__remove_entry(entry)
+
 
 	def get_password(self: PwdManager, website: str, username: str) -> str:
 		entry = self.__get_entry_with_username_or_None(website, username)
 
-		if (entry):
-			return entry.get_password()
+		if (entry is not None):
+			return self.entries[entry]
 
 		return "No such entry."
 
-	def __remove_entry(self: PwdManager, website: str, entry: Entry) -> None:
-		self.entries[website].remove(entry)
-
-	def __add_entry_value_to_key(self: PwdManager, website: str, entry: Entry) -> None:
-		if website not in self.entries:
-			self.entries[website] = []
-
-		self.entries[website].append(entry)
-
 	def __get_entry_with_username_or_None(self: PwdManager, website: str, username: str) -> Entry | None:
-		for entry in self.entries[website]:
-			if entry.get_username() == username:
-				return entry
+		entry = Entry.create_entry(website, username)
+
+		for e in self.entries:
+			if e.is_equal(entry):
+				return e
 
 		return None
 
+	def entry_exists(self: PwdManager, entry: Entry) -> bool:
+		for e in self.entries:
+			if e.is_equal(entry):
+				return True
+
+		return False
+
+	def __remove_entry(self: PwdManager, entry: Entry) -> None:
+		self.entries.pop(entry)
+
+	"""
+		Assumes entry does not exist in the list (simply overrides the value otherwise)
+	"""
+	def __add_entry_value_to_key(self: PwdManager, entry: Entry, password: str) -> None:
+		self.entries[entry] = password
 
 	def remove_website_entries(self: PwdManager, website: str) -> None:
-		if website in self.entries:
-			self.entries.pop(website)
+		for entry in list(self.entries):		# similar to creating a list of keys and iterating over it rather than
+								# iterating over the dictionary while modifying it
+			if entry.get_website().strip().lower() == website.strip().lower():
+				del self.entries[entry]
 
 	def encrypt_and_exit(self: PwdManager) -> None:
 		data = {
-			website:	[
-				entry.get_json()
-    							for entry in self.entries[website]
-			]
-   			for website in self.entries
+			f"{entry.get_website()}, {entry.get_username()}, {entry.get_description()}":	self.entries[entry]
+    			
+				for entry in self.entries
 		}
 
 		if self.file_path == "" or not Path(self.file_path).exists():
@@ -98,16 +122,10 @@ class PwdManager:
 	"""
 		decrypted_data has the following form:
 		{
-			website:	[
-						{
-							"username":	value,
-							"password":	value,
-							"description":	value
-						},
-						.
-						.
-						.
-					]
+			"website, username, description": password,
+			.
+			.
+			.
 		}
 	"""
 	@staticmethod
@@ -122,7 +140,7 @@ class PwdManager:
 			pwd_manager._key = key
 			pwd_manager._salt = salt
 
-			data: dict[str, list[dict[str, str]]] = decrypt_data(key, path)
+			data: dict[str, str] = decrypt_data(key, path)
 		except FileNotFoundError as e:
 			print(e)
 			return
@@ -137,12 +155,13 @@ class PwdManager:
 
 		print(f"{path} decryption successful!")
 
-		for website, entries in data.items():
-			for entry in entries:
-				username = entry["username"]
-				password = entry["password"]
-				description = entry["description"]
-				pwd_manager.add_entry(website, username, password, description)
+		try:
+			for tup in data:
+				website, username, description = tup.split(",", 2)
+				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup])
+		except:
+			print("Something went wrong during descrption of vault: vault does not have the correct foramt.")
+			return pwd_manager
 
 		print("Entries loaded successfully!")
 
