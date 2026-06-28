@@ -27,6 +27,8 @@ SPECIAL_CHARS =	[
 
 PWD_LENGTH =	24
 
+NO_SUCH_ENTRY_MESSAGE = "No such entry."
+
 class PwdManager:
 
 	"""
@@ -76,7 +78,7 @@ class PwdManager:
 		if (entry is not None):
 			return self.entries[entry]
 
-		return "No such entry."
+		return NO_SUCH_ENTRY_MESSAGE
 
 	def __get_entry_with_username_or_None(self: PwdManager, website: str, username: str) -> Entry | None:
 		entry = Entry.create_entry(website, username)

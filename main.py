@@ -1,9 +1,10 @@
 import sys
 import os
+from pyperclip import copy
 from pathlib import Path
 from getpass import getpass
 
-from pwd_manager import PwdManager
+from pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE
  
 
 def add_entry(pwd_manager: PwdManager) -> None:
@@ -47,8 +48,13 @@ def get_password(pwd_manager: PwdManager) -> None:
 	while (True):
 		website = input("Enter website:\n")
 		username = input("Enter username:\n")
-
-		print(pwd_manager.get_password(website, username))
+		pwd = pwd_manager.get_password(website, username)
+		print(pwd)
+		
+		if pwd != NO_SUCH_ENTRY_MESSAGE:
+			if input("Input '1' to copy password to clipboard.\n").strip() == '1':
+				copy(pwd)
+				print("Password is copied to clipboard!")
 
 		ans = input("Press enter to continue, or type 'back' to go back to the menu.\n")
 
