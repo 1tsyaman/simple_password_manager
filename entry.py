@@ -12,7 +12,7 @@ class Entry:
 		}
 
 		return obj
-	
+
 	def get_username(self) -> str:
 		return self.username
 

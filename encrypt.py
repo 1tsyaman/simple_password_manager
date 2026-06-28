@@ -1,8 +1,10 @@
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.exceptions import InvalidTag
-from pathlib import Path
 import json
 import os
+
+from pathlib import Path
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.exceptions import InvalidTag
+
 
 from keys import derrive_key, KEY_LEN
 
@@ -13,12 +15,12 @@ SALT		= "salt"
 
 RECORD_KEYS = [NONCE, CIPHERTEXT, ASSOCIATED_DATA]
 
-def encrypt_data_key(data: dict, key: bytes, salt: bytes, file_path: str, associated_data: str) -> None:
+def encrypt_data(data: dict, key: bytes, salt: bytes, file_path: str, associated_data: str) -> None:
 	path = Path(file_path)
 
 	if (not path.exists()):
 		raise FileNotFoundError(file_path)
-	
+
 	if len(key) != KEY_LEN:
 		raise KeyError("Something went wrong: Key is not of the expected length.")
 
@@ -28,7 +30,7 @@ def encrypt_data_key(data: dict, key: bytes, salt: bytes, file_path: str, associ
 
 	if associated_data != "":
 		ad = bytes(associated_data, encoding="utf-8")
-	
+
 	encrypted, nonce = __encrypt_data(data=data_bytes, key=key, associated_data=ad)
 
 	record = {
@@ -38,8 +40,7 @@ def encrypt_data_key(data: dict, key: bytes, salt: bytes, file_path: str, associ
 		ASSOCIATED_DATA:	ad.hex()
 	}
 
-	with open(path, 'w') as fd:
-		json.dump(record, fd)
+	__atomic_write(record, path)
 
 
 def __encrypt_data(data: bytes, key: bytes, associated_data: bytes | None) -> tuple[bytes, bytes]:
@@ -51,7 +52,7 @@ def __encrypt_data(data: bytes, key: bytes, associated_data: bytes | None) -> tu
 	return encrypted, nonce
 
 
-def get_key(pwd: str, file_path: str) -> tuple[bytes, bytes]:
+def get_key_from_pwd(pwd: str, file_path: str) -> tuple[bytes, bytes]:
 	path = Path(file_path)
 
 	if (not path.exists()):
@@ -69,27 +70,7 @@ def get_key(pwd: str, file_path: str) -> tuple[bytes, bytes]:
 	return derrive_key(pwd, bytes.fromhex(record[SALT]))
 
 
-def decrypt_data_pwd(pwd: str, file_path: str) -> dict:
-	path = Path(file_path)
-
-	if (not path.exists()):
-		raise FileNotFoundError(file_path)
-
-	record = {}
-
-	with open(path, 'r') as fd:
-		record = json.load(fd)
-
-	for dict_key in RECORD_KEYS:
-		if not dict_key in record.keys():
-			raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
-
-	_, key = derrive_key(pwd, salt=bytes.fromhex(record[SALT]))
-
-	return __decrypt_data(key, record)
-	
-
-def decrypt_data_key(key: bytes, file_path: str) -> dict:
+def decrypt_data(key: bytes, file_path: str) -> dict:
 	path = Path(file_path)
 
 	if (not path.exists()):
@@ -108,7 +89,8 @@ def decrypt_data_key(key: bytes, file_path: str) -> dict:
 			raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
 
 	return __decrypt_data(key, record)
-		
+
+
 def __decrypt_data(key: bytes, record: dict) -> dict:
 	aesgcm = AESGCM(key)
 
@@ -124,3 +106,14 @@ def __decrypt_data(key: bytes, record: dict) -> dict:
 	data = json.loads(decrypted_data.decode("utf-8"))
 
 	return data
+
+
+def __atomic_write(data: dict, path: Path):
+	tmp_path = path.with_name(path.name + ".tmp")
+	with open(tmp_path, 'w', encoding="utf-8") as fd:
+		json.dump(data, fd)
+
+		fd.flush()			# force python to actually pass buffer to os
+		os.fsync(fd.fileno())		# sync makes os carry out the write operation to disk
+	
+	os.replace(tmp_path, path)		# override old file only if write is successful (atomic write)

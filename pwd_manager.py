@@ -2,7 +2,7 @@ from getpass import getpass
 from pathlib import Path
 import random as rand
 
-from encrypt import encrypt_data_key, decrypt_data_key, get_key
+from encrypt import encrypt_data, decrypt_data, get_key_from_pwd
 from entry import Entry
 from keys import derrive_key
 
@@ -13,8 +13,6 @@ LETTERS =	[
 			'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
 			'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
 		]
-
-
 
 DIGITS =	['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
 
@@ -95,7 +93,7 @@ class PwdManager:
 		if self.file_path == "" or not Path(self.file_path).exists():
 			return print("File path is not valid!")
 
-		encrypt_data_key(data=data, key=self._key, salt=self._salt, file_path=self.file_path, associated_data="")
+		encrypt_data(data=data, key=self._key, salt=self._salt, file_path=self.file_path, associated_data="")
 
 	"""
 		decrypted_data has the following form:
@@ -120,11 +118,11 @@ class PwdManager:
 		pwd = getpass("Enter your master password:")
 	
 		try:
-			salt, key = get_key(pwd, path)
+			salt, key = get_key_from_pwd(pwd, path)
 			pwd_manager._key = key
 			pwd_manager._salt = salt
 
-			data: dict[str, list[dict[str, str]]] = decrypt_data_key(key, path)
+			data: dict[str, list[dict[str, str]]] = decrypt_data(key, path)
 		except FileNotFoundError as e:
 			print(e)
 			return
