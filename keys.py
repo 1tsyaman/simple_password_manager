@@ -8,14 +8,15 @@ ARGON2_TIME_COST	= 3
 ARGON2_MEMORY_COST	= 64 * 1024	# 64 MiB, value is in KiB
 ARGON2_PARALLELISM	= 1
 
-def derrive_key(pwd: str, salt: bytes) -> bytes:
-    return hash_secret_raw(
-	secret=pwd.encode("utf-8"),
-        salt=salt,
-        time_cost=ARGON2_TIME_COST,
-        memory_cost=ARGON2_MEMORY_COST,
-        parallelism=ARGON2_PARALLELISM,
-        hash_len=KEY_LEN,
-        type=Type.ID,			# Argon2id
-    )
-
+def derrive_key(pwd: str, salt=bytes(0)) -> tuple[bytes,bytes]:
+	if len(salt) == 0:
+		salt = os.urandom(SALT_LEN)
+	return salt, hash_secret_raw(
+		secret=pwd.encode("utf-8"),
+		salt=salt,
+		time_cost=ARGON2_TIME_COST,
+		memory_cost=ARGON2_MEMORY_COST,
+		parallelism=ARGON2_PARALLELISM,
+		hash_len=KEY_LEN,
+		type=Type.ID,			# Argon2id
+	)

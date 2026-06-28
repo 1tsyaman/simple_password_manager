@@ -2,8 +2,9 @@ from getpass import getpass
 from pathlib import Path
 import random as rand
 
-from encrypt import encrypt_data, decrypt_data
+from encrypt import encrypt_data_key, decrypt_data_key, get_key
 from entry import Entry
+from keys import derrive_key
 
 LETTERS =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
@@ -31,10 +32,11 @@ class PwdManager:
 		PwdManager.file_path is a string containing the file path containing the encrypted version.
 	"""
 
-	def __init__(self, path="", pwd = ""):
+	def __init__(self, path="", key=bytes(0), salt=bytes(0)):
 		self.entries: dict[str, list[Entry]]	= {}
 		self.file_path: str			= path
-		self.__master_pwd: str			= pwd
+		self._key: bytes			= key
+		self._salt: bytes			= salt
 
 	def add_entry(self: PwdManager, website: str, username: str, password: str, description: str) -> None:
 		entry = Entry.create_entry(username, password, description)
@@ -62,7 +64,6 @@ class PwdManager:
 
 	def __remove_entry(self: PwdManager, website: str, entry: Entry) -> None:
 		self.entries[website].remove(entry)
-		del entry
 
 	def __add_entry_value_to_key(self: PwdManager, website: str, entry: Entry) -> None:
 		if website not in self.entries:
@@ -80,8 +81,7 @@ class PwdManager:
 
 	def remove_website_entries(self: PwdManager, website: str) -> None:
 		if website in self.entries:
-			del self.entries[website]
-			self.entries[website] = []
+			self.entries.pop(website)
 
 	def encrypt_and_exit(self: PwdManager) -> None:
 		data = {
@@ -95,8 +95,7 @@ class PwdManager:
 		if self.file_path == "" or not Path(self.file_path).exists():
 			return print("File path is not valid!")
 
-		encrypt_data(data, self.__master_pwd, self.file_path, "")
-		del self
+		encrypt_data_key(data=data, key=self._key, salt=self._salt, file_path=self.file_path, associated_data="")
 
 	"""
 		decrypted_data has the following form:
@@ -119,8 +118,16 @@ class PwdManager:
 		pwd_manager.file_path = path
 
 		pwd = getpass("Enter your master password:")
+	
 		try:
-			data: dict[str, list[dict[str, str]]] = decrypt_data(pwd, path)
+			salt, key = get_key(pwd, path)
+			pwd_manager._key = key
+			pwd_manager._salt = salt
+
+			data: dict[str, list[dict[str, str]]] = decrypt_data_key(key, path)
+		except FileNotFoundError as e:
+			print(e)
+			return
 
 		except ValueError as e:
 			print(e)
@@ -131,7 +138,6 @@ class PwdManager:
 			return
 
 		print(f"{path} decryption successful!")
-		pwd_manager.__master_pwd = pwd
 
 		for website, entries in data.items():
 			for entry in entries:
@@ -144,6 +150,12 @@ class PwdManager:
 
 		return pwd_manager
 	
+	@staticmethod
+	def pwd_manager_from_pwd(file_path: str, pwd: str):
+		salt, key = derrive_key(pwd)
+
+		return PwdManager(file_path, key, salt)
+
 	@staticmethod
 	def generate_pwd():
 		CHARS = LETTERS + DIGITS + SPECIAL_CHARS

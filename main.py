@@ -1,4 +1,5 @@
 import sys
+import os
 from pathlib import Path
 from getpass import getpass
 
@@ -54,6 +55,8 @@ def get_password(pwd_manager: PwdManager) -> None:
 		if ans == "back":
 			return
 
+def clear_screen():
+	os.system('cls' if os.name == 'nt' else 'clear')
 
 if __name__ == "__main__":
 	if len(sys.argv) < 2 or len(sys.argv) > 4:
@@ -82,7 +85,7 @@ if __name__ == "__main__":
 		Path.touch(Path(path))
 
 		pwd = getpass("Enter your master password:")
-		pwd_manager = PwdManager(path, pwd)
+		pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
 
 	while (True):
 		ans = input("Enter 1 to add entry, 2 to remove entry, 3 to retrieve password or 'quit' to exit\n")

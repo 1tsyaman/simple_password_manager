@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 import os
 
-from keys import derrive_key
+from keys import derrive_key, KEY_LEN
 
 NONCE		= "nonce"
 CIPHERTEXT	= "ciphertext"
@@ -13,15 +13,14 @@ SALT		= "salt"
 
 RECORD_KEYS = [NONCE, CIPHERTEXT, ASSOCIATED_DATA]
 
-def encrypt_data(data: dict, pwd: str, file_path: str, associated_data: str) -> None:
+def encrypt_data_key(data: dict, key: bytes, salt: bytes, file_path: str, associated_data: str) -> None:
 	path = Path(file_path)
 
 	if (not path.exists()):
 		raise FileNotFoundError(file_path)
-
-	salt = os.urandom(16)
-
-	key = derrive_key(pwd, salt)
+	
+	if len(key) != KEY_LEN:
+		raise KeyError("Something went wrong: Key is not of the expected length.")
 
 	data_bytes = bytes(json.dumps(data), encoding="utf-8")
 
@@ -52,7 +51,7 @@ def __encrypt_data(data: bytes, key: bytes, associated_data: bytes | None) -> tu
 	return encrypted, nonce
 
 
-def decrypt_data(pwd: str, file_path: str) -> dict:
+def get_key(pwd: str, file_path: str) -> tuple[bytes, bytes]:
 	path = Path(file_path)
 
 	if (not path.exists()):
@@ -62,13 +61,55 @@ def decrypt_data(pwd: str, file_path: str) -> dict:
 
 	with open(path, 'r') as fd:
 		record = json.load(fd)
-	
+
 	for dict_key in RECORD_KEYS:
 		if not dict_key in record.keys():
 			raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
 
-	key = derrive_key(pwd, bytes.fromhex(record[SALT]))
+	return derrive_key(pwd, bytes.fromhex(record[SALT]))
+
+
+def decrypt_data_pwd(pwd: str, file_path: str) -> dict:
+	path = Path(file_path)
+
+	if (not path.exists()):
+		raise FileNotFoundError(file_path)
+
+	record = {}
+
+	with open(path, 'r') as fd:
+		record = json.load(fd)
+
+	for dict_key in RECORD_KEYS:
+		if not dict_key in record.keys():
+			raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
+
+	_, key = derrive_key(pwd, salt=bytes.fromhex(record[SALT]))
+
+	return __decrypt_data(key, record)
 	
+
+def decrypt_data_key(key: bytes, file_path: str) -> dict:
+	path = Path(file_path)
+
+	if (not path.exists()):
+		raise FileNotFoundError(file_path)
+	
+	if len(key) != KEY_LEN:
+		raise KeyError("Something went wrong: Key is not of the expected length.")
+
+	record = {}
+
+	with open(path, 'r') as fd:
+		record = json.load(fd)
+
+	for dict_key in RECORD_KEYS:
+		if not dict_key in record.keys():
+			raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
+
+	return __decrypt_data(key, record)
+		
+def __decrypt_data(key: bytes, record: dict) -> dict:
 	aesgcm = AESGCM(key)
 
 	nonce = bytes.fromhex(record[NONCE])
