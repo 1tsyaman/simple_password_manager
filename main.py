@@ -1,5 +1,6 @@
 import sys
 import os
+from time import sleep
 from pyperclip import copy
 from pathlib import Path
 from getpass import getpass
@@ -7,7 +8,41 @@ from getpass import getpass
 from pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE
  
 
+"""
+	This function is os-specific
+"""
+def get_key() -> str:
+	if os.name == "nt":					# if os is windows 
+		import msvcrt
+
+		key = msvcrt.getch().decode("utf-8").lower()
+
+		if key == "\x03":	# ctrl + c
+			raise KeyboardInterrupt
+
+		return key
+								# otherwise (posix)
+	import termios
+	from tty import setraw
+
+	fd = sys.stdin.fileno()
+	old_settings = termios.tcgetattr(fd)
+
+	try:
+		setraw(fd)
+		key =  sys.stdin.read(1).lower()
+
+		if key == "\x03":
+			raise KeyboardInterrupt
+
+		return key
+	finally:
+		termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
 def add_entry(pwd_manager: PwdManager) -> None:
+	clear_screen()
+
 	website = input("Enter website:\n")
 	username = input("Enter username:\n")
 	password = input("Enter password:\n")
@@ -24,6 +59,8 @@ def add_entry(pwd_manager: PwdManager) -> None:
 				return
 
 def remove_entry(pwd_manager: PwdManager) -> None:
+	clear_screen()
+
 	while (True):
 		website = input("Enter website:\n")
 		username = input("Enter username, or press enter to delete all 'website' entries:\n")
@@ -45,6 +82,8 @@ def remove_entry(pwd_manager: PwdManager) -> None:
 			return
 
 def get_password(pwd_manager: PwdManager) -> None:
+	clear_screen()
+
 	while (True):
 		website = input("Enter website:\n")
 		username = input("Enter username:\n")
@@ -85,25 +124,41 @@ if __name__ == "__main__":
 
 	else:
 		if (Path(path).exists()):
-			print("Vault already exists")
-			sys.exit(1)
+			print("Vault already exists. Overwrite it? Y/n")
+
+			if get_key() == "y":
+				print("Permanently delete the given vault? Y/n")
+				if get_key() == "y":
+					os.remove(Path(path))
+				else:
+					sys.exit(0)
+			else:
+				sys.exit(0)
 
 		Path.touch(Path(path))
 
 		pwd = getpass("Enter your master password:")
 		pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
 
-	while (True):
-		ans = input("Enter 1 to add entry, 2 to remove entry, 3 to retrieve password or 'quit' to exit\n")
-		match ans:
-			case "quit":
-				pwd_manager.encrypt_and_exit()
-				sys.exit(1)
-			case "1":
-				add_entry(pwd_manager)
-			case "2":
-				remove_entry(pwd_manager)
-			case "3":
-				get_password(pwd_manager)
-			case _:
-				print("Incorrect choice.")
+	try:
+		while (True):
+			clear_screen()
+
+			print("Press [a] to add entry, [d] to delete entry, [r] to retrieve password or [q] to exit\n")
+			ans = get_key()
+			match ans:
+				case "q":
+					pwd_manager.encrypt_and_exit()
+					sys.exit(0)
+				case "a":
+					add_entry(pwd_manager)
+				case "d":
+					remove_entry(pwd_manager)
+				case "r":
+					get_password(pwd_manager)
+	except KeyboardInterrupt:
+		print("Save before quiting? Y/n")
+		if get_key() == "y":
+			pwd_manager.encrypt_and_exit()
+		print("Goodbye")
+		sys.exit(0)
