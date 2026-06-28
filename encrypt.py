@@ -13,7 +13,7 @@ CIPHERTEXT	= "ciphertext"
 ASSOCIATED_DATA	= "associated_data"
 SALT		= "salt"
 
-RECORD_KEYS = [NONCE, CIPHERTEXT, ASSOCIATED_DATA]
+RECORD_KEYS = [NONCE, CIPHERTEXT, ASSOCIATED_DATA, SALT]
 
 def encrypt_data(data: dict, key: bytes, salt: bytes, file_path: str, associated_data: str) -> None:
 	path = Path(file_path)
