@@ -1,8 +1,28 @@
 from getpass import getpass
 from pathlib import Path
+import random as rand
+
 from encrypt import encrypt_data, decrypt_data
 from entry import Entry
 
+LETTERS =	[
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
+			'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+			'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
+			'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
+			'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+		]
+
+
+
+DIGITS =	['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+
+SPECIAL_CHARS =	[
+			'!', '"', "'", '§', '$', '%', '&', '/', '(', ')', '=', '?',
+			'`', '{', '[', ']', '}', '\\', '+', '-', '*', '_', ';', ':',
+		]
+
+PWD_LENGTH =	24
 
 class PwdManager:
 
@@ -123,3 +143,13 @@ class PwdManager:
 		print("Entries loaded successfully!")
 
 		return pwd_manager
+	
+	@staticmethod
+	def generate_pwd():
+		CHARS = LETTERS + DIGITS + SPECIAL_CHARS
+		pwd = ""
+
+		for i in range(PWD_LENGTH):
+			pwd += rand.choice(CHARS)
+
+		return pwd
