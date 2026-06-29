@@ -21,8 +21,10 @@ DIGITS =	[
 		]
 
 SPECIAL_CHARS =	[
-			'!', '"', "'", '§', '$', '%', '&', '/', '(', ')', '=', '?',
-			'`', '{', '[', ']', '}', '\\', '+', '-', '*', '_', ';', ':',
+			'!', '"', '#', '$', '%', '&', "'", '(', ')', '*',
+			'+', ',', '-', '.', '/', ':', ';', '<', '=', '>',
+			'?', '@', '[', '\\', ']', '^', '_', '`', '{', '|',
+			'}', '~'
 		]
 
 PWD_LENGTH =	24
@@ -104,10 +106,8 @@ class PwdManager:
 	
 	
 	def get_website_list(self: PwdManager) -> list[str]:
-		return 	[
-				entry.get_website()
-							for entry in self.entries
-			]
+		return 	list(set([entry.get_website()
+								for entry in self.entries]))
 	
 	
 	def get_username_and_description(self: PwdManager, website: str) -> list[tuple[str, str]]:

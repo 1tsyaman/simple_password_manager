@@ -12,6 +12,14 @@ CTRL_C		= '\x03'
 ENTER		= '\r'
 BACKSPACE	= '\x08'
 
+HEADER		= f"{15*"-"} Password Manager {15*"-"}"
+
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+BLUE = "\033[34m"
+RESET = "\033[0m"
+
 
 """
 	This function is os-specific
@@ -50,7 +58,22 @@ def add_entry(pwd_manager: PwdManager) -> None:
 
 	website = input("Enter website:\n")
 	username = input("Enter username:\n")
-	password = input("Enter password:\n")
+	
+	print("Generate random password? Y/n")
+
+	key = ''
+	while key not in ['y', 'n', 'q']:
+		key = get_key()
+	
+	if key == 'q':
+		return
+	if key == 'y':
+		password = PwdManager.generate_pwd()
+		copy(password)
+		print(f"password = {RED}{password}{RESET} was copied to clipboard")
+	else:
+		password = input("Enter password:\n")
+	
 	description = input("Enter description:\n")
 
 	while (True):
@@ -85,6 +108,19 @@ def remove_entry(pwd_manager: PwdManager) -> None:
 
 		if ans == "back":
 			return
+
+def gen_rand_password() -> None:
+	clear_screen()
+
+	pwd = PwdManager.generate_pwd()
+	copy(pwd)
+
+	print(f"Your random password {RED}{pwd}{RESET} was copied to clipboard!")
+
+	print("Press any key to continue..")
+	
+	get_key()
+	return
 
 def get_password(pwd_manager: PwdManager) -> None:
 	while (True):
@@ -192,6 +228,7 @@ def display_list(ls: list, index=0) -> int:
 
 def clear_screen():
 	os.system('cls' if os.name == 'nt' else 'clear')
+	print(HEADER)
 
 if __name__ == "__main__":
 	try:
@@ -233,7 +270,7 @@ if __name__ == "__main__":
 
 		try:
 			while (True):
-				print("Press [a] to add entry, [d] to delete entry, [r] to retrieve password or [q] to exit\n")
+				print("Press [a] to add entry, [d] to delete entry, [r] to retrieve password, [g] to generate a random password or [q] to exit\n")
 				ans = get_key()
 				match ans:
 					case "q":
@@ -245,7 +282,9 @@ if __name__ == "__main__":
 						remove_entry(pwd_manager)
 					case "r":
 						get_password(pwd_manager)
-		
+					case "g":
+						gen_rand_password()
+
 		except KeyboardInterrupt:
 			print("Save before quitting? Y/n")
 
