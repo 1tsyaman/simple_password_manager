@@ -5,8 +5,13 @@ from pyperclip import copy
 from pathlib import Path
 from getpass import getpass
 
-from pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE
+from pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, DIGITS
  
+
+CTRL_C		= '\x03'
+ENTER		= '\r'
+BACKSPACE	= '\x08'
+
 
 """
 	This function is os-specific
@@ -17,7 +22,7 @@ def get_key() -> str:
 
 		key = msvcrt.getch().decode("utf-8").lower()
 
-		if key == "\x03":	# ctrl + c
+		if key == CTRL_C:	# ctrl + c
 			raise KeyboardInterrupt
 
 		return key
@@ -82,23 +87,108 @@ def remove_entry(pwd_manager: PwdManager) -> None:
 			return
 
 def get_password(pwd_manager: PwdManager) -> None:
-	clear_screen()
-
 	while (True):
-		website = input("Enter website:\n")
-		username = input("Enter username:\n")
-		pwd = pwd_manager.get_password(website, username)
-		print(pwd)
+		clear_screen()
+
+		website_list = pwd_manager.get_website_list()
+
+		if len(website_list) == 0:
+			print("Vault has no entries. Press any button to continue.")
+			get_key()
+
+			return
+
+		index = 0
+
+		while True:
+			new_index = display_list(website_list, index)
+
+			key = get_key()
+
+			if is_digit(key):
+				website = website_list[int(key)]
+				break					# we can resume with account choice
+			if key=='n' and new_index != index:
+				index = new_index
+				continue
+			if key=='p' and index > 0:
+				index -= 1
+				continue
+			if key=='q':
+				return
+
+		index = 0
+
+		while True:
+			uname_desc_list = pwd_manager.get_username_and_description(website)
 		
+			if len(uname_desc_list) == 0:
+				print("Website has no entries. Press any button to continue.")
+				get_key()
+
+				return
+
+			new_index = display_list(uname_desc_list, index)
+
+			key = get_key()
+
+			if is_digit(key):
+				username, _ = uname_desc_list[int(key)]
+				break						# we can continue to grabbing the password
+			if key=='n' and new_index != index:
+				index = new_index
+				continue
+			if key=='p' and index > 0:
+				index -= 1
+				continue
+			if key=='q':
+				return
+
+		pwd = pwd_manager.get_password(website, username)
+		print(f"Password: {pwd}")
+
 		if pwd != NO_SUCH_ENTRY_MESSAGE:
-			if input("Input '1' to copy password to clipboard.\n").strip() == '1':
+			print("Press [c] to copy password to clipboard.")
+			if get_key().strip() == 'c':
 				copy(pwd)
 				print("Password is copied to clipboard!")
 
-		ans = input("Press enter to continue, or type 'back' to go back to the menu.\n")
 
-		if ans == "back":
+		print("Press [enter] to continue, or [backspace] to go back to the menu.\n")
+
+		key = get_key()
+
+		if key == BACKSPACE:
 			return
+
+
+
+def is_digit(key: str) -> bool:
+	return key in DIGITS
+
+def display_list(ls: list, index=0) -> int:
+	if index < 0:
+		raise IndexError("Calling display_list with negative index.")
+	
+	start_index = 10 * index
+	end_index = min(start_index + 10, len(ls))
+
+	for i in range(start_index, end_index):
+		print(f"[{i}]:\t{ls[i]}")
+	
+	next_page = "[n]: Next page"
+	prev_page = "[p]: Previous page"
+
+	if index == 0:
+		next_page = ""
+	if (index + 1) * 10 > len(ls):
+		prev_page = ""
+	else:
+		index += 1
+
+	print(f"[q]: Quit to main menu {next_page} {prev_page}")
+
+	return index
 
 def clear_screen():
 	os.system('cls' if os.name == 'nt' else 'clear')

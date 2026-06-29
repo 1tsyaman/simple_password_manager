@@ -101,6 +101,21 @@ class PwdManager:
 			return True
 	
 		return False
+	
+	
+	def get_website_list(self: PwdManager) -> list[str]:
+		return 	[
+				entry.get_website()
+							for entry in self.entries
+			]
+	
+	
+	def get_username_and_description(self: PwdManager, website: str) -> list[tuple[str, str]]:
+		return 	[
+				(entry.get_username(), entry.get_description())
+										for entry in self.entries
+			]
+
 
 	def __remove_entry(self: PwdManager, entry: Entry) -> None:
 		self.entries.pop(entry)
