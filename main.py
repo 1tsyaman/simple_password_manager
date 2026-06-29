@@ -105,7 +105,7 @@ def get_password(pwd_manager: PwdManager) -> None:
 
 			key = get_key()
 
-			if is_digit(key):
+			if is_valid_index(key, len(website_list)):
 				website = website_list[int(key)]
 				break					# we can resume with account choice
 			if key=='n' and new_index != index:
@@ -132,7 +132,7 @@ def get_password(pwd_manager: PwdManager) -> None:
 
 			key = get_key()
 
-			if is_digit(key):
+			if is_valid_index(key, len(uname_desc_list)):
 				username, _ = uname_desc_list[int(key)]
 				break						# we can continue to grabbing the password
 			if key=='n' and new_index != index:
@@ -163,8 +163,8 @@ def get_password(pwd_manager: PwdManager) -> None:
 
 
 
-def is_digit(key: str) -> bool:
-	return key in DIGITS
+def is_valid_index(key: str, bound: int) -> bool:
+	return key in DIGITS and int(key) < bound
 
 def display_list(ls: list, index=0) -> int:
 	if index < 0:
@@ -194,61 +194,72 @@ def clear_screen():
 	os.system('cls' if os.name == 'nt' else 'clear')
 
 if __name__ == "__main__":
-	if len(sys.argv) < 2 or len(sys.argv) > 4:
-		print("Usage: python this_script.py path/to/vault (--create)")
-		sys.exit(1)
-
-	
-	path = sys.argv[1]
-
-	if len(sys.argv) == 2:
-		if not Path(path).exists():
-			print("Vault path is incorrect")
-			sys.exit(1)
-		
-		pwd_manager = PwdManager.from_encrypted_file(path)
-		
-		if not pwd_manager:
-			print("Something went wrong. Exiting..")
+	try:
+		if len(sys.argv) < 2 or len(sys.argv) > 4:
+			print("Usage: python this_script.py path/to/vault (--create)")
 			sys.exit(1)
 
-	else:
-		if (Path(path).exists()):
-			print("Vault already exists. Overwrite it? Y/n")
+		
+		path = sys.argv[1]
 
-			if get_key() == "y":
-				print("Permanently delete the given vault? Y/n")
+		if len(sys.argv) == 2:
+			if not Path(path).exists():
+				print("Vault path is incorrect")
+				sys.exit(1)
+			
+			pwd_manager = PwdManager.from_encrypted_file(path)
+			
+			if not pwd_manager:
+				print("Something went wrong. Exiting..")
+				sys.exit(1)
+
+		else:
+			if (Path(path).exists()):
+				print("Vault already exists. Overwrite it? Y/n")
+
 				if get_key() == "y":
-					os.remove(Path(path))
+					print("Permanently delete the given vault? Y/n")
+					if get_key() == "y":
+						os.remove(Path(path))
+					else:
+						sys.exit(0)
 				else:
 					sys.exit(0)
-			else:
-				sys.exit(0)
 
-		Path.touch(Path(path))
+			Path(path).touch()
 
-		pwd = getpass("Enter your master password:")
-		pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
+			pwd = getpass("Enter your master password:")
+			pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
 
-	try:
-		while (True):
-			clear_screen()
+		try:
+			while (True):
+				print("Press [a] to add entry, [d] to delete entry, [r] to retrieve password or [q] to exit\n")
+				ans = get_key()
+				match ans:
+					case "q":
+						pwd_manager.encrypt_and_exit()
+						sys.exit(0)
+					case "a":
+						add_entry(pwd_manager)
+					case "d":
+						remove_entry(pwd_manager)
+					case "r":
+						get_password(pwd_manager)
+		
+		except KeyboardInterrupt:
+			print("Save before quitting? Y/n")
 
-			print("Press [a] to add entry, [d] to delete entry, [r] to retrieve password or [q] to exit\n")
-			ans = get_key()
-			match ans:
-				case "q":
+			try:
+				if get_key() == "y":
 					pwd_manager.encrypt_and_exit()
-					sys.exit(0)
-				case "a":
-					add_entry(pwd_manager)
-				case "d":
-					remove_entry(pwd_manager)
-				case "r":
-					get_password(pwd_manager)
-	except KeyboardInterrupt:
-		print("Save before quiting? Y/n")
-		if get_key() == "y":
-			pwd_manager.encrypt_and_exit()
-		print("Goodbye")
-		sys.exit(0)
+			except KeyboardInterrupt:				# in case CTRL+C is pressed again, we just quit without saving
+				pass
+
+			print("Goodbye")
+			sys.exit(0)
+	
+	#	big net to avoid crashing
+	except Exception as e:
+		print("Something went wrong. Unsaved changes will not be saved.")
+		print(f"Exception: {e!r}")
+		sys.exit(1)

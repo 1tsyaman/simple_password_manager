@@ -113,7 +113,7 @@ class PwdManager:
 	def get_username_and_description(self: PwdManager, website: str) -> list[tuple[str, str]]:
 		return 	[
 				(entry.get_username(), entry.get_description())
-										for entry in self.entries
+										for entry in self.entries if entry.get_website() == website
 			]
 
 
