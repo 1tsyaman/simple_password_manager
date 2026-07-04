@@ -5,14 +5,15 @@ from pyperclip import copy
 from pathlib import Path
 from getpass import getpass
 
-from pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, DIGITS
- 
+from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, DIGITS
+from core.entry import Entry
+
 
 CTRL_C		= '\x03'
 ENTER		= '\r'
 BACKSPACE	= '\x08'
 
-HEADER		= f"{15*"-"} Password Manager {15*"-"}"
+HEADER		= f"{20*"-"} Password Manager {20*"-"}"
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -77,7 +78,8 @@ def add_entry(pwd_manager: PwdManager) -> None:
 	description = input("Enter description:\n")
 
 	while (True):
-		ans: str = input(f"Save the following entry? Y/n\n {website = }\n{username = }\n{password = }\n{description = }.\n")
+		print(f"Save the following entry? Y/n\n {website = }\n{username = }\n{password = }\n{description = }.\n")
+		ans: str = get_key()
 
 		match ans.lower():
 			case "y":
@@ -86,28 +88,106 @@ def add_entry(pwd_manager: PwdManager) -> None:
 			case "n":
 				return
 
-def remove_entry(pwd_manager: PwdManager) -> None:
+def remove_entry(pwd_manager: PwdManager, entry: Entry) -> None:
 	clear_screen()
 
-	while (True):
-		website = input("Enter website:\n")
-		username = input("Enter username, or press enter to delete all 'website' entries:\n")
+	website = entry.get_website()
+	username = entry.get_username()
 
-		if (username == ""):
-			message = "*all users*"
-		else:
-			message = f"{username}"
-		ans = input(f"Deleting {message} of website {website}. Are you sure? Y/n\n")
-		
-		if ans.lower() == "y":
-			pwd_manager.remove_entry(website, username)
-		else:
-			print("Operation canceled.")
-		
-		ans = input("Press enter to continue, or type 'back' to go back to the menu.\n")
+	print(f"Delete entry ({website, username})? Y/n\n")
 
-		if ans == "back":
-			return
+	ans = get_key()
+		
+	if ans == "y":
+		pwd_manager.remove_entry(website, username)
+	else:
+		print("Operation canceled.")
+
+def get_password(pwd_manager: PwdManager, entry: Entry) -> None:
+	clear_screen()
+
+	website = entry.get_website()
+	username = entry.get_username()
+
+	pwd = pwd_manager.get_password(website, username)
+	print(f"Password: {pwd}")
+
+	if pwd != NO_SUCH_ENTRY_MESSAGE:
+		print("Press [c] to copy password to clipboard or [any key] to return to go back.")
+
+		match get_key():
+			case 'c':
+				copy(pwd)
+				print("Password is copied to clipboard!")
+			case _:
+				return
+
+	sleep(1)
+
+def modify_entry(pwd_manager: PwdManager, entry: Entry):
+	clear_screen()
+
+	print(entry.to_string_with_desc())
+
+	print("Modify [w]ebsite, [u]sername, [p]assword, [d]escription or press [backspace] to go back")
+
+	while True:
+		match get_key():
+			case 'w':
+				_modify_website(entry)
+				break
+			case 'u':
+				_modify_username(entry)
+				break
+			case 'p':
+				_modify_password(pwd_manager, entry)
+				break
+			case 'd':
+				_modify_description(entry)
+				break
+			case BACKSPACE:
+				return
+
+
+def _modify_website(entry: Entry):
+	clear_screen()
+
+	print(entry.to_string_with_desc())
+
+	website = input("New website: ")
+	
+	entry.set_website(website)
+
+def _modify_username(entry: Entry):
+	clear_screen()
+
+	print(entry.to_string_with_desc())
+
+	username = input("New username: ")
+	
+	entry.set_username(username)
+
+def _modify_description(entry: Entry):
+	clear_screen()
+
+	print(entry.to_string_with_desc())
+
+	description = input("New description: ")
+	
+	entry.set_description(description)
+
+def _modify_password(pwd_manager: PwdManager, entry: Entry):
+	clear_screen()
+
+	print(entry.to_string_with_desc())
+
+	password = input("New password: ")
+
+	website = entry.get_website()
+	username = entry.get_username()
+
+	pwd_manager.set_password(website, username, password)
+
 
 def gen_rand_password() -> None:
 	clear_screen()
@@ -122,90 +202,13 @@ def gen_rand_password() -> None:
 	get_key()
 	return
 
-def get_password(pwd_manager: PwdManager) -> None:
-	while (True):
-		clear_screen()
-
-		website_list = pwd_manager.get_website_list()
-
-		if len(website_list) == 0:
-			print("Vault has no entries. Press any button to continue.")
-			get_key()
-
-			return
-
-		index = 0
-
-		while True:
-			new_index = display_list(website_list, index)
-
-			key = get_key()
-
-			if is_valid_index(key, len(website_list)):
-				website = website_list[int(key)]
-				break					# we can resume with account choice
-			if key=='n' and new_index != index:
-				index = new_index
-				continue
-			if key=='p' and index > 0:
-				index -= 1
-				continue
-			if key=='q':
-				return
-
-		index = 0
-
-		while True:
-			uname_desc_list = pwd_manager.get_username_and_description(website)
-		
-			if len(uname_desc_list) == 0:
-				print("Website has no entries. Press any button to continue.")
-				get_key()
-
-				return
-
-			new_index = display_list(uname_desc_list, index)
-
-			key = get_key()
-
-			if is_valid_index(key, len(uname_desc_list)):
-				username, _ = uname_desc_list[int(key)]
-				break						# we can continue to grabbing the password
-			if key=='n' and new_index != index:
-				index = new_index
-				continue
-			if key=='p' and index > 0:
-				index -= 1
-				continue
-			if key=='q':
-				return
-
-		pwd = pwd_manager.get_password(website, username)
-		print(f"Password: {pwd}")
-
-		if pwd != NO_SUCH_ENTRY_MESSAGE:
-			print("Press [c] to copy password to clipboard.")
-			if get_key().strip() == 'c':
-				copy(pwd)
-				print("Password is copied to clipboard!")
-
-
-		print("Press [enter] to continue, or [backspace] to go back to the menu.\n")
-
-		key = get_key()
-
-		if key == BACKSPACE:
-			return
-
-
-
-def is_valid_index(key: str, bound: int) -> bool:
-	return key in DIGITS and int(key) < bound
+def is_valid_index(key: str, index: int, bound: int) -> bool:
+	return key in DIGITS and (10 * index) + int(key) < bound
 
 def display_list(ls: list, index=0) -> int:
 	if index < 0:
 		raise IndexError("Calling display_list with negative index.")
-	
+
 	start_index = 10 * index
 	end_index = min(start_index + 10, len(ls))
 
@@ -222,7 +225,7 @@ def display_list(ls: list, index=0) -> int:
 	else:
 		index += 1
 
-	print(f"[q]: Quit to main menu {next_page} {prev_page}")
+	print(f"{next_page} {prev_page}")
 
 	return index
 
@@ -230,60 +233,107 @@ def clear_screen():
 	os.system('cls' if os.name == 'nt' else 'clear')
 	print(HEADER)
 
+def _init(argv: list[str]) -> PwdManager | int:
+	if len(argv) < 2 or len(argv) > 4:
+		print("Usage: python this_script.py path/to/vault (--create)")
+		return 1
+
+	path = argv[1]
+
+	if len(argv) == 2:
+		if not Path(path).exists():
+			print("Vault path is incorrect")
+			return 1
+
+		pwd_manager = PwdManager.from_encrypted_file(path)
+
+		if not pwd_manager:
+			print("Something went wrong. Exiting..")
+			return 1
+
+	else:
+		if (Path(path).exists()):
+			print("Vault already exists. Overwrite it? Y/n")
+
+			if get_key() == "y":
+				print("Permanently delete the given vault? Y/n")
+				if get_key() == "y":
+					os.remove(Path(path))
+				else:
+					return 0
+			else:
+				return 0
+
+		Path(path).touch()
+
+		pwd = getpass("Enter your master password:")
+		pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
+
+	return pwd_manager
+
+def _main_loop(pwd_manager: PwdManager):
+	index = 0
+
+	while (True):
+		clear_screen()
+
+		index = display_list(pwd_manager.get_website_and_username_string())
+
+		print("Press [a] to add entry, [g] to generate a random password or [q] to exit\n")
+		
+		ans = get_key()
+
+		if ans in DIGITS:
+			_sub_loop(pwd_manager, ans, index)
+		else:
+			match ans:
+				case "q":
+					pwd_manager.encrypt_and_exit()
+					sys.exit(0)
+				case "a":
+					add_entry(pwd_manager)
+				case "g":
+					gen_rand_password()
+
+def _sub_loop(pwd_manager: PwdManager, key: str, index: int):
+	clear_screen()
+
+	if not is_valid_index(key, index, pwd_manager.get_entry_num()):
+		return
+	
+	i = (10 * index) + int(key)
+
+	entry = pwd_manager.get_entry_by_index(i)
+
+	print(entry.to_string_with_desc())
+	print("\nPress [m] to modify, [d] to delete, [r] to retrieve password, [backspace] to go back.")
+
+	key = get_key()
+
+	match key:
+		case 'm':
+			modify_entry(pwd_manager, entry)
+		case 'd':
+			remove_entry(pwd_manager, entry)
+		case 'r':
+			get_password(pwd_manager, entry)
+		case BACKSPACE:
+			return
+
+
+
+
 if __name__ == "__main__":
 	try:
-		if len(sys.argv) < 2 or len(sys.argv) > 4:
-			print("Usage: python this_script.py path/to/vault (--create)")
-			sys.exit(1)
+		pwd_manager = _init(sys.argv)
 
-		
-		path = sys.argv[1]
+		if not isinstance(pwd_manager, PwdManager):
+			sys.exit(pwd_manager)
 
-		if len(sys.argv) == 2:
-			if not Path(path).exists():
-				print("Vault path is incorrect")
-				sys.exit(1)
-			
-			pwd_manager = PwdManager.from_encrypted_file(path)
-			
-			if not pwd_manager:
-				print("Something went wrong. Exiting..")
-				sys.exit(1)
-
-		else:
-			if (Path(path).exists()):
-				print("Vault already exists. Overwrite it? Y/n")
-
-				if get_key() == "y":
-					print("Permanently delete the given vault? Y/n")
-					if get_key() == "y":
-						os.remove(Path(path))
-					else:
-						sys.exit(0)
-				else:
-					sys.exit(0)
-
-			Path(path).touch()
-
-			pwd = getpass("Enter your master password:")
-			pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
+		sleep(1)
 
 		try:
-			while (True):
-				print("Press [a] to add entry, [d] to delete entry, [r] to retrieve password, [g] to generate a random password or [q] to exit\n")
-				ans = get_key()
-				match ans:
-					case "q":
-						pwd_manager.encrypt_and_exit()
-						sys.exit(0)
-					case "a":
-						add_entry(pwd_manager)
-					case "d":
-						remove_entry(pwd_manager)
-					case "r":
-						get_password(pwd_manager)
-					case "g":
-						gen_rand_password()
+			_main_loop(pwd_manager)
 
 		except KeyboardInterrupt:
 			print("Save before quitting? Y/n")

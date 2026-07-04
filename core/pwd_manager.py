@@ -4,9 +4,9 @@ from getpass import getpass
 from pathlib import Path
 
 
-from encrypt import encrypt_data, decrypt_data, get_key_from_pwd
-from entry import Entry
-from keys import derrive_key
+from core.encrypt import encrypt_data, decrypt_data, get_key_from_pwd
+from core.entry import Entry
+from core.keys import derrive_key
 
 LETTERS =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
@@ -39,13 +39,11 @@ class PwdManager:
 		PwdManager._key is the encryption/decryption key.
 		PwdManager._salt is the salt used with the master pwd to create the encryption/decryption key.
 	"""
-
 	def __init__(self, path="", key=bytes(0), salt=bytes(0)):
 		self.entries: dict[Entry, str]		= {}
 		self.file_path: str			= path
 		self._key: bytes			= key
 		self._salt: bytes			= salt
-
 
 	"""
 		Does nothing if entry is already in the list (should use modify_entry instead)
@@ -73,7 +71,6 @@ class PwdManager:
 		if reference is not None:
 			self.__remove_entry(reference)
 
-
 	def get_password(self: PwdManager, website: str, username: str) -> str:
 		entry = self.__get_entry_with_username_or_None(website, username)
 
@@ -81,22 +78,25 @@ class PwdManager:
 			return self.entries[entry]
 
 		return NO_SUCH_ENTRY_MESSAGE
+	
+	def set_password(self: PwdManager, website: str, username: str, password: str):
+		entry = self.__get_entry_with_username_or_None(website, username)
 
-	def __get_entry_with_username_or_None(self: PwdManager, website: str, username: str) -> Entry | None:
-		entry = Entry.create_entry(website, username)
+		if (entry is not None):
+			self.entries[entry] = password
 
-		for e in self.entries:
-			if e.is_equal(entry):
-				return e
+		return NO_SUCH_ENTRY_MESSAGE
 
-		return None
 
-	def _get_entry_reference_or_None(self: PwdManager, entry: Entry) -> Entry | None:
-		for e in self.entries:
-			if e.is_equal(entry):
-				return e
+	def get_entry_by_index(self: PwdManager, index: int) -> Entry:
+		ls = list(self.entries)
 		
-		return None
+		if index < 0 or index > len(self.entries) - 1:
+			raise IndexError("Trying to access an entry with an invalid index!")
+
+		entry = ls[index]
+
+		return entry
 
 	def entry_exists(self: PwdManager, entry: Entry) -> bool:
 		if self._get_entry_reference_or_None(entry) is not None:
@@ -104,11 +104,9 @@ class PwdManager:
 	
 		return False
 	
-	
 	def get_website_list(self: PwdManager) -> list[str]:
 		return 	list(set([entry.get_website()
 								for entry in self.entries]))
-	
 	
 	def get_username_and_description(self: PwdManager, website: str) -> list[tuple[str, str]]:
 		return 	[
@@ -116,15 +114,11 @@ class PwdManager:
 										for entry in self.entries if entry.get_website() == website
 			]
 
+	def get_website_and_username_string(self: PwdManager) -> list[str]:
+		return [entry.to_string() for entry in self.entries]
 
-	def __remove_entry(self: PwdManager, entry: Entry) -> None:
-		self.entries.pop(entry)
-
-	"""
-		Assumes entry does not exist in the list (simply overrides the value otherwise)
-	"""
-	def __add_entry_value_to_key(self: PwdManager, entry: Entry, password: str) -> None:
-		self.entries[entry] = password
+	def get_entry_num(self: PwdManager) -> int:
+		return len(self.entries)
 
 	def remove_website_entries(self: PwdManager, website: str) -> None:
 		for entry in list(self.entries):		# similar to creating a list of keys and iterating over it rather than
@@ -143,6 +137,33 @@ class PwdManager:
 			return print("File path is not valid!")
 
 		encrypt_data(data=data, key=self._key, salt=self._salt, file_path=self.file_path, associated_data="")
+
+
+	def __get_entry_with_username_or_None(self: PwdManager, website: str, username: str) -> Entry | None:
+		entry = Entry.create_entry(website, username)
+
+		for e in self.entries:
+			if e.is_equal(entry):
+				return e
+
+		return None
+
+	def _get_entry_reference_or_None(self: PwdManager, entry: Entry) -> Entry | None:
+		for e in self.entries:
+			if e.is_equal(entry):
+				return e
+		
+		return None
+
+
+	def __remove_entry(self: PwdManager, entry: Entry) -> None:
+		self.entries.pop(entry)
+
+	"""
+		Assumes entry does not exist in the list (simply overrides the value otherwise)
+	"""
+	def __add_entry_value_to_key(self: PwdManager, entry: Entry, password: str) -> None:
+		self.entries[entry] = password
 
 	"""
 		decrypted_data has the following form:

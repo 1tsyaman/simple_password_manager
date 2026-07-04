@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
 
 
-from keys import derrive_key, KEY_LEN
+from core.keys import derrive_key, KEY_LEN
 
 NONCE		= "nonce"
 CIPHERTEXT	= "ciphertext"

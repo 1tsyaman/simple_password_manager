@@ -24,13 +24,30 @@ class Entry:
 	def get_description(self: Entry) -> str:
 		return self.description
 	
+	def set_website(self: Entry, website: str):
+		self.website = website
+	
+	def set_username(self: Entry, username: str):
+		self.username = username
+	
+	def set_description(self: Entry, description: str):
+		self.description = description
+	
 	"""
 		This function ignores the description
 	"""
 	def is_equal(self: Entry, other: Entry) -> bool:
 		return self.website.strip().lower() == other.website.strip().lower() \
 			and self.username.strip().lower() == other.username.strip().lower()
+
+	"""
+		returns a string ('website', 'username')
+	"""
+	def to_string(self: Entry) -> str:
+		return f"({self.website}, {self.username})"
 	
+	def to_string_with_desc(self: Entry) -> str:
+		return f"Website: {self.website}\nUsername: {self.username}\nDescription: {self.description}"
 
 
 	@staticmethod
