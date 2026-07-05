@@ -302,11 +302,12 @@ def _init(argv: list[str]) -> PwdManager | int:
 
 def _main_loop(pwd_manager: PwdManager):
 	index = 0
-	n = pwd_manager.get_entry_num()
 
 	while (True):
 		clear_screen()
 
+		n = pwd_manager.get_entry_num()
+		
 		options = display_list(pwd_manager.get_website_and_username_string(), index)
 
 		main_str = ""
@@ -325,6 +326,7 @@ def _main_loop(pwd_manager: PwdManager):
 
 			if ans in options:
 				_sub_loop(pwd_manager, ans, index)
+				break
 			else:
 				match ans:
 					case "q":
@@ -332,16 +334,21 @@ def _main_loop(pwd_manager: PwdManager):
 						sys.exit(0)
 					case "a":
 						add_entry(pwd_manager)
+						break
 					case "g":
 						gen_rand_password()
+						break
 					case "m":
 						modify_master_password(pwd_manager)
+						break
 					case "p":
 						if index != 0:
 							index -= 1
+						break
 					case "n":
 						if (index + 1) * 10 <= n:
 							index += 1
+						break
 
 
 def _sub_loop(pwd_manager: PwdManager, key: str, index: int):
