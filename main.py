@@ -167,6 +167,23 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry):
 				return
 
 
+def modify_master_password(pwd_manager: PwdManager):
+	clear_screen()
+
+	print("Enter your new master password or leave empty to go back.\n")
+	pwd = input("New Password: ")
+
+	if len(pwd) == 0:
+		return
+	else:
+		print(f"Change master password to {RED}{pwd}{RESET}? Y/n")
+
+		if get_key() == "y":
+			pwd_manager.modify_master_password(pwd)
+		else:
+			return
+
+
 def _modify_website(entry: Entry):
 	clear_screen()
 
@@ -294,7 +311,7 @@ def _main_loop(pwd_manager: PwdManager):
 		if (index + 1) * 10 <= n:
 			main_str += "[n] for next page, "
 		
-		main_str += "[a] to add entry, [g] to generate a random password or [q] to exit"
+		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password or [q] to exit"
 
 		print(f"Press {main_str}\n")
 
@@ -305,12 +322,14 @@ def _main_loop(pwd_manager: PwdManager):
 		else:
 			match ans:
 				case "q":
-					pwd_manager.encrypt_and_exit()
+					pwd_manager.encrypt()
 					sys.exit(0)
 				case "a":
 					add_entry(pwd_manager)
 				case "g":
 					gen_rand_password()
+				case "m":
+					modify_master_password(pwd_manager)
 				case "p":
 					if index != 0:
 						index -= 1
@@ -362,7 +381,7 @@ if __name__ == "__main__":
 
 			try:
 				if get_key() == "y":
-					pwd_manager.encrypt_and_exit()
+					pwd_manager.encrypt()
 			except KeyboardInterrupt:				# in case CTRL+C is pressed again, we just quit without saving
 				pass
 

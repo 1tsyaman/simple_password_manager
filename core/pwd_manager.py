@@ -57,6 +57,14 @@ class PwdManager:
 		print("An entry with the same website-username combination already exists! You can either modify it or remove it and start over.")
 
 
+	def modify_master_password(self: PwdManager, pwd: str) -> None:
+		salt, key = derrive_key(pwd)
+		self._key = key
+		self._salt = salt
+
+		# rewrite the vault file to update the password
+		self.encrypt()
+
 	"""
 		If no username is provided, all entries associated with the website will be deleted
 	"""
@@ -126,7 +134,10 @@ class PwdManager:
 			if entry.get_website().strip().lower() == website.strip().lower():
 				del self.entries[entry]
 
-	def encrypt_and_exit(self: PwdManager) -> None:
+	"""
+		encrypts the PwdManager object and writes it into the vault file
+	"""
+	def encrypt(self: PwdManager) -> None:
 		data = {
 			f"{entry.get_website()}, {entry.get_username()}, {entry.get_description()}":	self.entries[entry]
     			
@@ -213,11 +224,18 @@ class PwdManager:
 
 		return pwd_manager
 	
+	"""
+		creates a PwdManager object and initializes the vault file
+	"""
 	@staticmethod
 	def pwd_manager_from_pwd(file_path: str, pwd: str):
 		salt, key = derrive_key(pwd)
+		
+		pwd_manager = PwdManager(file_path, key, salt)
 
-		return PwdManager(file_path, key, salt)
+		pwd_manager.encrypt()
+
+		return pwd_manager
 
 	@staticmethod
 	def generate_pwd():
