@@ -14,7 +14,7 @@ CTRL_C		= '\x03'
 ENTER		= '\r'
 BACKSPACE	= '\x08'
 
-HEADER		= f"{20*"-"} Password Manager {20*"-"}"
+HEADER		= f"{15*"-"} Password Manager {15*"-"}"
 
 RED = "\033[31m"
 GREEN = "\033[32m"
