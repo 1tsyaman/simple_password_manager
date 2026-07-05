@@ -69,7 +69,7 @@ def safe_copy(text: str) -> bool:
 		except Exception:
 			return False
 
-def add_entry(pwd_manager: PwdManager) -> None:
+def add_entry(pwd_manager: PwdManager) -> bool:
 	clear_screen()
 
 	website = input("Enter website:\n")
@@ -82,7 +82,7 @@ def add_entry(pwd_manager: PwdManager) -> None:
 		key = get_key()
 	
 	if key == 'q':
-		return
+		return False
 	if key == 'y':
 		password = PwdManager.generate_pwd()
 		if safe_copy(password):
@@ -102,11 +102,11 @@ def add_entry(pwd_manager: PwdManager) -> None:
 		match ans.lower():
 			case "y":
 				pwd_manager.add_entry(website, username, password, description)
-				return
+				return True
 			case "n":
-				return
+				return False
 
-def remove_entry(pwd_manager: PwdManager, entry: Entry) -> None:
+def remove_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 	clear_screen()
 
 	website = entry.get_website()
@@ -118,8 +118,10 @@ def remove_entry(pwd_manager: PwdManager, entry: Entry) -> None:
 		
 	if ans == "y":
 		pwd_manager.remove_entry(website, username)
+		return True
 	else:
 		print("Operation canceled.")
+		return False
 
 def get_password(pwd_manager: PwdManager, entry: Entry) -> None:
 	clear_screen()
@@ -144,7 +146,7 @@ def get_password(pwd_manager: PwdManager, entry: Entry) -> None:
 
 	sleep(1)
 
-def modify_entry(pwd_manager: PwdManager, entry: Entry):
+def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 	clear_screen()
 
 	print(entry.to_string_with_desc())
@@ -154,76 +156,101 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry):
 	while True:
 		match get_key():
 			case 'w':
-				_modify_website(entry)
+				return _modify_website(entry)
 				break
 			case 'u':
-				_modify_username(entry)
+				return _modify_username(entry)
 				break
 			case 'p':
-				_modify_password(pwd_manager, entry)
+				return _modify_password(pwd_manager, entry)
 				break
 			case 'd':
-				_modify_description(entry)
+				return _modify_description(entry)
 				break
 			case BACKSPACE:
-				return
+				return False
 
 
-def modify_master_password(pwd_manager: PwdManager):
+def modify_master_password(pwd_manager: PwdManager) -> bool:
 	clear_screen()
 
 	print("Enter your new master password or leave empty to go back.\n")
 	pwd = input("New Password: ")
 
 	if len(pwd) == 0:
-		return
+		return False
 	else:
 		print(f"Change master password to {RED}{pwd}{RESET}? Y/n")
 
 		if get_key() == "y":
 			pwd_manager.modify_master_password(pwd)
+			return True
 		else:
-			return
+			return False
 
 
-def _modify_website(entry: Entry):
+def _modify_website(entry: Entry) -> bool:
 	clear_screen()
 
 	print(entry.to_string_with_desc())
+	print("Input new website for this entry or leave empty to go back.\n")
 
 	website = input("New website: ")
+
+	if len(website) == 0:
+		return False
 	
 	entry.set_website(website)
 
-def _modify_username(entry: Entry):
+	return True
+
+def _modify_username(entry: Entry) -> bool:
 	clear_screen()
 
 	print(entry.to_string_with_desc())
+	print("Input new username for this entry or leave empty to go back.\n")
 
 	username = input("New username: ")
 	
+	if len(username) == 0:
+		return False
+	
 	entry.set_username(username)
 
-def _modify_description(entry: Entry):
+	return True
+
+def _modify_description(entry: Entry) -> bool:
 	clear_screen()
 
 	print(entry.to_string_with_desc())
+	print("Input new description for this entry or leave empty to go back.\n")
 
 	description = input("New description: ")
+
+	if len(description) == 0:
+		return False
 	
 	entry.set_description(description)
 
-def _modify_password(pwd_manager: PwdManager, entry: Entry):
+	return True
+
+def _modify_password(pwd_manager: PwdManager, entry: Entry) -> bool:
 	clear_screen()
 
 	print(entry.to_string_with_desc())
+	print("Input new password for this entry or leave empty to go back.\n")
 
 	password = input("New password: ")
+
+	if len(password) == 0:
+		return False
 
 	website = entry.get_website()
 	username = entry.get_username()
 
 	pwd_manager.set_password(website, username, password)
+
+	return True
 
 
 def gen_rand_password() -> None:
@@ -302,6 +329,7 @@ def _init(argv: list[str]) -> PwdManager | int:
 
 def _main_loop(pwd_manager: PwdManager):
 	index = 0
+	modified = False
 
 	while (True):
 		clear_screen()
@@ -325,21 +353,22 @@ def _main_loop(pwd_manager: PwdManager):
 			ans = get_key()
 
 			if ans in options:
-				_sub_loop(pwd_manager, ans, index)
+				modified |= _sub_loop(pwd_manager, ans, index)
 				break
 			else:
 				match ans:
 					case "q":
-						pwd_manager.encrypt()
+						if modified:
+							pwd_manager.encrypt()
 						sys.exit(0)
 					case "a":
-						add_entry(pwd_manager)
+						modified |= add_entry(pwd_manager)
 						break
 					case "g":
 						gen_rand_password()
 						break
 					case "m":
-						modify_master_password(pwd_manager)
+						modified |= modify_master_password(pwd_manager)
 						break
 					case "p":
 						if index != 0:
@@ -351,11 +380,11 @@ def _main_loop(pwd_manager: PwdManager):
 						break
 
 
-def _sub_loop(pwd_manager: PwdManager, key: str, index: int):
+def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
 	clear_screen()
 
 	if not is_valid_index(key, index, pwd_manager.get_entry_num()):
-		return
+		return False
 	
 	i = (10 * index) + int(key)
 
@@ -368,13 +397,14 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int):
 
 	match key:
 		case 'm':
-			modify_entry(pwd_manager, entry)
+			return modify_entry(pwd_manager, entry)
 		case 'd':
-			remove_entry(pwd_manager, entry)
+			return remove_entry(pwd_manager, entry)
 		case 'r':
 			get_password(pwd_manager, entry)
+			return False				# since we don't modify anything here
 		case BACKSPACE:
-			return
+			return False
 
 
 if __name__ == "__main__":
