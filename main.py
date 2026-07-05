@@ -1,7 +1,8 @@
 import sys
 import os
+import subprocess
 from time import sleep
-from pyperclip import copy
+from pyperclip import copy, PyperclipException
 from pathlib import Path
 from getpass import getpass
 
@@ -54,6 +55,20 @@ def get_key() -> str:
 		termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
+"""
+	supports copying mechanism for termux
+"""
+def safe_copy(text: str) -> bool:
+	try:
+		copy(text)
+		return True
+	except PyperclipException:
+		try:
+			subprocess.run(["termux-clipboard-set"], input=text, text=True, check=True)
+			return True
+		except Exception:
+			return False
+
 def add_entry(pwd_manager: PwdManager) -> None:
 	clear_screen()
 
@@ -70,8 +85,10 @@ def add_entry(pwd_manager: PwdManager) -> None:
 		return
 	if key == 'y':
 		password = PwdManager.generate_pwd()
-		copy(password)
-		print(f"password = {RED}{password}{RESET} was copied to clipboard")
+		if safe_copy(password):
+			print(f"password = {RED}{password}{RESET} was copied to clipboard")
+		else:
+			print(f"password = {RED}{password}{RESET}")
 	else:
 		password = input("Enter password:\n")
 	
@@ -194,9 +211,10 @@ def gen_rand_password() -> None:
 	clear_screen()
 
 	pwd = PwdManager.generate_pwd()
-	copy(pwd)
-
-	print(f"Your random password {RED}{pwd}{RESET} was copied to clipboard!")
+	if safe_copy(pwd):
+		print(f"Your random password {RED}{pwd}{RESET} was copied to clipboard!")
+	else:
+		print(f"Your random password is {RED}{pwd}{RESET}")
 
 	print("Press any key to continue..")
 	
@@ -224,7 +242,7 @@ def clear_screen():
 
 def _init(argv: list[str]) -> PwdManager | int:
 	if len(argv) < 2 or len(argv) > 4:
-		print("Usage: python this_script.py path/to/vault (--create)")
+		print("Usage: python this_script.py path/to/file.vault (--create)")
 		return 1
 
 	path = argv[1]
