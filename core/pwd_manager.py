@@ -8,12 +8,16 @@ from core.encrypt import encrypt_data, decrypt_data, get_key_from_pwd
 from core.entry import Entry
 from core.keys import derrive_key
 
-LETTERS =	[
+LETTERS_LOWER =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
 			'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-			'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
-			'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
-			'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+			'w', 'x', 'y', 'z'
+		]
+
+LETTERS_UPPER = [
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+			'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+			'W', 'X', 'Y', 'Z'
 		]
 
 DIGITS =	[
@@ -26,6 +30,11 @@ SPECIAL_CHARS =	[
 			'?', '@', '[', '\\', ']', '^', '_', '`', '{', '|',
 			'}', '~'
 		]
+
+#	For websites that are picky about special characters
+"""
+SPECIAL_CHARS = [char for char in r"#()+,-_./"]
+"""
 
 PWD_LENGTH =	24
 
@@ -239,10 +248,42 @@ class PwdManager:
 
 	@staticmethod
 	def generate_pwd():
-		CHARS = LETTERS + DIGITS + SPECIAL_CHARS
-		pwd = ""
+		CHARS = LETTERS_LOWER + LETTERS_UPPER + DIGITS + SPECIAL_CHARS
+		while True:
+			pwd = ""
 
-		for i in range(PWD_LENGTH):
-			pwd += rand.choice(CHARS)
+			for i in range(PWD_LENGTH):
+				pwd += rand.choice(CHARS)
+			
+			if PwdManager._pwd_satisfies_conditions(pwd):
+				break
 
 		return pwd
+	
+	@staticmethod
+	def _pwd_satisfies_conditions(pwd: str) -> bool:
+		for digit in DIGITS:
+			if digit in pwd:
+				break
+		else:
+			return False
+
+		for letter in LETTERS_LOWER:
+			if letter in pwd:
+				break
+		else:
+			return False
+		
+		for letter in LETTERS_UPPER:
+			if letter in pwd:
+				break
+		else:
+			return False
+		
+		for spec in SPECIAL_CHARS:
+			if spec in pwd:
+				break
+		else:
+			return False
+
+		return True

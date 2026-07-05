@@ -188,6 +188,9 @@ def modify_master_password(pwd_manager: PwdManager) -> bool:
 		else:
 			return False
 
+def save_changes(pwd_manager: PwdManager) -> bool:
+	pwd_manager.encrypt()
+	return True
 
 def _modify_website(entry: Entry) -> bool:
 	clear_screen()
@@ -345,7 +348,7 @@ def _main_loop(pwd_manager: PwdManager):
 		if (index + 1) * 10 <= n:
 			main_str += "[n] for next page, "
 		
-		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password or [q] to exit"
+		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [s] to save current changes or [q] to exit"
 
 		print(f"Press {main_str}\n")
 		while True:
@@ -369,6 +372,9 @@ def _main_loop(pwd_manager: PwdManager):
 						break
 					case "m":
 						modified |= modify_master_password(pwd_manager)
+						break
+					case "s":
+						modified &= not save_changes(pwd_manager)	# upon success, we reset modified to False
 						break
 					case "p":
 						if index != 0:
