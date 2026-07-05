@@ -135,8 +135,10 @@ def get_password(pwd_manager: PwdManager, entry: Entry) -> None:
 
 		match get_key():
 			case 'c':
-				copy(pwd)
-				print("Password is copied to clipboard!")
+				if safe_copy(pwd):
+					print("Password is copied to clipboard!")
+				else:
+					print("Could not copy password.")
 			case _:
 				return
 
