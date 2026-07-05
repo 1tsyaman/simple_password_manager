@@ -77,8 +77,9 @@ def add_entry(pwd_manager: PwdManager) -> None:
 	
 	description = input("Enter description:\n")
 
+	print(f"Save the following entry? Y/n\n {website = }\n{username = }\n{password = }\n{description = }.")
+
 	while (True):
-		print(f"Save the following entry? Y/n\n {website = }\n{username = }\n{password = }\n{description = }.\n")
 		ans: str = get_key()
 
 		match ans.lower():
@@ -205,7 +206,7 @@ def gen_rand_password() -> None:
 def is_valid_index(key: str, index: int, bound: int) -> bool:
 	return key in DIGITS and (10 * index) + int(key) < bound
 
-def display_list(ls: list, index=0) -> int:
+def display_list(ls: list, index=0):
 	if index < 0:
 		raise IndexError("Calling display_list with negative index.")
 
@@ -213,19 +214,7 @@ def display_list(ls: list, index=0) -> int:
 	end_index = min(start_index + 10, len(ls))
 
 	for i in range(start_index, end_index):
-		print(f"[{i}]:\t{ls[i]}")
-	
-	next_page = "[n]: Next page"
-	prev_page = "[p]: Previous page"
-
-	if index == 0:
-		next_page = ""
-	if (index + 1) * 10 > len(ls):
-		prev_page = ""
-	else:
-		index += 1
-
-	print(f"{next_page} {prev_page}")
+		print(f"[{i - (10 * index)}]:\t{ls[i]}")
 
 	return index
 
@@ -273,14 +262,24 @@ def _init(argv: list[str]) -> PwdManager | int:
 
 def _main_loop(pwd_manager: PwdManager):
 	index = 0
+	n = pwd_manager.get_entry_num()
 
 	while (True):
 		clear_screen()
 
-		index = display_list(pwd_manager.get_website_and_username_string())
+		display_list(pwd_manager.get_website_and_username_string(), index)
 
-		print("Press [a] to add entry, [g] to generate a random password or [q] to exit\n")
+		main_str = ""
+
+		if index != 0:
+			main_str += "[p] for previous page, "
+		if (index + 1) * 10 <= n:
+			main_str += "[n] for next page, "
 		
+		main_str += "[a] to add entry, [g] to generate a random password or [q] to exit"
+
+		print(f"Press {main_str}\n")
+
 		ans = get_key()
 
 		if ans in DIGITS:
@@ -294,6 +293,13 @@ def _main_loop(pwd_manager: PwdManager):
 					add_entry(pwd_manager)
 				case "g":
 					gen_rand_password()
+				case "p":
+					if index != 0:
+						index -= 1
+				case "n":
+					if (index + 1) * 10 <= n:
+						index += 1
+
 
 def _sub_loop(pwd_manager: PwdManager, key: str, index: int):
 	clear_screen()
@@ -319,8 +325,6 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int):
 			get_password(pwd_manager, entry)
 		case BACKSPACE:
 			return
-
-
 
 
 if __name__ == "__main__":
