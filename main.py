@@ -250,10 +250,13 @@ def display_list(ls: list, index=0):
 	start_index = 10 * index
 	end_index = min(start_index + 10, len(ls))
 
+	options = []
+
 	for i in range(start_index, end_index):
 		print(f"[{i - (10 * index)}]:\t{ls[i]}")
+		options.append(f'{i - (10 * index)}')
 
-	return index
+	return options
 
 def clear_screen():
 	os.system('cls' if os.name == 'nt' else 'clear')
@@ -304,7 +307,7 @@ def _main_loop(pwd_manager: PwdManager):
 	while (True):
 		clear_screen()
 
-		display_list(pwd_manager.get_website_and_username_string(), index)
+		options = display_list(pwd_manager.get_website_and_username_string(), index)
 
 		main_str = ""
 
@@ -316,28 +319,29 @@ def _main_loop(pwd_manager: PwdManager):
 		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password or [q] to exit"
 
 		print(f"Press {main_str}\n")
+		while True:
+		
+			ans = get_key()
 
-		ans = get_key()
-
-		if ans in DIGITS:
-			_sub_loop(pwd_manager, ans, index)
-		else:
-			match ans:
-				case "q":
-					pwd_manager.encrypt()
-					sys.exit(0)
-				case "a":
-					add_entry(pwd_manager)
-				case "g":
-					gen_rand_password()
-				case "m":
-					modify_master_password(pwd_manager)
-				case "p":
-					if index != 0:
-						index -= 1
-				case "n":
-					if (index + 1) * 10 <= n:
-						index += 1
+			if ans in options:
+				_sub_loop(pwd_manager, ans, index)
+			else:
+				match ans:
+					case "q":
+						pwd_manager.encrypt()
+						sys.exit(0)
+					case "a":
+						add_entry(pwd_manager)
+					case "g":
+						gen_rand_password()
+					case "m":
+						modify_master_password(pwd_manager)
+					case "p":
+						if index != 0:
+							index -= 1
+					case "n":
+						if (index + 1) * 10 <= n:
+							index += 1
 
 
 def _sub_loop(pwd_manager: PwdManager, key: str, index: int):
