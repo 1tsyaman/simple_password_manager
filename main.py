@@ -6,13 +6,15 @@ from pyperclip import copy, PyperclipException
 from pathlib import Path
 from getpass import getpass
 
-from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, DIGITS
+from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, DIGITS, LETTERS_LOWER, SPECIAL_CHARS
 from core.entry import Entry
 
 
 CTRL_C		= '\x03'
 ENTER		= '\r'
 BACKSPACE	= '\x08'
+
+CHARS = DIGITS + LETTERS_LOWER + SPECIAL_CHARS
 
 HEADER		= f"{15*"-"} Password Manager {15*"-"}"
 
@@ -192,6 +194,106 @@ def save_changes(pwd_manager: PwdManager) -> bool:
 	pwd_manager.encrypt()
 	return True
 
+def search_entries(pwd_manager: PwdManager) -> bool:
+	query = ""
+	website_set = set(pwd_manager.get_website_list())
+	username_set = set(pwd_manager.get_username_list())
+
+	done = False
+	while not done:
+		clear_screen()
+
+		print(f"Query: {query}")
+
+		# TODO: Turn this into a real-time filtering function (and move it to its own function)
+
+		# curr_website_set = {website for website in website_set if query in website}
+		# curr_username_set = {username for username in username_set if query in username}
+
+		keystroke = get_key()
+		query, decrement, done = _handle_keystroke(query, keystroke)
+		
+		#if decrement:
+		#	curr_website_set = {website for website in website_set if query in website}
+		#	curr_username_set = {username for username in username_set if query in username}
+		#else:
+		#	curr_website_set = {website for website in curr_website_set if query in website}
+		#	curr_username_set = {username for username in curr_username_set if query in username}
+	
+	curr_website_set = {website for website in website_set if query in website.lower()}
+	curr_username_set = {username for username in username_set if query in username.lower()}
+
+	entries: list[Entry] = []
+
+	for website in curr_website_set:
+		entries += pwd_manager.get_entries_by_website(website)
+		
+	for username in curr_username_set:
+		entries += pwd_manager.get_entries_by_username(username)
+
+	#	display logic
+	
+	index = 0
+
+	while True:
+		clear_screen()
+
+		options = display_list([entry.to_string() for entry in entries], index)
+		n = len(entries)
+
+		main_str = ""
+
+		if index != 0:
+			main_str += "[p] for previous page, "
+		if (index + 1) * 10 <= n:
+			main_str += "[n] for next page, "
+		
+		if main_str != "":
+			print("Press " + main_str)
+
+		ans = get_key()
+
+		if ans in options:
+			i = (10 * index) + int(ans)
+
+			entry = entries[i]
+
+			print(entry.to_string_with_desc())
+
+			return _specific_entry_options(pwd_manager, entry)
+		
+		match ans:
+			case "p":
+				if index != 0:
+					index -= 1
+			case "n":
+				if (index + 1) * 10 <= n:
+					index += 1
+			case "q":
+				return False
+
+"""
+	puts together the query one keystroke at a time.
+	returns (query, decrement, done), where
+		- query is the current composed query
+		- decrement indicates if the query has gotten shorter (for search and efficiency purposes)
+		- done indicates if input is done [enter] was pressed
+"""
+def _handle_keystroke(query: str, keystroke: str) -> tuple[str, bool, bool]:
+	if keystroke == ENTER:
+		return query, False, True
+
+	if keystroke == BACKSPACE:
+		if query == "":
+			return query, False, False
+		return query[:-1], True, False
+	
+	if keystroke in CHARS:
+		return query + keystroke, False, False
+
+	return query, False, False
+
+
 def _modify_website(entry: Entry) -> bool:
 	clear_screen()
 
@@ -348,7 +450,7 @@ def _main_loop(pwd_manager: PwdManager):
 		if (index + 1) * 10 <= n:
 			main_str += "[n] for next page, "
 		
-		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [s] to save current changes or [q] to exit"
+		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [f] to search entries, [s] to save current changes or [q] to exit"
 
 		print(f"Press {main_str}\n")
 		while True:
@@ -373,6 +475,9 @@ def _main_loop(pwd_manager: PwdManager):
 					case "m":
 						modified |= modify_master_password(pwd_manager)
 						break
+					case "f":
+						modified |= search_entries(pwd_manager)
+						break
 					case "s":
 						modified &= not save_changes(pwd_manager)	# upon success, we reset modified to False
 						break
@@ -396,6 +501,9 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
 
 	entry = pwd_manager.get_entry_by_index(i)
 
+	return _specific_entry_options(pwd_manager, entry)
+
+def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
 	print(entry.to_string_with_desc())
 	print("\nPress [m] to modify, [d] to delete, [r] to retrieve password, [backspace] to go back.")
 

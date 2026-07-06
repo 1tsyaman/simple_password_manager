@@ -122,20 +122,38 @@ class PwdManager:
 		return False
 	
 	def get_website_list(self: PwdManager) -> list[str]:
-		return 	list(set([entry.get_website()
-								for entry in self.entries]))
+		return 	list(set([
+			entry.get_website()
+								for entry in self.entries
+		]))
 	
+	def get_username_list(self: PwdManager) -> list[str]:
+		return list(set([
+			entry.get_username()
+								for entry in self.entries
+		]))
+
 	def get_username_and_description(self: PwdManager, website: str) -> list[tuple[str, str]]:
 		return 	[
 				(entry.get_username(), entry.get_description())
 										for entry in self.entries if entry.get_website() == website
-			]
+		]
 
 	def get_website_and_username_string(self: PwdManager) -> list[str]:
 		return [entry.to_string() for entry in self.entries]
 
 	def get_entry_num(self: PwdManager) -> int:
 		return len(self.entries)
+
+	def get_entries_by_website(self: PwdManager, website: str) -> list[Entry]:
+		return [
+			entry for entry in self.entries if entry.get_website() == website
+		]
+
+	def get_entries_by_username(self: PwdManager, username: str) -> list[Entry]:
+		return [
+			entry for entry in self.entries if entry.get_username() == username
+		]
 
 	def remove_website_entries(self: PwdManager, website: str) -> None:
 		for entry in list(self.entries):		# similar to creating a list of keys and iterating over it rather than
