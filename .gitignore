@@ -1,1 +1,4 @@
 __pycache__
+*.vault
+vaults/
+myenv/

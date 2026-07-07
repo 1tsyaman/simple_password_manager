@@ -1,103 +1,161 @@
 import sys
-import os
-from pathlib import Path
-from getpass import getpass
+from time import sleep
 
-from pwd_manager import PwdManager
- 
+import cli.actions as act
 
-def add_entry(pwd_manager: PwdManager) -> None:
-	website = input("Enter website:\n")
-	username = input("Enter username:\n")
-	password = input("Enter password:\n")
-	description = input("Enter description:\n")
+from core.pwd_manager import PwdManager
+from core.entry import Entry
+from cli.input import get_key, poll_for_with_backspace
+from cli.display import display_list, clear_screen
+from cli.util import format_prev_next_str, is_valid_index
+from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
 
-	while (True):
-		ans: str = input(f"Save the following entry? Y/n\n {website = }\n{username = }\n{password = }\n{description = }.\n")
+GENERAL_ERROR	= "Something went wrong. Exiting..."
 
-		match ans.lower():
-			case "y":
-				pwd_manager.add_entry(website, username, password, description)
-				return
-			case "n":
-				return
+def _init(argv: list[str]) -> PwdManager | int:
+	if len(argv) < 2 or len(argv) > 4:
+		print("Usage: python this_script.py path/to/file.vault (--create)")
+		return 1
 
-def remove_entry(pwd_manager: PwdManager) -> None:
-	while (True):
-		website = input("Enter website:\n")
-		username = input("Enter username, or press enter to delete all 'website' entries:\n")
+	path = argv[1]
 
-		if (username == ""):
-			message = "*all users*"
-		else:
-			message = f"{username}"
-		ans = input(f"Deleting {message} of website {website}. Are you sure? Y/n\n")
-		
-		if ans.lower() == "y":
-			pwd_manager.remove_entry(website, username)
-		else:
-			print("Operation canceled.")
-		
-		ans = input("Press enter to continue, or type 'back' to go back to the menu.\n")
-
-		if ans == "back":
-			return
-
-def get_password(pwd_manager: PwdManager) -> None:
-	while (True):
-		website = input("Enter website:\n")
-		username = input("Enter username:\n")
-
-		print(pwd_manager.get_password(website, username))
-
-		ans = input("Press enter to continue, or type 'back' to go back to the menu.\n")
-
-		if ans == "back":
-			return
-
-def clear_screen():
-	os.system('cls' if os.name == 'nt' else 'clear')
-
-if __name__ == "__main__":
-	if len(sys.argv) < 2 or len(sys.argv) > 4:
-		print("Usage: python this_script.py path/to/vault (--create)")
-		sys.exit(1)
-
+	if len(argv) == 2:
+		pwd_manager = load_vault(path)
 	
-	path = sys.argv[1]
-
-	if len(sys.argv) == 2:
-		if not Path(path).exists():
-			print("Vault path is incorrect")
-			sys.exit(1)
-		
-		pwd_manager = PwdManager.from_encrypted_file(path)
-		
 		if not pwd_manager:
-			print("Something went wrong. Exiting..")
-			sys.exit(1)
+			print(GENERAL_ERROR)
+			return -1
 
 	else:
-		if (Path(path).exists()):
-			print("Vault already exists")
-			sys.exit(1)
+		if (vault_exists(path)):
+			ans = act.double_check_deletion(message1="Vault already exists. Overwrite it? Y/n",
+						message2="Permanently delete the given vault? Y/n")
+			if ans:
+				delete_vault(path)
+			else:
+				print("Goodbye.")
+				return 0
+		
+		pwd_manager = create_and_load_vault(path)
 
-		Path.touch(Path(path))
+		if not pwd_manager:
+			print(GENERAL_ERROR)
+			return -1
 
-		pwd = getpass("Enter your master password:")
-		pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
+	return pwd_manager
+
+def _main_loop(pwd_manager: PwdManager):
+	index = 0
+	modified = False
 
 	while (True):
-		ans = input("Enter 1 to add entry, 2 to remove entry, 3 to retrieve password or 'quit' to exit\n")
-		match ans:
-			case "quit":
-				pwd_manager.encrypt_and_exit()
-				sys.exit(1)
-			case "1":
-				add_entry(pwd_manager)
-			case "2":
-				remove_entry(pwd_manager)
-			case "3":
-				get_password(pwd_manager)
-			case _:
-				print("Incorrect choice.")
+		clear_screen()
+
+		n = pwd_manager.get_entry_list_len()
+		options = display_list(pwd_manager.get_website_and_username_string(), index)
+		main_str = format_prev_next_str(index, len=n)
+		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [f] to search entries, [s] to save current changes or [q] to exit"
+
+		print(f"Press {main_str}\n")
+
+		while True:
+			ans = get_key()
+
+			if ans in options:
+				modified |= _sub_loop(pwd_manager, ans, index)
+				break
+			else:
+				match ans:
+					case "q":
+						if modified:
+							act.save_changes(pwd_manager)
+						clear_screen(header=False)
+						sys.exit(0)
+					case "a":
+						modified |= act.add_entry(pwd_manager)
+						break
+					case "g":
+						act.gen_rand_password()
+						break
+					case "m":
+						modified |= act.modify_master_password(pwd_manager)
+						break
+					case "f":
+						entry = act.search_entries(pwd_manager)
+						if entry is not None:
+							clear_screen()
+							modified |= _specific_entry_options(pwd_manager, entry)
+						break
+					case "s":
+						modified &= not act.save_changes(pwd_manager)	# upon success, we reset modified to False
+						break
+					case "p":
+						if index != 0:
+							index -= 1
+						break
+					case "n":
+						if (index + 1) * 10 <= n:
+							index += 1
+						break
+
+def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
+	clear_screen()
+
+	if not is_valid_index(key, index, pwd_manager.get_entry_list_len()):
+		return False
+	
+	i = (10 * index) + int(key)
+
+	entry = pwd_manager.get_entry_by_index(i)
+
+	return _specific_entry_options(pwd_manager, entry)
+
+def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
+	print(entry.to_string_with_desc())
+	print("\nPress [m] to modify, [d] to delete, [r] to retrieve password, [backspace] to go back.")
+
+	key = poll_for_with_backspace(['m', 'd', 'r', 'BACKSPACE'])
+
+	match key:
+		case 'm':
+			return act.modify_entry(pwd_manager, entry)
+		case 'd':
+			return act.remove_entry(pwd_manager, entry)
+		case 'r':
+			act.get_password(pwd_manager, entry)
+			return False				# since we don't modify anything here
+		case _:
+			return False
+
+
+if __name__ == "__main__":
+	try:
+		pwd_manager = _init(sys.argv)
+
+		if not isinstance(pwd_manager, PwdManager):	# returns int if it fails
+			sys.exit(pwd_manager)
+
+		sleep(1)	# show success before clearing the screen
+
+		try:
+			_main_loop(pwd_manager)
+
+		except KeyboardInterrupt:
+			clear_screen(header=False)
+			print("Save before quitting? Y/n")
+
+			try:
+				if get_key() == "y":
+					pwd_manager.encrypt()
+			except KeyboardInterrupt:				# in case CTRL+C is pressed again, we just quit without saving
+				pass
+
+			print("Goodbye")
+			sys.exit(0)
+	
+	#	big net to avoid crashing
+	except Exception as e:
+		clear_screen(header=False)
+		print("Something went wrong. Unsaved changes will not be saved.")
+		print(f"Exception: {e!r}")
+		sys.exit(1)
