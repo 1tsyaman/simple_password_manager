@@ -70,7 +70,7 @@ def _handle_keystroke(query: str, keystroke: str) -> tuple[str, bool, bool]:
 
 		return query[:-1], True, False
 	
-	if keystroke in CHARS:
+	if keystroke in CHARS or keystroke == " ":
 		return query + keystroke, False, False
 
 	return query, False, False

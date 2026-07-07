@@ -1,8 +1,9 @@
 from time import sleep
 from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE
 from core.entry import Entry
-from cli.input import safe_copy, get_key, poll_y_n_backspace, is_backspace, _handle_keystroke
-from cli.display import clear_screen, display_list, str_color
+from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke
+from cli.display import clear_screen, display_list, display_list_str, str_color
+from cli.util import filter_list, list_diff, format_prev_next_str
 
 def add_entry(pwd_manager: PwdManager) -> bool:
 	clear_screen()
@@ -139,73 +140,62 @@ def save_changes(pwd_manager: PwdManager) -> bool:
 	pwd_manager.encrypt()
 	return True
 
-def search_entries(pwd_manager: PwdManager) -> bool:
+def handle_query(pwd_manager: PwdManager) -> list[Entry]:
 	query = ""
-	website_set = set(pwd_manager.get_website_list())
-	username_set = set(pwd_manager.get_username_list())
-
 	done = False
+
+	original_list = pwd_manager.get_entry_list()
+	ans = original_list
+
+	clear_screen()
+
 	while not done:
 		clear_screen()
 
 		print(f"Query: {query}")
-
-		# TODO: Turn this into a real-time filtering function (and move it to its own function)
-
-		# curr_website_set = {website for website in website_set if query in website}
-		# curr_username_set = {username for username in username_set if query in username}
+		_, output = display_list_str([entry.to_string() for entry in ans])	# only shows the first 10 matches
+		print("\n"+ f"{40*"-"}\n" + output)
 
 		keystroke = get_key()
+	
 		query, decrement, done = _handle_keystroke(query, keystroke)
-		
-		#if decrement:
-		#	curr_website_set = {website for website in website_set if query in website}
-		#	curr_username_set = {username for username in username_set if query in username}
-		#else:
-		#	curr_website_set = {website for website in curr_website_set if query in website}
-		#	curr_username_set = {username for username in curr_username_set if query in username}
+
+		if decrement:
+			ans = filter_list(original_list, query)
+		else:
+			ans = filter_list(ans, query)
 	
-	curr_website_set = {website for website in website_set if query in website.lower()}
-	curr_username_set = {username for username in username_set if query in username.lower()}
+	return ans
 
-	entries: list[Entry] = []
-
-	for website in curr_website_set:
-		entries += pwd_manager.get_entries_by_website(website)
-		
-	for username in curr_username_set:
-		entries += pwd_manager.get_entries_by_username(username)
-
-	#	display logic
+def search_entries(pwd_manager: PwdManager) -> Entry | None:
+	candidates = handle_query(pwd_manager)
 	
+	if len(candidates) == 0:
+		return None
+
 	index = 0
 
 	while True:
 		clear_screen()
 
-		options = display_list([entry.to_string() for entry in entries], index)
-		n = len(entries)
+		n = len(candidates)
+		options = display_list([entry.to_string() for entry in candidates], index)
 
-		main_str = ""
-
-		if index != 0:
-			main_str += "[p] for previous page, "
-		if (index + 1) * 10 <= n:
-			main_str += "[n] for next page, "
+		main_str = format_prev_next_str(index, len=n)
 		
-		if main_str != "":
-			print("Press " + main_str)
+		if len(main_str) != 0:
+			print(f"Press {main_str}")
 
-		ans = get_key()
+		ans = poll_for_with_backspace(options + ['p', 'n'])
 
 		if ans in options:
 			i = (10 * index) + int(ans)
 
-			entry = entries[i]
+			entry = candidates[i]
 
 			print(entry.to_string_with_desc())
 
-			return _specific_entry_options(pwd_manager, entry)
+			return entry
 		
 		match ans:
 			case "p":
@@ -214,8 +204,8 @@ def search_entries(pwd_manager: PwdManager) -> bool:
 			case "n":
 				if (index + 1) * 10 <= n:
 					index += 1
-			case "q":
-				return False
+			case _:
+				return None
 
 
 def _modify_website(entry: Entry) -> bool:

@@ -65,15 +65,6 @@ class PwdManager:
 
 		print("An entry with the same website-username combination already exists! You can either modify it or remove it and start over.")
 
-
-	def modify_master_password(self: PwdManager, pwd: str) -> None:
-		salt, key = derrive_key(pwd)
-		self._key = key
-		self._salt = salt
-
-		# rewrite the vault file to update the password
-		self.encrypt()
-
 	"""
 		If no username is provided, all entries associated with the website will be deleted
 	"""
@@ -88,6 +79,15 @@ class PwdManager:
 		if reference is not None:
 			self.__remove_entry(reference)
 
+	def modify_master_password(self: PwdManager, pwd: str) -> None:
+		salt, key = derrive_key(pwd)
+		self._key = key
+		self._salt = salt
+
+		# rewrite the vault file to update the password
+		self.encrypt()
+
+	
 	def get_password(self: PwdManager, website: str, username: str) -> str:
 		entry = self.__get_entry_with_username_or_None(website, username)
 
@@ -104,6 +104,8 @@ class PwdManager:
 
 		return NO_SUCH_ENTRY_MESSAGE
 
+	def get_entry_list(self: PwdManager) -> list[Entry]:
+		return [entry for entry in self.entries]
 
 	def get_entry_by_index(self: PwdManager, index: int) -> Entry:
 		ls = list(self.entries)
@@ -121,17 +123,6 @@ class PwdManager:
 	
 		return False
 	
-	def get_website_list(self: PwdManager) -> list[str]:
-		return 	list(set([
-			entry.get_website()
-								for entry in self.entries
-		]))
-	
-	def get_username_list(self: PwdManager) -> list[str]:
-		return list(set([
-			entry.get_username()
-								for entry in self.entries
-		]))
 
 	def get_username_and_description(self: PwdManager, website: str) -> list[tuple[str, str]]:
 		return 	[

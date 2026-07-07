@@ -7,7 +7,7 @@ from core.pwd_manager import PwdManager
 from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
 from cli.display import display_list, clear_screen
-from cli.util import format_main_str, is_valid_index
+from cli.util import format_prev_next_str, is_valid_index
 from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
@@ -53,7 +53,8 @@ def _main_loop(pwd_manager: PwdManager):
 
 		n = pwd_manager.get_entry_list_len()
 		options = display_list(pwd_manager.get_website_and_username_string(), index)
-		main_str = format_main_str(index, len=n)
+		main_str = format_prev_next_str(index, len=n)
+		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [f] to search entries, [s] to save current changes or [q] to exit"
 
 		print(f"Press {main_str}\n")
 
@@ -79,7 +80,10 @@ def _main_loop(pwd_manager: PwdManager):
 						modified |= act.modify_master_password(pwd_manager)
 						break
 					case "f":
-						modified |= act.search_entries(pwd_manager)
+						entry = act.search_entries(pwd_manager)
+						if entry is not None:
+							clear_screen()
+							modified |= _specific_entry_options(pwd_manager, entry)
 						break
 					case "s":
 						modified &= not act.save_changes(pwd_manager)	# upon success, we reset modified to False

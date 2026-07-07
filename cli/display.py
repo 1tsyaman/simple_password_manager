@@ -14,20 +14,28 @@ RESET = "\033[0m"
 	- index represents 'page number' and is used to calculate which options to show
 	@returns list of available options (between 0 and 9)
 """
-def display_list(ls: list, index=0):
+def display_list(ls: list, index=0) -> list[int]:
+	options, output = display_list_str(ls, index)
+	print(output)
+	return options
+
+def display_list_str(ls: list, index=0) -> tuple[list[int], str]:
 	if index < 0:
 		raise IndexError("Calling display_list with negative index.")
 
+	output = ""
 	start_index = 10 * index
 	end_index = min(start_index + 10, len(ls))
 
 	options = []
 
 	for i in range(start_index, end_index):
-		print(f"[{i - (10 * index)}]:\t{ls[i]}")
+		output += f"[{i - (10 * index)}]:\t{ls[i]}\n"
 		options.append(f'{i - (10 * index)}')
 
-	return options
+	if len(output) != 0:
+		output = output[:-1]
+	return options, output
 
 def str_color(input: str, color: str):
 	c = ""
