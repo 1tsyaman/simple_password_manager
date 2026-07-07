@@ -30,7 +30,7 @@ def vault_exists(path: str) -> bool:
 def delete_vault(path: str) -> None:
 	try:
 		os.remove(Path(path))
-	except OSError:
-		raise OSError("Given vault path is a directory")
 	except FileExistsError:
 		raise FileExistsError(INVALID_PATH_ERROR)
+	except OSError:
+		raise OSError("Given vault path is a directory")

@@ -242,7 +242,7 @@ class PwdManager:
 
 		return pwd_manager
 	
-
+	@staticmethod
 	def  pwd_manager_from_pwd(file_path: str) -> PwdManager:
 		pwd = getpass("Enter your master password:")
 
