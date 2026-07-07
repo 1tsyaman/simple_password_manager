@@ -142,7 +142,7 @@ class PwdManager:
 	def get_website_and_username_string(self: PwdManager) -> list[str]:
 		return [entry.to_string() for entry in self.entries]
 
-	def get_entry_num(self: PwdManager) -> int:
+	def get_entry_list_len(self: PwdManager) -> int:
 		return len(self.entries)
 
 	def get_entries_by_website(self: PwdManager, website: str) -> list[Entry]:
@@ -251,11 +251,17 @@ class PwdManager:
 
 		return pwd_manager
 	
+
+	def  pwd_manager_from_pwd(file_path: str) -> PwdManager:
+		pwd = getpass("Enter your master password:")
+
+		return PwdManager._pwd_manager_from_pwd(file_path, pwd)
+
 	"""
 		creates a PwdManager object and initializes the vault file
 	"""
 	@staticmethod
-	def pwd_manager_from_pwd(file_path: str, pwd: str):
+	def _pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManager:
 		salt, key = derrive_key(pwd)
 		
 		pwd_manager = PwdManager(file_path, key, salt)
