@@ -152,11 +152,12 @@ def handle_query(pwd_manager: PwdManager) -> list[Entry]:
 	while not done:
 		clear_screen()
 
-		print(f"Query: {query}")
 		_, output = display_list_str([entry.to_string() for entry in ans])	# only shows the first 10 matches
-		print("\n"+ f"{40*"-"}\n" + output)
+		print(output)
+		print(f"{40*"-"}")
+		print(f"Query: {query}")
 
-		keystroke = get_key()
+		keystroke = get_key(lower=False)	# Don't convert everything to lower case for display accuracy
 	
 		query, decrement, done = _handle_keystroke(query, keystroke)
 

@@ -16,11 +16,14 @@ CHARS = DIGITS + LETTERS_LOWER + SPECIAL_CHARS
 """
 	This function is os-specific
 """
-def get_key() -> str:
+def get_key(lower=True) -> str:
 	if os.name == "nt":					# if os is windows
 		import msvcrt
 
-		key = msvcrt.getch().decode("utf-8").lower()
+		key = msvcrt.getch().decode("utf-8")
+
+		if lower:
+			key = key.lower()
 
 		if is_ctrl_c(key):
 			raise KeyboardInterrupt
@@ -35,7 +38,10 @@ def get_key() -> str:
 
 	try:
 		setraw(fd)
-		key =  sys.stdin.read(1).lower()
+		key =  sys.stdin.read(1)
+
+		if lower:
+			key = key.lower()
 
 		if is_ctrl_c(key):
 			raise KeyboardInterrupt
@@ -70,7 +76,7 @@ def _handle_keystroke(query: str, keystroke: str) -> tuple[str, bool, bool]:
 
 		return query[:-1], True, False
 	
-	if keystroke in CHARS or keystroke == " ":
+	if keystroke.lower() in CHARS or keystroke == " ":
 		return query + keystroke, False, False
 
 	return query, False, False

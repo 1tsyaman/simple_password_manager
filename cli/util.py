@@ -14,8 +14,9 @@ def format_prev_next_str(index: int, len: int) -> str:
 		
 	return main_str
 
-def filter_list(ls: list[Entry], query: str) -> set[Entry]:
+def filter_list(ls: list[Entry], query: str) -> list[Entry]:
 	ans = []
+	query = query.lower()
 
 	#	filter descriptions
 	ans += [entry for entry in ls if query in entry.get_description().lower()]
