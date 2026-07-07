@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from encrypt import (
+from core.encrypt import (
     ASSOCIATED_DATA,
     CIPHERTEXT,
     NONCE,
@@ -17,7 +17,7 @@ from encrypt import (
     encrypt_data,
     get_key_from_pwd,
 )
-from keys import KEY_LEN, SALT_LEN, derrive_key
+from core.keys import KEY_LEN, SALT_LEN, derrive_key
 
 
 class EncryptionTests(unittest.TestCase):

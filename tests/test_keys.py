@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from keys import KEY_LEN, SALT_LEN, derrive_key
+from core.keys import KEY_LEN, SALT_LEN, derrive_key
 
 
 class KeyDerivationTests(unittest.TestCase):
