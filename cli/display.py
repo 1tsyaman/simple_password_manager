@@ -55,6 +55,7 @@ def str_color(input: str, color: str):
 	return f"{c}{input}{RESET}"
 
 
-def clear_screen():
+def clear_screen(header=True):
 	os.system('cls' if os.name == 'nt' else 'clear')
-	print(HEADER)
+	if header:
+		print(HEADER)

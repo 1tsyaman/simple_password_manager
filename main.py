@@ -68,7 +68,8 @@ def _main_loop(pwd_manager: PwdManager):
 				match ans:
 					case "q":
 						if modified:
-							pwd_manager.encrypt()
+							act.save_changes(pwd_manager)
+						clear_screen(header=False)
 						sys.exit(0)
 					case "a":
 						modified |= act.add_entry(pwd_manager)
@@ -140,6 +141,7 @@ if __name__ == "__main__":
 			_main_loop(pwd_manager)
 
 		except KeyboardInterrupt:
+			clear_screen(header=False)
 			print("Save before quitting? Y/n")
 
 			try:
@@ -153,6 +155,7 @@ if __name__ == "__main__":
 	
 	#	big net to avoid crashing
 	except Exception as e:
+		clear_screen(header=False)
 		print("Something went wrong. Unsaved changes will not be saved.")
 		print(f"Exception: {e!r}")
 		sys.exit(1)
