@@ -1,6 +1,7 @@
 import os
 
 HEADER		= f"{15*"-"} Password Manager {15*"-"}"
+FOOTER		= 48*"-"
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -59,3 +60,6 @@ def clear_screen(header=True):
 	os.system('cls' if os.name == 'nt' else 'clear')
 	if header:
 		print(HEADER)
+
+def print_footer():
+	print(FOOTER)
