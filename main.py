@@ -6,7 +6,7 @@ import cli.actions as act
 from core.pwd_manager import PwdManager
 from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
-from cli.display import display_list, clear_screen, print_footer
+from cli.display import display_list, clear_screen, print_footer, display_password_rejection_reason
 from cli.util import format_prev_next_str, is_valid_index
 from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
 
@@ -20,7 +20,8 @@ def _init(argv: list[str]) -> PwdManager | int:
 	path = argv[1]
 
 	if len(argv) == 2:
-		pwd_manager = load_vault(path)
+		pwd = act.grab_master_password()
+		pwd_manager = load_vault(path, pwd)
 	
 		if not pwd_manager:
 			print(GENERAL_ERROR)
@@ -35,8 +36,9 @@ def _init(argv: list[str]) -> PwdManager | int:
 			else:
 				print("Goodbye.")
 				return 0
-		
-		pwd_manager = create_and_load_vault(path)
+
+		pwd = act.grab_master_password(new=True)
+		pwd_manager = create_and_load_vault(path, pwd)
 
 		if not pwd_manager:
 			print(GENERAL_ERROR)
