@@ -11,11 +11,15 @@ from core.pwd_manager import (
 	DIGITS,
 	LETTERS_LOWER,
 	LETTERS_UPPER,
+	MIN_PWD_LENGTH,
 	NO_SUCH_ENTRY_MESSAGE,
 	PWD_LENGTH,
 	SPECIAL_CHARS,
 	PwdManager,
 )
+
+
+VALID_MASTER_PASSWORD = "Aa1!aaaa"
 
 
 class PwdManagerTests(unittest.TestCase):
@@ -26,6 +30,11 @@ class PwdManagerTests(unittest.TestCase):
 		manager.add_entry("github.com", "yaman", "gh-pass", "main github")
 		manager.add_entry("rwth.de", "student", "rwth-pass", "university")
 		manager.add_entry("github.com", "work", "work-pass", "work account")
+
+	def assert_pwd_rejected(self, password: str, reason: str, *, min_len: int = PWD_LENGTH) -> None:
+		satisfies, actual_reason = PwdManager._pwd_satisfies_conditions(password, len_min=min_len)
+		self.assertFalse(satisfies)
+		self.assertEqual(actual_reason, reason)
 
 	def test_init_stores_entries_path_key_and_salt(self):
 		key = b"a" * KEY_LEN
@@ -247,7 +256,7 @@ class PwdManagerTests(unittest.TestCase):
 		old_salt = manager._salt
 
 		with patch.object(manager, "encrypt") as encrypt:
-			manager.modify_master_password("new-master-password")
+			manager.modify_master_password(VALID_MASTER_PASSWORD)
 
 		self.assertNotEqual(manager._key, old_key)
 		self.assertNotEqual(manager._salt, old_salt)
@@ -255,55 +264,94 @@ class PwdManagerTests(unittest.TestCase):
 		self.assertEqual(len(manager._salt), SALT_LEN)
 		encrypt.assert_called_once()
 
-	def test_pwd_manager_from_pwd_initializes_key_salt_and_encrypts(self):
+	def test_public_pwd_manager_from_pwd_initializes_key_salt_and_encrypts(self):
 		with TemporaryDirectory() as tmp:
 			path = Path(tmp) / "vault.json"
 			path.touch()
 
-			manager = PwdManager._pwd_manager_from_pwd(str(path), "master-password")
+			manager = PwdManager.pwd_manager_from_pwd(str(path), VALID_MASTER_PASSWORD)
 
 		self.assertEqual(manager.file_path, str(path))
 		self.assertEqual(len(manager._key), KEY_LEN)
 		self.assertEqual(len(manager._salt), SALT_LEN)
+
+	def test_public_pwd_manager_from_pwd_rejects_short_master_password(self):
+		with TemporaryDirectory() as tmp:
+			path = Path(tmp) / "vault.json"
+			path.touch()
+
+			with self.assertRaisesRegex(KeyError, "minimum requirements"):
+				PwdManager.pwd_manager_from_pwd(str(path), "Aa1!")
+
+	def test_public_pwd_manager_from_pwd_rejects_missing_required_character_classes(self):
+		invalid_passwords = [
+			("Aaaaaaaa!", "digit"),
+			("AAAAAAA1!", "lower"),
+			("aaaaaaa1!", "upper"),
+			("Aaaaaaa1", "special"),
+		]
+
+		with TemporaryDirectory() as tmp:
+			path = Path(tmp) / "vault.json"
+			path.touch()
+
+			for password, reason in invalid_passwords:
+				with self.subTest(reason=reason):
+					with self.assertRaisesRegex(KeyError, "minimum requirements"):
+						PwdManager.pwd_manager_from_pwd(str(path), password)
+
+	def test_private_pwd_manager_from_pwd_does_not_validate_master_password(self):
+		with TemporaryDirectory() as tmp:
+			path = Path(tmp) / "vault.json"
+			path.touch()
+
+			manager = PwdManager._pwd_manager_from_pwd(str(path), "weak")
+
+		self.assertIsInstance(manager, PwdManager)
 
 	def test_encrypt_and_from_encrypted_file_round_trip(self):
 		with TemporaryDirectory() as tmp:
 			path = Path(tmp) / "vault.json"
 			path.touch()
 
-			manager = PwdManager._pwd_manager_from_pwd(str(path), "master-password")
+			manager = PwdManager.pwd_manager_from_pwd(str(path), VALID_MASTER_PASSWORD)
 			manager.add_entry("github.com", "yaman", "secret", "personal")
 			manager.add_entry("rwth.de", "student", "rwth-pass", "university")
 			manager.encrypt()
 
-			with patch("core.pwd_manager.getpass", return_value="master-password"):
-				with redirect_stdout(io.StringIO()):
-					loaded = PwdManager.from_encrypted_file(str(path))
+			with redirect_stdout(io.StringIO()):
+				loaded = PwdManager.from_encrypted_file(str(path), VALID_MASTER_PASSWORD)
 
 		self.assertIsInstance(loaded, PwdManager)
 		self.assertEqual(loaded.get_entry_list_len(), 2)
 		self.assertEqual(loaded.get_password("github.com", "yaman"), "secret")
 		self.assertEqual(loaded.get_password("rwth.de", "student"), "rwth-pass")
 
-	def test_from_encrypted_file_returns_none_for_wrong_password(self):
+	def test_from_encrypted_file_rejects_invalid_master_password_before_decryption(self):
 		with TemporaryDirectory() as tmp:
 			path = Path(tmp) / "vault.json"
 			path.touch()
 
-			manager = PwdManager._pwd_manager_from_pwd(str(path), "correct-password")
+			with self.assertRaisesRegex(KeyError, "minimum requirements"):
+				PwdManager.from_encrypted_file(str(path), "weak")
+
+	def test_from_encrypted_file_returns_none_for_wrong_valid_password(self):
+		with TemporaryDirectory() as tmp:
+			path = Path(tmp) / "vault.json"
+			path.touch()
+
+			manager = PwdManager.pwd_manager_from_pwd(str(path), VALID_MASTER_PASSWORD)
 			manager.add_entry("github.com", "yaman", "secret", "personal")
 			manager.encrypt()
 
-			with patch("core.pwd_manager.getpass", return_value="wrong-password"):
-				with redirect_stdout(io.StringIO()):
-					loaded = PwdManager.from_encrypted_file(str(path))
+			with redirect_stdout(io.StringIO()):
+				loaded = PwdManager.from_encrypted_file(str(path), "Bb2@bbbb")
 
 		self.assertIsNone(loaded)
 
-	def test_from_encrypted_file_returns_none_for_missing_file(self):
-		with patch("core.pwd_manager.getpass", return_value="master-password"):
-			with redirect_stdout(io.StringIO()):
-				loaded = PwdManager.from_encrypted_file("missing-file.vault")
+	def test_from_encrypted_file_returns_none_for_missing_file_with_valid_password(self):
+		with redirect_stdout(io.StringIO()):
+			loaded = PwdManager.from_encrypted_file("missing-file.vault", VALID_MASTER_PASSWORD)
 
 		self.assertIsNone(loaded)
 
@@ -320,30 +368,37 @@ class PwdManagerTests(unittest.TestCase):
 		self.assertTrue(any(char in LETTERS_UPPER for char in password))
 		self.assertTrue(any(char in SPECIAL_CHARS for char in password))
 
-	def test_pwd_satisfies_conditions_accepts_valid_password(self):
+	def test_pwd_satisfies_conditions_accepts_generated_password_requirements(self):
 		password = "aA1!" + "x" * (PWD_LENGTH - 4)
 
-		self.assertTrue(PwdManager._pwd_satisfies_conditions(password))
+		satisfies, reason = PwdManager._pwd_satisfies_conditions(password)
+
+		self.assertTrue(satisfies)
+		self.assertEqual(reason, "")
+
+	def test_pwd_satisfies_conditions_accepts_master_password_requirements(self):
+		satisfies, reason = PwdManager._pwd_satisfies_conditions(
+			VALID_MASTER_PASSWORD,
+			len_min=MIN_PWD_LENGTH,
+		)
+
+		self.assertTrue(satisfies)
+		self.assertEqual(reason, "")
+
+	def test_pwd_satisfies_conditions_rejects_too_short_password(self):
+		self.assert_pwd_rejected("aA1!", "len", min_len=MIN_PWD_LENGTH)
 
 	def test_pwd_satisfies_conditions_rejects_password_without_digit(self):
-		password = "aA!" + "x" * (PWD_LENGTH - 3)
-
-		self.assertFalse(PwdManager._pwd_satisfies_conditions(password))
+		self.assert_pwd_rejected("aA!" + "x" * (PWD_LENGTH - 3), "digit")
 
 	def test_pwd_satisfies_conditions_rejects_password_without_lowercase(self):
-		password = "A1!" + "X" * (PWD_LENGTH - 3)
-
-		self.assertFalse(PwdManager._pwd_satisfies_conditions(password))
+		self.assert_pwd_rejected("A1!" + "X" * (PWD_LENGTH - 3), "lower")
 
 	def test_pwd_satisfies_conditions_rejects_password_without_uppercase(self):
-		password = "a1!" + "x" * (PWD_LENGTH - 3)
-
-		self.assertFalse(PwdManager._pwd_satisfies_conditions(password))
+		self.assert_pwd_rejected("a1!" + "x" * (PWD_LENGTH - 3), "upper")
 
 	def test_pwd_satisfies_conditions_rejects_password_without_special_char(self):
-		password = "aA1" + "x" * (PWD_LENGTH - 3)
-
-		self.assertFalse(PwdManager._pwd_satisfies_conditions(password))
+		self.assert_pwd_rejected("aA1" + "x" * (PWD_LENGTH - 3), "special")
 
 
 if __name__ == "__main__":

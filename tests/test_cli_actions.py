@@ -3,7 +3,10 @@ from unittest.mock import Mock, patch
 
 import cli.actions as actions
 from core.entry import Entry
-from core.pwd_manager import PwdManager
+from core.pwd_manager import MIN_PWD_LENGTH, PwdManager
+
+
+VALID_MASTER_PASSWORD = "Aa1!aaaa"
 
 
 class CliActionsTests(unittest.TestCase):
@@ -97,7 +100,6 @@ class CliActionsTests(unittest.TestCase):
 
 		with patch("builtins.input", return_value="new-user"):
 			self.assertTrue(actions._modify_username(entry))
-
 		with patch("builtins.input", return_value="new-desc"):
 			self.assertTrue(actions._modify_description(entry))
 
@@ -127,13 +129,13 @@ class CliActionsTests(unittest.TestCase):
 	def test_modify_master_password_updates_when_confirmed(self):
 		manager = PwdManager()
 
-		with patch("builtins.input", return_value="new-master"):
+		with patch("builtins.input", return_value=VALID_MASTER_PASSWORD):
 			with patch("cli.actions.poll_y_n_backspace", return_value="y"):
 				with patch.object(manager, "modify_master_password") as modify_mock:
 					with patch("cli.actions.sleep"):
 						self.assertTrue(actions.modify_master_password(manager))
 
-		modify_mock.assert_called_once_with("new-master")
+		modify_mock.assert_called_once_with(VALID_MASTER_PASSWORD)
 
 	def test_modify_master_password_returns_false_for_empty_input_or_cancel(self):
 		manager = PwdManager()
@@ -141,7 +143,7 @@ class CliActionsTests(unittest.TestCase):
 		with patch("builtins.input", return_value=""):
 			self.assertFalse(actions.modify_master_password(manager))
 
-		with patch("builtins.input", return_value="new-master"):
+		with patch("builtins.input", return_value=VALID_MASTER_PASSWORD):
 			with patch("cli.actions.poll_y_n_backspace", return_value="n"):
 				self.assertFalse(actions.modify_master_password(manager))
 
@@ -175,13 +177,48 @@ class CliActionsTests(unittest.TestCase):
 				with patch("cli.actions.poll_for_with_backspace", return_value="0"):
 					self.assertIs(actions.search_entries(PwdManager()), entry)
 
+	def test_grab_master_password_for_existing_vault_rejects_until_requirements_are_met(self):
+		with patch("cli.actions.getpass", side_effect=["weak", VALID_MASTER_PASSWORD]) as getpass_mock:
+			with patch("cli.actions.display_password_rejection_reason") as reason_mock:
+				self.assertEqual(actions.grab_master_password(), VALID_MASTER_PASSWORD)
+
+		reason_mock.assert_called_once_with(reason="len", min_len=MIN_PWD_LENGTH)
+		self.assertEqual(getpass_mock.call_count, 2)
+
+	def test_grab_master_password_for_new_vault_requires_confirmation_match(self):
+		with patch(
+			"cli.actions.getpass",
+			side_effect=[VALID_MASTER_PASSWORD, "mismatch", VALID_MASTER_PASSWORD, VALID_MASTER_PASSWORD],
+		) as getpass_mock:
+			self.assertEqual(actions.grab_master_password(new=True), VALID_MASTER_PASSWORD)
+
+		self.assertEqual(getpass_mock.call_count, 4)
+
+	def test_grab_master_password_reports_each_requirement_failure(self):
+		invalid_then_valid = [
+			("short", "len"),
+			("Aaaaaaaa!", "digit"),
+			("AAAAAAA1!", "lower"),
+			("aaaaaaa1!", "upper"),
+			("Aaaaaaa1", "special"),
+		]
+
+		password_inputs = [password for password, _reason in invalid_then_valid] + [VALID_MASTER_PASSWORD]
+
+		with patch("cli.actions.getpass", side_effect=password_inputs):
+			with patch("cli.actions.display_password_rejection_reason") as reason_mock:
+				self.assertEqual(actions.grab_master_password(), VALID_MASTER_PASSWORD)
+
+		self.assertEqual(
+			[call.kwargs["reason"] for call in reason_mock.call_args_list],
+			[reason for _password, reason in invalid_then_valid],
+		)
+
 	def test_double_check_deletion_requires_two_yes_answers(self):
 		with patch("cli.actions.get_key", side_effect=["y", "y"]):
 			self.assertTrue(actions.double_check_deletion("first", "second"))
-
 		with patch("cli.actions.get_key", side_effect=["y", "n"]):
 			self.assertFalse(actions.double_check_deletion("first", "second"))
-
 		with patch("cli.actions.get_key", side_effect=["n"]):
 			self.assertFalse(actions.double_check_deletion("first", "second"))
 

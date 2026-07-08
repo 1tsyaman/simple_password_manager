@@ -6,65 +6,78 @@ from core.entry import Entry
 from core.pwd_manager import PwdManager
 
 
+VALID_MASTER_PASSWORD = "Aa1!aaaa"
+
+
 class MainTests(unittest.TestCase):
 	def test_init_rejects_invalid_number_of_arguments(self):
 		with patch("builtins.print"):
 			self.assertEqual(main._init(["main.py"]), 1)
 			self.assertEqual(main._init(["main.py", "a", "b", "c", "d"]), 1)
 
-	def test_init_loads_existing_vault_when_only_path_is_given(self):
+	def test_init_loads_existing_vault_with_grabbed_master_password(self):
 		manager = PwdManager()
 
-		with patch("main.load_vault", return_value=manager) as load_mock:
-			self.assertIs(main._init(["main.py", "vault.vault"]), manager)
+		with patch("main.act.grab_master_password", return_value=VALID_MASTER_PASSWORD) as grab_mock:
+			with patch("main.load_vault", return_value=manager) as load_mock:
+				self.assertIs(main._init(["main.py", "vault.vault"]), manager)
 
-		load_mock.assert_called_once_with("vault.vault")
+		grab_mock.assert_called_once_with()
+		load_mock.assert_called_once_with("vault.vault", VALID_MASTER_PASSWORD)
 
 	def test_init_returns_error_when_loading_existing_vault_fails(self):
-		with patch("main.load_vault", return_value=None):
-			with patch("builtins.print"):
-				self.assertEqual(main._init(["main.py", "vault.vault"]), -1)
+		with patch("main.act.grab_master_password", return_value=VALID_MASTER_PASSWORD):
+			with patch("main.load_vault", return_value=None):
+				with patch("builtins.print"):
+					self.assertEqual(main._init(["main.py", "vault.vault"]), -1)
 
-	def test_init_creates_new_vault_when_extra_argument_is_given_and_file_does_not_exist(self):
+	def test_init_creates_new_vault_with_new_master_password_when_file_does_not_exist(self):
 		manager = PwdManager()
 
 		with patch("main.vault_exists", return_value=False) as exists_mock:
-			with patch("main.create_and_load_vault", return_value=manager) as create_mock:
-				with patch("main.delete_vault") as delete_mock:
-					self.assertIs(main._init(["main.py", "vault.vault", "--create"]), manager)
+			with patch("main.act.grab_master_password", return_value=VALID_MASTER_PASSWORD) as grab_mock:
+				with patch("main.create_and_load_vault", return_value=manager) as create_mock:
+					with patch("main.delete_vault") as delete_mock:
+						self.assertIs(main._init(["main.py", "vault.vault", "--create"]), manager)
 
 		exists_mock.assert_called_once_with("vault.vault")
-		create_mock.assert_called_once_with("vault.vault")
+		grab_mock.assert_called_once_with(new=True)
+		create_mock.assert_called_once_with("vault.vault", VALID_MASTER_PASSWORD)
 		delete_mock.assert_not_called()
 
 	def test_init_existing_vault_create_path_cancelled_by_user(self):
 		with patch("main.vault_exists", return_value=True):
 			with patch("main.act.double_check_deletion", return_value=False):
-				with patch("main.delete_vault") as delete_mock:
-					with patch("main.create_and_load_vault") as create_mock:
-						with patch("builtins.print"):
-							self.assertEqual(main._init(["main.py", "vault.vault", "--create"]), 0)
+				with patch("main.act.grab_master_password") as grab_mock:
+					with patch("main.delete_vault") as delete_mock:
+						with patch("main.create_and_load_vault") as create_mock:
+							with patch("builtins.print"):
+								self.assertEqual(main._init(["main.py", "vault.vault", "--create"]), 0)
 
 		delete_mock.assert_not_called()
 		create_mock.assert_not_called()
+		grab_mock.assert_not_called()
 
 	def test_init_existing_vault_create_path_deletes_then_creates_when_confirmed(self):
 		manager = PwdManager()
 
 		with patch("main.vault_exists", return_value=True):
 			with patch("main.act.double_check_deletion", return_value=True):
-				with patch("main.delete_vault") as delete_mock:
-					with patch("main.create_and_load_vault", return_value=manager) as create_mock:
-						self.assertIs(main._init(["main.py", "vault.vault", "--create"]), manager)
+				with patch("main.act.grab_master_password", return_value=VALID_MASTER_PASSWORD) as grab_mock:
+					with patch("main.delete_vault") as delete_mock:
+						with patch("main.create_and_load_vault", return_value=manager) as create_mock:
+							self.assertIs(main._init(["main.py", "vault.vault", "--create"]), manager)
 
 		delete_mock.assert_called_once_with("vault.vault")
-		create_mock.assert_called_once_with("vault.vault")
+		grab_mock.assert_called_once_with(new=True)
+		create_mock.assert_called_once_with("vault.vault", VALID_MASTER_PASSWORD)
 
 	def test_init_returns_error_when_create_and_load_fails(self):
 		with patch("main.vault_exists", return_value=False):
-			with patch("main.create_and_load_vault", return_value=None):
-				with patch("builtins.print"):
-					self.assertEqual(main._init(["main.py", "vault.vault", "--create"]), -1)
+			with patch("main.act.grab_master_password", return_value=VALID_MASTER_PASSWORD):
+				with patch("main.create_and_load_vault", return_value=None):
+					with patch("builtins.print"):
+						self.assertEqual(main._init(["main.py", "vault.vault", "--create"]), -1)
 
 	def test_sub_loop_returns_false_for_invalid_index(self):
 		manager = PwdManager()
