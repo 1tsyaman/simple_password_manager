@@ -6,7 +6,7 @@ import cli.actions as act
 from core.pwd_manager import PwdManager
 from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
-from cli.display import display_list, clear_screen
+from cli.display import display_list, clear_screen, print_footer, display_password_rejection_reason
 from cli.util import format_prev_next_str, is_valid_index
 from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
 
@@ -20,7 +20,8 @@ def _init(argv: list[str]) -> PwdManager | int:
 	path = argv[1]
 
 	if len(argv) == 2:
-		pwd_manager = load_vault(path)
+		pwd = act.grab_master_password()
+		pwd_manager = load_vault(path, pwd)
 	
 		if not pwd_manager:
 			print(GENERAL_ERROR)
@@ -35,8 +36,9 @@ def _init(argv: list[str]) -> PwdManager | int:
 			else:
 				print("Goodbye.")
 				return 0
-		
-		pwd_manager = create_and_load_vault(path)
+
+		pwd = act.grab_master_password(new=True)
+		pwd_manager = create_and_load_vault(path, pwd)
 
 		if not pwd_manager:
 			print(GENERAL_ERROR)
@@ -53,6 +55,10 @@ def _main_loop(pwd_manager: PwdManager):
 
 		n = pwd_manager.get_entry_list_len()
 		options = display_list(pwd_manager.get_website_and_username_string(), index)
+		
+		print_footer()
+		actual_index = 10 * index + 1
+		print(f"Showing entries {actual_index}..{actual_index + int(options[-1])} out of {n}")
 		main_str = format_prev_next_str(index, len=n)
 		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [f] to search entries, [s] to save current changes or [q] to exit"
 
@@ -112,7 +118,8 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
 
 def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
 	print(entry.to_string_with_desc())
-	print("\nPress [m] to modify, [d] to delete, [r] to retrieve password, [backspace] to go back.")
+	print_footer()
+	print("Press [m] to modify, [d] to delete, [r] to retrieve password, [backspace] to go back.")
 
 	key = poll_for_with_backspace(['m', 'd', 'r', 'BACKSPACE'])
 
@@ -158,4 +165,5 @@ if __name__ == "__main__":
 		clear_screen(header=False)
 		print("Something went wrong. Unsaved changes will not be saved.")
 		print(f"Exception: {e!r}")
+		sleep(5)
 		sys.exit(1)

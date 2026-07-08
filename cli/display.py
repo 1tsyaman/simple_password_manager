@@ -1,6 +1,7 @@
 import os
 
 HEADER		= f"{15*"-"} Password Manager {15*"-"}"
+FOOTER		= 48*"-"
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -59,3 +60,20 @@ def clear_screen(header=True):
 	os.system('cls' if os.name == 'nt' else 'clear')
 	if header:
 		print(HEADER)
+
+def print_footer():
+	print(FOOTER)
+
+def display_password_rejection_reason(reason: str, min_len: int):
+	message = ''
+	match reason:
+		case 'len':
+			message = f'be at least {min_len} characters long'
+		case 'digit':
+			message = f"contain at least one digit"
+		case 'lower':
+			message = f"contain at least one lower case letter"
+		case 'upper':
+			message = f"contain at least one upper case letter"
+		case 'special':
+			message = f"contain at least one special character"

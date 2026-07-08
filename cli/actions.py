@@ -1,9 +1,11 @@
 from time import sleep
-from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE
+from getpass import getpass
+from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, MIN_PWD_LENGTH
 from core.entry import Entry
 from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke
-from cli.display import clear_screen, display_list, display_list_str, str_color
+from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
 from cli.util import filter_list, list_diff, format_prev_next_str
+
 
 def add_entry(pwd_manager: PwdManager) -> bool:
 	clear_screen()
@@ -88,7 +90,7 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 		modified = False
 
 		print(entry.to_string_with_desc())
-
+		print_footer()
 		print("Modify [w]ebsite, [u]sername, [p]assword, [d]escription or press [backspace] to go back")
 
 		while True:
@@ -154,7 +156,7 @@ def handle_query(pwd_manager: PwdManager) -> list[Entry]:
 
 		_, output = display_list_str([entry.to_string() for entry in ans])	# only shows the first 10 matches
 		print(output)
-		print(f"{40*"-"}")
+		print_footer()
 		print(f"Query: {query}")
 
 		keystroke = get_key(lower=False)	# Don't convert everything to lower case for display accuracy
@@ -181,6 +183,7 @@ def search_entries(pwd_manager: PwdManager) -> Entry | None:
 
 		n = len(candidates)
 		options = display_list([entry.to_string() for entry in candidates], index)
+		print_footer()
 
 		main_str = format_prev_next_str(index, len=n)
 		
@@ -208,6 +211,24 @@ def search_entries(pwd_manager: PwdManager) -> Entry | None:
 			case _:
 				return None
 
+def grab_master_password(new=False) -> str:
+	pwd = '-'
+	pwd_conf = ''
+
+	while pwd != pwd_conf:
+		pwd = getpass("Enter master password: ")
+		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+
+		while (not satisfies):
+			display_password_rejection_reason(reason=reason, min_len=MIN_PWD_LENGTH)
+			pwd = getpass("Enter master password: ")
+
+		if not new:
+			break
+
+		pwd_conf = getpass("Confirm master password: ")
+	
+	return pwd
 
 def _modify_website(entry: Entry) -> bool:
 	clear_screen()

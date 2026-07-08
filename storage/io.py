@@ -5,20 +5,20 @@ from core.pwd_manager import PwdManager
 
 INVALID_PATH_ERROR	= "Given vault path does not exist"
 
-def load_vault(path: str) -> PwdManager | None:
+def load_vault(path: str, pwd: str) -> PwdManager | None:
 	if not Path(path).exists():
 			print("Vault path is incorrect")
 			return None
 
-	return PwdManager.from_encrypted_file(path)
+	return PwdManager.from_encrypted_file(path, pwd)
 
-def create_and_load_vault(path: str) -> PwdManager | None:
+def create_and_load_vault(path: str, pwd: str) -> PwdManager | None:
 	try:
 		Path(path).touch()
 	except FileNotFoundError:
 		raise FileNotFoundError(INVALID_PATH_ERROR)
 	
-	return PwdManager.pwd_manager_from_pwd(path)
+	return PwdManager.pwd_manager_from_pwd(path, pwd)
 
 def vault_exists(path: str) -> bool:
 	return Path(path).exists()

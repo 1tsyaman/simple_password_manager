@@ -1,12 +1,13 @@
 from __future__ import annotations
 import random as rand
-from getpass import getpass
 from pathlib import Path
 
 
 from core.encrypt import encrypt_data, decrypt_data, get_key_from_pwd
 from core.entry import Entry
 from core.keys import derrive_key
+
+from cli.display import display_password_rejection_reason
 
 LETTERS_LOWER =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
@@ -36,7 +37,8 @@ SPECIAL_CHARS =	[
 SPECIAL_CHARS = [char for char in r"#()+,-_./"]
 """
 
-PWD_LENGTH =	24
+MIN_PWD_LENGTH	=	8
+PWD_LENGTH	=	24
 
 NO_SUCH_ENTRY_MESSAGE = "No such entry."
 
@@ -204,12 +206,16 @@ class PwdManager:
 		}
 	"""
 	@staticmethod
-	def from_encrypted_file(path: str) -> PwdManager | None:
+	def from_encrypted_file(path: str, pwd: str) -> PwdManager | None:
+		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+
+		if not satisfies:
+			raise KeyError(f"Password does not meet the minimum requirements: {reason}")
+
 		pwd_manager = PwdManager()
 		pwd_manager.file_path = path
 
-		pwd = getpass("Enter your master password:")
-	
+
 		try:
 			salt, key = get_key_from_pwd(pwd, path)
 			pwd_manager._key = key
@@ -243,8 +249,11 @@ class PwdManager:
 		return pwd_manager
 	
 	@staticmethod
-	def  pwd_manager_from_pwd(file_path: str) -> PwdManager:
-		pwd = getpass("Enter your master password:")
+	def  pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManager:
+		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+
+		if not satisfies:
+			raise KeyError(f"Password does not meet the minimum requirements: {reason}")
 
 		return PwdManager._pwd_manager_from_pwd(file_path, pwd)
 
@@ -270,35 +279,39 @@ class PwdManager:
 			for i in range(PWD_LENGTH):
 				pwd += rand.choice(CHARS)
 			
-			if PwdManager._pwd_satisfies_conditions(pwd):
+			satisfies, _ = PwdManager._pwd_satisfies_conditions(pwd)
+			if satisfies:
 				break
 
 		return pwd
 	
 	@staticmethod
-	def _pwd_satisfies_conditions(pwd: str) -> bool:
+	def _pwd_satisfies_conditions(pwd: str, len_min=PWD_LENGTH) -> tuple[bool, str]:
+		if len(pwd) < len_min:
+			return False, 'len'
+
 		for digit in DIGITS:
 			if digit in pwd:
 				break
 		else:
-			return False
+			return False, 'digit'
 
 		for letter in LETTERS_LOWER:
 			if letter in pwd:
 				break
 		else:
-			return False
+			return False, 'lower'
 		
 		for letter in LETTERS_UPPER:
 			if letter in pwd:
 				break
 		else:
-			return False
+			return False, 'upper'
 		
 		for spec in SPECIAL_CHARS:
 			if spec in pwd:
 				break
 		else:
-			return False
+			return False, 'special'
 
-		return True
+		return True, ''
