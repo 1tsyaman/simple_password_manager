@@ -7,8 +7,11 @@ func            = None
 
 def init_watchdog(exit_func) -> None:
     global watchdog
+    global func
     func = exit_func
     watchdog = Timer(TIMEOUT_SECONDS, exit_func)
+
+    watchdog.start()
 
 def reset_timer() -> None:
     global watchdog
