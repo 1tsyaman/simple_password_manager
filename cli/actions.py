@@ -231,12 +231,6 @@ def grab_master_password(new=False) -> str:
 	
 	return pwd
 
-def exit(pwd_manager=None, modified=False) -> None:
-	if modified and pwd_manager is not None:
-		save_changes(pwd_manager)
-	clear_screen(header=False)
-	sys.exit(0)
-
 def _modify_website(entry: Entry) -> bool:
 	clear_screen()
 

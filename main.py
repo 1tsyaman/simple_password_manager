@@ -1,4 +1,7 @@
 import sys
+import os
+import signal
+
 from time import sleep
 
 import cli.actions as act
@@ -9,7 +12,7 @@ from cli.input import get_key, poll_for_with_backspace
 from cli.display import display_list, clear_screen, print_footer, display_password_rejection_reason
 from cli.util import format_prev_next_str, is_valid_index
 from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
-from cli.watchdog import init_watchdog
+from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
 
@@ -17,6 +20,8 @@ def _init(argv: list[str]) -> PwdManager | int:
 	if len(argv) < 2 or len(argv) > 4:
 		print("Usage: python this_script.py path/to/file.vault (--create)")
 		return 1
+
+	init_watchdog(exit_func=timeout_exit)
 
 	path = argv[1]
 
@@ -74,7 +79,10 @@ def _main_loop(pwd_manager: PwdManager):
 			else:
 				match ans:
 					case "q":
-						act.exit(pwd_manager=pwd_manager, modified=modified)
+						if modified and pwd_manager is not None:
+							act.save_changes(pwd_manager)
+							sleep(1)
+						return
 					case "a":
 						modified |= act.add_entry(pwd_manager)
 						break
@@ -131,38 +139,50 @@ def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
 			return False				# since we don't modify anything here
 		case _:
 			return False
+		
+def cleanup() -> None:
+	clear_screen(header=False)
+	cancel_watchdog()
 
+def quit_program(exit_code=0, message='') -> None:
+	cleanup()
+	print(message)
+
+	sys.exit(exit_code)
+
+def timeout_exit() -> None:
+	os.kill(os.getpid(), signal.SIGINT)		# sends a ctrl+c interrupt to kill the 
 
 if __name__ == "__main__":
 	try:
 		pwd_manager = _init(sys.argv)
 
 		if not isinstance(pwd_manager, PwdManager):	# returns int if it fails
-			sys.exit(pwd_manager)
+			quit_program(exit_code=pwd_manager, message="Failed to initalize PwdManager object.")
 
 		sleep(1)	# show success before clearing the screen
 
-		try:
-			init_watchdog(exit_func=act.exit)
-			_main_loop(pwd_manager)
+		_main_loop(pwd_manager)
+		quit_program(exit_code=0, message="Goodbye")
 
-		except KeyboardInterrupt:
-			clear_screen(header=False)
-			print("Save before quitting? Y/n")
+	except KeyboardInterrupt:				# this covers two cases: timeout, or ctrl+c input by user
+		if timeout_occurred():
+			message = "Inactive for too long. Exisitng without saving."
+			quit_program(exit_code=0, message=message)
 
-			try:
-				if get_key() == "y":
-					pwd_manager.encrypt()
-			except KeyboardInterrupt:				# in case CTRL+C is pressed again, we just quit without saving
-				pass
-
-			print("Goodbye")
-			sys.exit(0)
-	
-	#	big net to avoid crashing
-	except Exception as e:
+		# otherwise -> user interrupt.
 		clear_screen(header=False)
-		print("Something went wrong. Unsaved changes will not be saved.")
-		print(f"Exception: {e!r}")
-		sleep(5)
-		sys.exit(1)
+		print("Save before quitting? Y/n")
+
+		try:
+			if get_key() == "y":
+				pwd_manager.encrypt()
+		except KeyboardInterrupt:				# in case CTRL+C is pressed again, we just quit without saving
+			pass
+
+		quit_program(exit_code=0, message="Goodbye")
+
+	except Exception as e:	#	big net to avoid crashing
+		clear_screen(header=False)
+		message = f"Something went wrong. Unsaved changes will not be saved.\nException: {e!r}"
+		quit_program(exit_code=-1, message=message)
