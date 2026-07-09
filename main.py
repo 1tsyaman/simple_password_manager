@@ -9,6 +9,7 @@ from cli.input import get_key, poll_for_with_backspace
 from cli.display import display_list, clear_screen, print_footer, display_password_rejection_reason
 from cli.util import format_prev_next_str, is_valid_index
 from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
+from cli.watchdog import init_watchdog
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
 
@@ -73,10 +74,7 @@ def _main_loop(pwd_manager: PwdManager):
 			else:
 				match ans:
 					case "q":
-						if modified:
-							act.save_changes(pwd_manager)
-						clear_screen(header=False)
-						sys.exit(0)
+						act.exit(pwd_manager=pwd_manager, modified=modified)
 					case "a":
 						modified |= act.add_entry(pwd_manager)
 						break
@@ -145,6 +143,7 @@ if __name__ == "__main__":
 		sleep(1)	# show success before clearing the screen
 
 		try:
+			init_watchdog(exit_func=act.exit)
 			_main_loop(pwd_manager)
 
 		except KeyboardInterrupt:

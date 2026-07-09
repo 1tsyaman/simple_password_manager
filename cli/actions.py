@@ -1,8 +1,8 @@
+import sys
 from time import sleep
-from getpass import getpass
 from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, MIN_PWD_LENGTH
 from core.entry import Entry
-from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke
+from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke, get_input, input_password
 from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
 from cli.util import filter_list, list_diff, format_prev_next_str
 
@@ -10,8 +10,8 @@ from cli.util import filter_list, list_diff, format_prev_next_str
 def add_entry(pwd_manager: PwdManager) -> bool:
 	clear_screen()
 
-	website = input("Enter website: ")
-	username = input("Enter username: ")
+	website = get_input("Enter website: ")
+	username = get_input("Enter username: ")
 	
 	print("Generate random password? Y/n")
 
@@ -26,9 +26,9 @@ def add_entry(pwd_manager: PwdManager) -> bool:
 			print(f"password = {str_color(password, 'r')}")
 
 	else:
-		password = input("Enter password: ")
+		password = get_input("Enter password: ")
 
-	description = input("Enter description: ")
+	description = get_input("Enter description: ")
 
 	print(f"Save the following entry? Y/n\n {website = }\n{username = }\n{password = }\n{description = }.")
 
@@ -117,7 +117,7 @@ def modify_master_password(pwd_manager: PwdManager) -> bool:
 	clear_screen()
 
 	print("Enter your new master password or leave empty to go back.")
-	pwd = input("New Password: ")
+	pwd = get_input("New Password: ")
 
 	if len(pwd) == 0:
 		return False
@@ -216,20 +216,26 @@ def grab_master_password(new=False) -> str:
 	pwd_conf = ''
 
 	while pwd != pwd_conf:
-		pwd = getpass("Enter master password: ")
+		pwd = input_password("Enter master password: ")
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		while (not satisfies):
 			display_password_rejection_reason(reason=reason, min_len=MIN_PWD_LENGTH)
-			pwd = getpass("Enter master password: ")
+			pwd = input_password("Enter master password: ")
 			satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		if not new:
 			break
 
-		pwd_conf = getpass("Confirm master password: ")
+		pwd_conf = input_password("Confirm master password: ")
 	
 	return pwd
+
+def exit(pwd_manager=None, modified=False) -> None:
+	if modified and pwd_manager is not None:
+		save_changes(pwd_manager)
+	clear_screen(header=False)
+	sys.exit(0)
 
 def _modify_website(entry: Entry) -> bool:
 	clear_screen()
@@ -237,7 +243,7 @@ def _modify_website(entry: Entry) -> bool:
 	print(entry.to_string_with_desc())
 	print("Input new website for this entry or leave empty to go back.")
 
-	website = input("New website: ")
+	website = get_input("New website: ")
 
 	if len(website) == 0:
 		return False
@@ -252,7 +258,7 @@ def _modify_username(entry: Entry) -> bool:
 	print(entry.to_string_with_desc())
 	print("Input new username for this entry or leave empty to go back.")
 
-	username = input("New username: ")
+	username = get_input("New username: ")
 	
 	if len(username) == 0:
 		return False
@@ -267,7 +273,7 @@ def _modify_description(entry: Entry) -> bool:
 	print(entry.to_string_with_desc())
 	print("Input new description for this entry or leave empty to go back.")
 
-	description = input("New description: ")
+	description = get_input("New description: ")
 
 	if len(description) == 0:
 		return False
@@ -282,7 +288,7 @@ def _modify_password(pwd_manager: PwdManager, entry: Entry) -> bool:
 	print(entry.to_string_with_desc())
 	print("Input new password for this entry or leave empty to go back.")
 
-	password = input("New password: ")
+	password = get_input("New password: ")
 
 	if len(password) == 0:
 		return False
