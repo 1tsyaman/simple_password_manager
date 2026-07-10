@@ -1,7 +1,7 @@
 from threading import Timer
 from functools import wraps
 
-TIMEOUT_SECONDS = 10
+TIMEOUT_SECONDS = 60
 
 _watchdog       = None	# global Timer object
 _exit_func      = None
