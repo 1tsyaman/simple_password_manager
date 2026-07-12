@@ -73,7 +73,11 @@ class Entry:
 		return entry
 
 	"""
-		entry: dict[str, str | dict[str, str]]: key=config has value: dict[str, str]
+		entry: {
+			"website":	"Facebook",
+			"username":	"sample_user",
+			"description":	"sample_desc"
+		}
 	"""
 	@staticmethod
 	def from_json(entry: dict) -> Entry | None:
@@ -85,10 +89,8 @@ class Entry:
 			if not all(isinstance(value, str) for value in [website, username, description]):
 				return None
 
-			config = TOTP_Config.from_json(entry["totp_config"])
-			
 			return Entry.create_entry(website=website, username=username,
-			     				description=description, totp_config=config)
+			     				description=description)
 
 		except (KeyError, TypeError):
 			return None

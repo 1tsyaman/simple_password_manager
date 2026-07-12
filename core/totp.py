@@ -27,8 +27,8 @@ class TOTP_Config:
 			"issuer":	self.issuer,
 			"account":	self.account,
 			"algorithm":	self.algorithm,
-			"digits":	self.digits,
-			"period":	self.period
+			"digits":	f"{self.digits}",
+			"period":	f"{self.period}"
 		}
 
 	@staticmethod
@@ -82,35 +82,6 @@ class TOTP_Config:
 		totp = TOTP_Config(issuer=issuer, account=account)
 
 		return totp, secret
-
-	"""
-		valid json: {
-			"issuer":	"example_issuer",
-			"account":	"example@account.domain",
-			.
-			.
-			.
-			# we ignore other values
-		}
-		raises TypeError if dictionary is not of correct type
-		returns None if dictionary does not have the correct format (does not encode a valid config)
-	"""
-	@staticmethod
-	def from_json(json: dict[str, str]) -> TOTP_Config | None:
-		if not(
-			isinstance(json, dict)
-			and all (
-				isinstance(key, str) and isinstance(value, str)
-					for key, value in json.items()
-			)
-		):
-			raise TypeError
-
-		try:
-			return TOTP_Config(issuer=json["issuer"], account=json["account"])
-
-		except KeyError:
-			return None
 
 
 def totp_secret_is_valid(secret: str) -> bool:

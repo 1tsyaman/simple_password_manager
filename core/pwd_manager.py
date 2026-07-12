@@ -35,6 +35,7 @@ SPECIAL_CHARS =	[
 
 PWD		= "pwd"
 TOTP_SECRET	= "totp_secret"
+TOTP_URI	= "totp_uri"
 
 #	For websites that are picky about special characters
 """
@@ -53,7 +54,8 @@ class PwdManager:
 	"""
 		PwdManager.entries are a dictionary: key=Entry, value={
 									PWD: 		pwd,
-									TOTP_SECRET: 	secret
+									TOTP_SECRET: 	secret,
+									TOTP_URI:	uri
 								}
 		PwdManager.file_path is a string containing the file path containing the encrypted version.
 		PwdManager._key is the encryption/decryption key.
@@ -154,6 +156,7 @@ class PwdManager:
 
 		entry.set_totp_config(totp_config=totp_config)
 		self.entries[entry][TOTP_SECRET] = secret
+		self.entries[entry][TOTP_URI] = uri
 
 			
 	def get_entry_list(self: PwdManager) -> list[Entry]:
@@ -205,11 +208,20 @@ class PwdManager:
 
 	"""
 		encrypts the PwdManager object and writes it into the vault file
+		{
+			"(website, username, description)": {
+								PWD: 		password,
+								TOTP_URI	uri
+							}
+		}
 	"""
 	def encrypt(self: PwdManager) -> None:
 		data = {
-			f"{entry.get_website()}, {entry.get_username()}, {entry.get_description()}":	self.entries[entry]
-    			
+			f"{entry.get_website()}, {entry.get_username()}, {entry.get_description()}":
+				{
+					PWD: self.entries[entry][PWD],
+					TOTP_URI: self.entries[entry][TOTP_URI]
+				}
 				for entry in self.entries
 		}
 
@@ -251,14 +263,8 @@ class PwdManager:
 		decrypted_data has the following form:
 		{
 			"website, username, description": {
-								PWD: "password",
-								TOTP_CONFIG: {
-									"issuer":	"example_issuer",
-									"account":	"example@account.domain",
-									.
-									.
-									.
-								}
+								PWD: 		"password",
+								TOTP_URI: 	"valid_uri" 
 							  },
 			.
 			.
@@ -312,7 +318,7 @@ class PwdManager:
 				for value in tup.split(",", 2)
 			)
 			pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
-
+			pwd_manager.set_totp_config(website=website, username=username, uri=data[tup][TOTP_URI])
 
 		print("Entries loaded successfully!")
 
@@ -446,11 +452,11 @@ class PwdManager:
 	@staticmethod
 	def _has_new_format(data: dict) -> bool:
 		return bool(data) and all(
-			isinstance(data, dict)
-			and isinstance(key, str)
+			isinstance(key, str)
 			and len(key.split(",", 2)) == 3
 			and isinstance(value, dict)
 			and isinstance(value.get(PWD), str)
+			and isinstance(value.get(TOTP_URI), str)
 				for key, value in data.items()
 		)
 	
