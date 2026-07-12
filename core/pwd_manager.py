@@ -1,13 +1,13 @@
 from __future__ import annotations
 import random as rand
 from pathlib import Path
-
+from pyotp import TOTP
+from hashlib import sha1
 
 from core.encrypt import encrypt_data, decrypt_data, get_key_from_pwd
 from core.entry import Entry
 from core.keys import derrive_key
-
-from cli.display import display_password_rejection_reason
+from core.totp import TOTP_Config, totp_secret_is_valid
 
 LETTERS_LOWER =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
@@ -32,6 +32,9 @@ SPECIAL_CHARS =	[
 			'}', '~'
 		]
 
+PWD		= "pwd"
+TOTP_SECRET	= "totp_secret"
+
 #	For websites that are picky about special characters
 """
 SPECIAL_CHARS = [char for char in r"#()+,-_./"]
@@ -40,30 +43,37 @@ SPECIAL_CHARS = [char for char in r"#()+,-_./"]
 MIN_PWD_LENGTH	=	8
 PWD_LENGTH	=	24
 
-NO_SUCH_ENTRY_MESSAGE = "No such entry."
+NO_SUCH_ENTRY_MESSAGE	= "No such entry."
+NO_SUCH_TOTP_MESSAGE	= "There is no TOTP config associated with this entry"
+URI_INVALID_MESSAGE	= "Provided TOTP URI is invalid."
 
 class PwdManager:
 
 	"""
-		PwdManager.entries are a dictionary: key=Entry, value=encrypted_pwd.
+		PwdManager.entries are a dictionary: key=Entry, value={
+									PWD: 		pwd,
+									TOTP_SECRET: 	secret
+								}
 		PwdManager.file_path is a string containing the file path containing the encrypted version.
 		PwdManager._key is the encryption/decryption key.
 		PwdManager._salt is the salt used with the master pwd to create the encryption/decryption key.
+		PwdManager._totp is the TOTP object associated with this account
 	"""
 	def __init__(self, path="", key=bytes(0), salt=bytes(0)):
-		self.entries: dict[Entry, str]		= {}
-		self.file_path: str			= path
-		self._key: bytes			= key
-		self._salt: bytes			= salt
+		self.entries: dict[Entry, dict[str, str]]		= {}
+		self.file_path: str					= path
+		self._key: bytes					= key
+		self._salt: bytes					= salt
 
 	"""
 		Does nothing if entry is already in the list (should use modify_entry instead)
+		Does not set totp config (should be done in a separate stage)
 	"""
 	def add_entry(self: PwdManager, website: str, username: str, password: str, description: str) -> None:
 		entry = Entry.create_entry(website, username, description)
 
 		if not self.entry_exists(entry):
-			return self.__add_entry_value_to_key(entry, password)
+			return self.__add_entry_pwd_to_key(entry, password)
 
 		print("An entry with the same website-username combination already exists! You can either modify it or remove it and start over.")
 
@@ -89,23 +99,62 @@ class PwdManager:
 		# rewrite the vault file to update the password
 		self.encrypt()
 
-	
 	def get_password(self: PwdManager, website: str, username: str) -> str:
 		entry = self.__get_entry_with_username_or_None(website, username)
 
 		if (entry is not None):
-			return self.entries[entry]
+			return self.entries[entry][PWD]
 
 		return NO_SUCH_ENTRY_MESSAGE
 	
+	def get_totp(self: PwdManager, website: str, username: str) -> str:
+		entry = self.__get_entry_with_username_or_None(website, username)
+
+		if entry is None:
+			return NO_SUCH_ENTRY_MESSAGE
+
+		totp_config = entry.get_totp_config()
+
+		if totp_config is None:
+			return NO_SUCH_TOTP_MESSAGE
+				
+		secret = self.entries[entry][TOTP_SECRET]
+
+		return TOTP(s=secret, digits=totp_config.digits, digest=sha1, interval=totp_config.period).now()
+
+	def has_totp(self: PwdManager, website: str, username: str) -> bool:
+		entry = self.__get_entry_with_username_or_None(website, username)
+
+		if entry is None:
+			return False
+
+		return entry.get_totp_config() is not None
+
 	def set_password(self: PwdManager, website: str, username: str, password: str):
 		entry = self.__get_entry_with_username_or_None(website, username)
 
 		if (entry is not None):
-			self.entries[entry] = password
+			self.entries[entry][PWD] = password
 
 		return NO_SUCH_ENTRY_MESSAGE
+	
+	def set_totp_config(self: PwdManager,website: str, username: str, uri: str):
+		entry = self.__get_entry_with_username_or_None(website=website, username=username)
 
+		if entry is None:
+			return NO_SUCH_ENTRY_MESSAGE
+	
+		config = TOTP_Config.from_uri(uri)
+		
+		if config is None:
+			return URI_INVALID_MESSAGE
+		
+		totp_config, secret = config
+
+		entry.set_totp_config(totp_config=totp_config)
+		self.entries[entry][TOTP_SECRET] = secret
+
+			
 	def get_entry_list(self: PwdManager) -> list[Entry]:
 		return [entry for entry in self.entries]
 
@@ -124,7 +173,6 @@ class PwdManager:
 			return True
 	
 		return False
-	
 
 	def get_username_and_description(self: PwdManager, website: str) -> list[tuple[str, str]]:
 		return 	[
@@ -193,13 +241,22 @@ class PwdManager:
 	"""
 		Assumes entry does not exist in the list (simply overrides the value otherwise)
 	"""
-	def __add_entry_value_to_key(self: PwdManager, entry: Entry, password: str) -> None:
-		self.entries[entry] = password
+	def __add_entry_pwd_to_key(self: PwdManager, entry: Entry, password: str) -> None:
+		self.entries[entry][PWD] = password
 
 	"""
 		decrypted_data has the following form:
 		{
-			"website, username, description": password,
+			"website, username, description": {
+								PWD: "password",
+								TOTP_CONFIG: {
+									"issuer":	"example_issuer",
+									"account":	"example@account.domain",
+									.
+									.
+									.
+								}
+							  },
 			.
 			.
 			.
@@ -221,7 +278,7 @@ class PwdManager:
 			pwd_manager._key = key
 			pwd_manager._salt = salt
 
-			data: dict[str, str] = decrypt_data(key, path)
+			data = decrypt_data(key, path)
 		except FileNotFoundError as e:
 			print(e)
 			return
@@ -239,7 +296,9 @@ class PwdManager:
 		try:
 			for tup in data:
 				website, username, description = tup.split(",", 2)
-				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup])
+				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
+
+
 		except:
 			print("Something went wrong during descrption of vault: vault does not have the correct foramt.")
 			return pwd_manager
