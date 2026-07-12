@@ -132,9 +132,18 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
 def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
 	print(entry.to_string_with_desc())
 	print_footer()
-	print("Press [m] to modify, [d] to delete, [r] to retrieve password, [backspace] to go back.")
 
-	key = poll_for_with_backspace(['m', 'd', 'r', 'BACKSPACE'])
+	options = ['m', 'd', 'r', 'BACKSPACE']
+
+	totp_message = ""
+
+	if entry.has_totp():
+		totp_message = " [g] to get TOTP code,"
+		options += ['g']
+
+	print(f"Press [m] to modify, [d] to delete, [r] to retrieve password,{totp_message} [backspace] to go back.")
+
+	key = poll_for_with_backspace(options)
 
 	match key:
 		case 'm':
@@ -144,6 +153,9 @@ def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
 		case 'r':
 			act.get_password(pwd_manager, entry)
 			return False				# since we don't modify anything here
+		case 'g':
+			act.get_totp_code(pwd_manager, entry)
+			return False
 		case _:
 			return False
 		
@@ -164,6 +176,7 @@ if __name__ == "__main__":
 	pwd_manager = _init(sys.argv)
 	try:
 		if not isinstance(pwd_manager, PwdManager):	# returns int if it fails
+			sleep(10)
 			quit_program(exit_code=pwd_manager, message="Failed to initalize PwdManager object.")
 
 		sleep(1)	# show success before clearing the screen

@@ -1,6 +1,10 @@
 from __future__ import annotations
+
+import math
+
 from urllib.parse import urlparse, parse_qs, unquote
 from base64 import b32decode as decode
+from time import time
 
 
 
@@ -83,6 +87,8 @@ class TOTP_Config:
 
 		return totp, secret
 
+	def seconds_remaining(self: TOTP_Config) -> int:
+		return math.ceil(self.period - time() % self.period)	# calculate from unix time 
 
 def totp_secret_is_valid(secret: str) -> bool:
 	try:

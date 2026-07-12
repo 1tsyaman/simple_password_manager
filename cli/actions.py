@@ -1,6 +1,6 @@
 import sys
 from time import sleep
-from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, MIN_PWD_LENGTH
+from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, NO_SUCH_TOTP_MESSAGE, MIN_PWD_LENGTH
 from core.entry import Entry
 from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke, get_input, input_password
 from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
@@ -83,6 +83,34 @@ def get_password(pwd_manager: PwdManager, entry: Entry) -> None:
 
 	sleep(1)
 
+def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
+	clear_screen()
+
+	website = entry.get_website()
+	username = entry.get_username()
+
+	totp = pwd_manager.get_totp(website=website, username=username)
+
+	if totp in [NO_SUCH_TOTP_MESSAGE, NO_SUCH_ENTRY_MESSAGE]:
+		return print(totp)
+	
+	print(f"Website: {website}\nUsername: {username}\nTOTP Code: {totp}")
+
+	print("Press [c] to copy to clipboard or [any key] to return to go back.")
+
+	match get_key():
+		case 'c':
+			if safe_copy(totp):
+				print("Code is copied to clipboard!")
+			else:
+				print("Could not copy Code.")
+		case _:
+			return
+
+	sleep(1)
+
+
+
 def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 	while True:
 		clear_screen()
@@ -91,7 +119,7 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 
 		print(entry.to_string_with_desc())
 		print_footer()
-		print("Modify [w]ebsite, [u]sername, [p]assword, [d]escription or press [backspace] to go back")
+		print("Modify [w]ebsite, [u]sername, [p]assword, [d]escription [t]otp/two factor authentication, or press [backspace] to go back")
 
 		while True:
 			key = get_key()
@@ -107,6 +135,9 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 					break
 				case 'd':
 					modified |= _modify_description(entry)
+					break
+				case 't':
+					modified |= _modify_totp(pwd_manager, entry)
 					break
 				case _:
 					if is_backspace(key):
@@ -294,6 +325,30 @@ def _modify_password(pwd_manager: PwdManager, entry: Entry) -> bool:
 
 	return True
 
+def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
+	clear_screen()
+
+	website = entry.get_website()
+	username = entry.get_username()
+
+	print(entry.to_string_with_desc())
+	print("Input TOTP URI for this entry or leave empty to go back.")
+
+
+	uri = get_input("TOTP URI: ")
+
+	if len(uri) == 0:
+		return False
+
+	err = pwd_manager.set_totp_config(website=website, username=username, uri=uri)
+
+	if err in [NO_SUCH_TOTP_MESSAGE, NO_SUCH_ENTRY_MESSAGE]:
+		print(err)
+		sleep(2)
+
+		return False
+	
+	return True
 
 def gen_rand_password() -> None:
 	clear_screen()
