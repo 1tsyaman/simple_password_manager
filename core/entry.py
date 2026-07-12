@@ -1,10 +1,12 @@
 from __future__ import annotations
+from core.totp import TOTP
 
 class Entry:
 	def __init__(self):
-		self.website		= ""
-		self.username           = ""
-		self.description        = ""
+		self.website	 : str		= ""
+		self.username    : str       	= ""
+		self.description : str       	= ""
+		self.totp_config : TOTP | None	= None
 
 	def get_json(self: Entry):
 		obj = {
@@ -33,6 +35,9 @@ class Entry:
 	def set_description(self: Entry, description: str):
 		self.description = description
 	
+	def set_totp_config(self: Entry, uri: str):
+		self.totp_config = TOTP.from_uri(uri)
+
 	"""
 		This function ignores the description
 	"""
@@ -51,12 +56,13 @@ class Entry:
 
 
 	@staticmethod
-	def create_entry(website: str, username: str, description=""):
+	def create_entry(website: str, username: str, description="", totp_uri=""):
 		entry = Entry()
 
 		entry.website		= website
 		entry.username		= username
 		entry.description	= description
+		entry.totp_config	= TOTP.from_uri(totp_uri)
 
 		return entry
 
