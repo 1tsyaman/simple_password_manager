@@ -89,18 +89,19 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 	website = entry.get_website()
 	username = entry.get_username()
 
-	totp = pwd_manager.get_totp(website=website, username=username)
+	totp_message = pwd_manager.get_totp(website=website, username=username)
 
-	if totp in [NO_SUCH_TOTP_MESSAGE, NO_SUCH_ENTRY_MESSAGE]:
-		return print(totp)
+	if totp_message in [NO_SUCH_TOTP_MESSAGE, NO_SUCH_ENTRY_MESSAGE]:
+		return print(totp_message)
 	
-	print(f"Website: {website}\nUsername: {username}\nTOTP Code: {totp}")
+	print(f"Website: {website}\nUsername: {username}\nTOTP Code: {totp_message}")
 
 	print("Press [c] to copy to clipboard or [any key] to return to go back.")
 
 	match get_key():
 		case 'c':
-			if safe_copy(totp):
+			code = totp_message.removeprefix("Code: ").split(".", maxsplit=1)[0]	# assuming the format is "Code: 123456. Valid for XY seconds."
+			if safe_copy(code):
 				print("Code is copied to clipboard!")
 			else:
 				print("Could not copy Code.")
@@ -112,10 +113,10 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 
 
 def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
+	modified = False
+	
 	while True:
 		clear_screen()
-
-		modified = False
 
 		print(entry.to_string_with_desc())
 		print_footer()

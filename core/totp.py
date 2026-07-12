@@ -37,53 +37,76 @@ class TOTP_Config:
 
 	@staticmethod
 	def from_uri(uri: str) -> tuple[TOTP_Config, str] | None:
-		# ParseResult(scheme='otpauth', netloc='totp', path='', params='', query='', fragment='')
 		parsed = urlparse(uri)
 
 		if parsed.scheme != "otpauth" or parsed.netloc != "totp":
 			return None
 
-		try:
-			issuer, account = unquote(parsed.path.lstrip("/")).split(":", maxsplit=1)
-			
-			if len(issuer) == 0 or len(account) == 0:
-				return None
+		label = unquote(parsed.path.lstrip("/"))
 
-		except ValueError:
+		if len(label) == 0:
 			return None
+
+		# Labels may be either "issuer:account" or just "account".
+		if ":" in label:
+			label_issuer, account = label.split(":", maxsplit=1)
+
+			if len(label_issuer) == 0 or len(account) == 0:
+				return None
+		else:
+			label_issuer = None
+			account = label
 
 		params = parse_qs(parsed.query)
 
-		if "secret" not in params or len(params["secret"]) != 1 or not totp_secret_is_valid(params["secret"][0]):
+		if (
+			"secret" not in params
+			or len(params["secret"]) != 1
+			or not totp_secret_is_valid(params["secret"][0])
+		):
 			return None
-		
+
 		secret = params["secret"][0]
 
-		if "issuer" in params and len(params["issuer"]) > 0:
-			if issuer != params["issuer"][0]:
+		# The issuer may come from the label, the query parameter, or both.
+		query_issuer = None
+
+		if "issuer" in params:
+			if len(params["issuer"]) != 1 or len(params["issuer"][0]) == 0:
 				return None
-		
-		# if algorithm is explicitly specified
-		if "algorithm" in params and len(params["algorithm"]) > 0:
-			# for now, we only support SHA1
-			if params["algorithm"][0] != "SHA1":
+
+			query_issuer = params["issuer"][0]
+
+			if label_issuer is not None and label_issuer != query_issuer:
 				return None
-		# otherwise, we assume algorithm is SHA1 implicitly
-		
+
+		issuer = query_issuer if query_issuer is not None else label_issuer
+
+		if issuer is None:
+			return None
+
+		# SHA1 is the default when algorithm is omitted.
+		if "algorithm" in params:
+			if len(params["algorithm"]) != 1 or params["algorithm"][0].upper() != "SHA1":
+				return None
+
 		try:
-			# similarly, we assume (and only support) digits=6
-			if "digits" in params and len(params["digits"]) > 0:
-				if int(params["digits"][0]) != 6:
+			# Six digits and a 30-second period are the defaults.
+			if "digits" in params:
+				if len(params["digits"]) != 1 or int(params["digits"][0]) != 6:
 					return None
 
-			if "period" in params and len(params["period"]) > 0:
-				if int(params["period"][0]) != 30:
+			if "period" in params:
+				if len(params["period"]) != 1 or int(params["period"][0]) != 30:
 					return None
 
 		except ValueError:
 			return None
 
-		totp = TOTP_Config(issuer=issuer, account=account)
+		totp = TOTP_Config(
+			issuer=issuer,
+			account=account,
+		)
 
 		return totp, secret
 
