@@ -4,6 +4,7 @@ import signal
 import traceback
 
 from time import sleep
+from typing import Never
 
 import cli.actions as act
 
@@ -150,7 +151,7 @@ def cleanup() -> None:
 	clear_screen(header=False)
 	cancel_watchdog()
 
-def quit_program(exit_code=0, message='') -> None:
+def quit_program(exit_code=0, message='') -> Never:
 	cleanup()
 	print(message)
 
@@ -160,9 +161,8 @@ def timeout_exit() -> None:
 	os.kill(os.getpid(), signal.SIGINT)		# sends a ctrl+c interrupt to kill the 
 
 if __name__ == "__main__":
+	pwd_manager = _init(sys.argv)
 	try:
-		pwd_manager = _init(sys.argv)
-
 		if not isinstance(pwd_manager, PwdManager):	# returns int if it fails
 			quit_program(exit_code=pwd_manager, message="Failed to initalize PwdManager object.")
 
@@ -181,7 +181,7 @@ if __name__ == "__main__":
 		print("Save before quitting? Y/n")
 
 		try:
-			if get_key() == "y":
+			if get_key() == "y" and isinstance(pwd_manager, PwdManager):
 				pwd_manager.encrypt()
 		except KeyboardInterrupt:				# in case CTRL+C is pressed again, we just quit without saving
 			pass
