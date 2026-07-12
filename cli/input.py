@@ -3,7 +3,10 @@ import sys
 import subprocess
 
 from pyperclip import copy, PyperclipException
+from getpass import getpass
+
 from core.pwd_manager import DIGITS, LETTERS_LOWER, SPECIAL_CHARS
+from cli.watchdog import reset_on_call
 
 CTRL_C		= ['\x03']
 ENTER		= ['\r']
@@ -15,7 +18,9 @@ CHARS = DIGITS + LETTERS_LOWER + SPECIAL_CHARS
 
 """
 	This function is os-specific
+	decorator resets watchdog timer on activity
 """
+@reset_on_call
 def get_key(lower=True) -> str:
 	if os.name == "nt":					# if os is windows
 		import msvcrt
@@ -66,6 +71,7 @@ def is_ctrl_c(key: str) -> bool:
 		- decrement indicates if the query has gotten shorter (for search and efficiency purposes)
 		- done indicates if input is done [enter] was pressed
 """
+@reset_on_call
 def _handle_keystroke(query: str, keystroke: str) -> tuple[str, bool, bool]:
 	if is_enter(keystroke):
 		return query, False, True
@@ -110,3 +116,18 @@ def safe_copy(text: str) -> bool:
 			return True
 		except Exception:
 			return False
+
+"""
+	input() wrapper to enable watchdog reset decoration
+"""
+@reset_on_call
+def get_input(message: str) -> str:
+	return input(message)
+
+
+"""
+	getpass wrapper to enable watchdog reset decoration
+"""
+@reset_on_call
+def input_password(message: str) -> str:
+	return getpass(message)

@@ -6,18 +6,20 @@ This project is mainly a learning project for working with password storage, enc
 
 ## Features
 
-- Create and open encrypted local vault files
-- Add entries with website, username, password, and description
-- List saved entries by website and username
-- Search entries by website, username, or description
-- Retrieve saved passwords
-- Copy passwords to the clipboard
-- Modify existing entries
-- Delete entries
-- Generate random passwords
-- Change the master password
-- Save changes manually
-- Save modified vaults on normal exit
+* Create and open encrypted local vault files
+* Add entries with website, username, password, and description
+* List saved entries by website and username
+* Search entries by website, username, or description
+* Retrieve saved passwords
+* Copy passwords to the clipboard
+* Modify existing entries
+* Delete entries
+* Generate random passwords
+* Change the master password
+* Save changes manually
+* Save modified vaults on normal exit
+* Automatically exit after 60 seconds of inactivity
+* Reset the inactivity timer whenever user input is received
 
 ## Project structure
 
@@ -28,14 +30,15 @@ simple_password_manager/
 │   ├── actions.py       # User-facing actions
 │   ├── display.py       # Terminal display helpers
 │   ├── input.py         # Keyboard and clipboard input helpers
-│   └── util.py          # CLI utility functions
+│   ├── util.py          # CLI utility functions
+│   └── watchdog.py      # Inactivity watchdog
 ├── core/
 │   ├── encrypt.py       # Encryption/decryption logic
 │   ├── entry.py         # Entry class
 │   ├── keys.py          # Key derivation logic
 │   └── pwd_manager.py   # Password manager logic
 └── storage/
-    └── io.py            # Vault loading/creation/deletion helpers
+    └── io.py            # Vault loading, creation, and deletion helpers
 ```
 
 ## Security design
@@ -46,12 +49,12 @@ The master password is used to derive a 256-bit encryption key with Argon2id. Va
 
 The encrypted vault file stores:
 
-- salt
-- nonce
-- ciphertext
-- associated data field
+* Salt
+* Nonce
+* Ciphertext
+* Associated data field
 
-Vault writes are done through a temporary file and then replaced atomically. This helps avoid corrupting the old vault if a write fails.
+Vault writes are done through a temporary file and then replaced atomically. This helps avoid corrupting the previous vault if a write fails.
 
 ## Important warning
 
@@ -120,36 +123,47 @@ Inside the program, use the displayed keyboard commands.
 
 Main actions include:
 
-- `[a]` add an entry
-- `[g]` generate a random password
-- `[m]` modify the master password
-- `[f]` search entries
-- `[s]` save current changes
-- `[q]` quit
+* `[a]` add an entry
+* `[g]` generate a random password
+* `[m]` modify the master password
+* `[f]` search entries
+* `[s]` save current changes
+* `[q]` quit
 
 When selecting a specific entry, you can modify it, delete it, or retrieve its password.
 
+### Inactivity watchdog
+
+The program includes an inactivity watchdog.
+
+If no user input is received for 60 seconds, the process exits automatically. The timer is reset whenever the user interacts with the program, including while entering passwords or using menu commands.
+
+A watchdog timeout exits immediately and does not save unsaved vault changes. Use `[s]` to save important changes manually.
+
+Normal quitting with `[q]` still saves modified vaults automatically.
+
 ## Notes
 
-- The master password cannot be recovered if forgotten.
-- Keep backups of your vault file.
-- Do not store the vault file together with your master password.
-- Clipboard support depends on the platform.
-- Unsaved changes are saved automatically on normal quit, but manual saving is also available.
+* The master password cannot be recovered if forgotten.
+* Keep backups of your vault file.
+* Do not store the vault file together with your master password.
+* Clipboard support depends on the platform.
+* Unsaved changes are saved automatically on normal quit.
+* Unsaved changes are discarded when the inactivity watchdog triggers.
+* The watchdog exits the application rather than locking and reopening the active vault.
 
 ## Current limitations
 
-- No graphical interface
-- No browser integration
-- No automatic clipboard clearing
-- No automatic vault locking/watchdog timer
-- No formal security audit
-- No packaged installer
+* No graphical interface
+* No browser integration
+* No automatic clipboard clearing
+* No formal security audit
+* No packaged installer
 
 ## Planned improvements
 
-- Improve command-line argument handling
-- Add safer clipboard handling
-- Add optional vault locking
-- Improve error messages
-- Package the project for easier installation
+* Improve command-line argument handling
+* Add safer clipboard handling
+* Add optional vault locking and unlocking
+* Improve error messages
+* Package the project for easier installation
