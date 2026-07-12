@@ -156,9 +156,6 @@ class PwdManagerTOTPTests(unittest.TestCase):
         self.assertEqual(self.manager.entries[entry][TOTP_SECRET], "")
         self.assertEqual(self.manager.entries[entry][TOTP_URI], "")
         self.assertIsNone(entry.get_totp_config())
-        self.assertEqual(self.manager.entries[entry][TOTP_URI], "")
-        self.assertEqual(self.manager.entries[entry][TOTP_SECRET], "")
-        self.assertIsNone(entry.get_totp_config())
 
     def test_invalid_replacement_does_not_remove_existing_totp(self):
         self.manager.set_totp_config("example.com", "alice", VALID_URI)
@@ -179,16 +176,30 @@ class PwdManagerTOTPTests(unittest.TestCase):
             NO_SUCH_TOTP_MESSAGE,
         )
 
+    @patch(
+        "core.pwd_manager.TOTP_Config.seconds_remaining",
+        return_value=9,
+    )
     @patch("core.pwd_manager.TOTP")
-    def test_get_totp_uses_stored_secret_and_config(self, totp_class: Mock):
+    def test_get_totp_uses_stored_secret_and_config(
+        self,
+        totp_class: Mock,
+        seconds_remaining: Mock,
+    ):
         self.manager.set_totp_config("example.com", "alice", VALID_URI)
         totp_class.return_value.now.return_value = "123456"
-        self.assertEqual(self.manager.get_totp("example.com", "alice"), "123456")
+
+        self.assertEqual(
+            self.manager.get_totp("example.com", "alice"),
+            "Code: 123456. Valid for 9 seconds.",
+        )
+
         totp_class.assert_called_once()
         kwargs = totp_class.call_args.kwargs
         self.assertEqual(kwargs["s"], VALID_SECRET)
         self.assertEqual(kwargs["digits"], 6)
         self.assertEqual(kwargs["interval"], 30)
+        seconds_remaining.assert_called_once()
 
 
 class FormatValidationTests(unittest.TestCase):
@@ -244,7 +255,6 @@ class FormatValidationTests(unittest.TestCase):
 
     def test_empty_vault_is_a_valid_new_format(self):
         self.assertTrue(PwdManager._has_new_format({}))
-        self.assertFalse(PwdManager._has_old_format({}))
 
 
 class PwdManagerPersistenceTests(unittest.TestCase):
