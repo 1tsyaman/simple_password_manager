@@ -1,6 +1,7 @@
 import sys
 import os
 import signal
+import traceback
 
 from time import sleep
 
@@ -63,9 +64,14 @@ def _main_loop(pwd_manager: PwdManager):
 		options = display_list(pwd_manager.get_website_and_username_string(), index)
 		
 		print_footer()
-		actual_index = 10 * index + 1
-		print(f"Showing entries {actual_index}..{actual_index + int(options[-1])} out of {n}")
-		main_str = format_prev_next_str(index, len=n)
+
+		main_str = ""
+
+		if len(options) > 0:
+			actual_index = 10 * index + 1
+			print(f"Showing entries {actual_index}..{actual_index + int(options[-1])} out of {n}")
+			main_str = format_prev_next_str(index, len=n)
+
 		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [f] to search entries, [s] to save current changes or [q] to exit"
 
 		print(f"Press {main_str}\n")
@@ -185,4 +191,7 @@ if __name__ == "__main__":
 	except Exception as e:	#	big net to avoid crashing
 		clear_screen(header=False)
 		message = f"Something went wrong. Unsaved changes will not be saved.\nException: {e!r}"
+		cleanup()
+		traceback.print_exc()
+		sys.exit(-1)
 		quit_program(exit_code=-1, message=message)
