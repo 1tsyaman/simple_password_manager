@@ -123,7 +123,7 @@ class PwdManager:
 				
 		secret = self.entries[entry][TOTP_SECRET]
 
-		return TOTP(s=secret, digits=totp_config.digits, digest=sha1, interval=totp_config.period).now()
+		return f"Code: {TOTP(s=secret, digits=totp_config.digits, digest=sha1, interval=totp_config.period).now()}. Valid for {totp_config.seconds_remaining()} seconds."
 
 	def has_totp(self: PwdManager, website: str, username: str) -> bool:
 		entry = self.__get_entry_with_username_or_None(website, username)
@@ -473,11 +473,10 @@ class PwdManager:
 		)
 	
 	@staticmethod
-	def _has_old_format(data: dict) -> bool:
-		return bool(data) and all(
-				isinstance(data, dict)
-				and isinstance(key, str)
-				and len(key.split(",", 2)) == 3
-				and isinstance(value, str)
-				for key, value in data.items()
-			)
+	def _has_old_format(data: object) -> bool:
+		return isinstance(data, dict) and all(
+			isinstance(key, str)
+			and len(key.split(",", 2)) == 3
+			and isinstance(value, str)
+			for key, value in data.items()
+		)

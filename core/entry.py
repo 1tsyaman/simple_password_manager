@@ -45,6 +45,9 @@ class Entry:
 	def set_totp_config(self: Entry, totp_config: TOTP_Config | None):
 		self.totp_config = totp_config
 
+	def has_totp(self: Entry) -> bool:
+		return self.totp_config is not None
+
 	"""
 		This function ignores the description
 	"""
