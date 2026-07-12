@@ -8,7 +8,7 @@ from time import sleep
 from core.encrypt import encrypt_data, decrypt_data, get_key_from_pwd
 from core.entry import Entry
 from core.keys import derrive_key
-from core.totp import TOTP_Config, totp_secret_is_valid
+from core.totp import TOTP_Config
 
 LETTERS_LOWER =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
@@ -136,10 +136,10 @@ class PwdManager:
 	def set_password(self: PwdManager, website: str, username: str, password: str):
 		entry = self.__get_entry_with_username_or_None(website, username)
 
-		if (entry is not None):
-			self.entries[entry][PWD] = password
-
-		return NO_SUCH_ENTRY_MESSAGE
+		if entry is None:
+			return NO_SUCH_ENTRY_MESSAGE
+		
+		self.entries[entry][PWD] = password
 	
 	def set_totp_config(self: PwdManager,website: str, username: str, uri: str):
 		entry = self.__get_entry_with_username_or_None(website=website, username=username)
@@ -256,7 +256,9 @@ class PwdManager:
 	"""
 	def __add_entry_pwd_to_key(self: PwdManager, entry: Entry, password: str) -> None:
 		self.entries[entry] = {
-			PWD: password
+			PWD: password,
+			TOTP_SECRET: "",
+			TOTP_URI: ""
 		}
 
 	"""
@@ -318,8 +320,17 @@ class PwdManager:
 				for value in tup.split(",", 2)
 			)
 			pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
-			pwd_manager.set_totp_config(website=website, username=username, uri=data[tup][TOTP_URI])
+			
+			uri = data[tup][TOTP_URI]
 
+			if len(uri) > 0:
+				message = pwd_manager.set_totp_config(website=website, username=username, uri=uri)
+
+				if message == URI_INVALID_MESSAGE:
+					# data loss warning message (should not happen normally)
+					print(f"Invalid TOTP URI for entry ({website}, {username}).")
+					sleep(5)
+			
 		print("Entries loaded successfully!")
 
 		return pwd_manager
@@ -451,8 +462,9 @@ class PwdManager:
 	
 	@staticmethod
 	def _has_new_format(data: dict) -> bool:
-		return bool(data) and all(
-			isinstance(key, str)
+		return all(
+			isinstance(data, dict)
+			and isinstance(key, str)
 			and len(key.split(",", 2)) == 3
 			and isinstance(value, dict)
 			and isinstance(value.get(PWD), str)
