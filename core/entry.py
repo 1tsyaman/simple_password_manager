@@ -1,12 +1,12 @@
 from __future__ import annotations
-from core.totp import TOTP
+from core.totp import TOTP_Config
 
 class Entry:
 	def __init__(self):
 		self.website	 : str		= ""
 		self.username    : str       	= ""
 		self.description : str       	= ""
-		self.totp_config : TOTP | None	= None
+		self.totp_config : TOTP_Config | None	= None
 
 	def get_json(self: Entry):
 		obj = {
@@ -36,7 +36,7 @@ class Entry:
 		self.description = description
 	
 	def set_totp_config(self: Entry, uri: str):
-		self.totp_config = TOTP.from_uri(uri)
+		self.totp_config = TOTP_Config.from_uri(uri)
 
 	"""
 		This function ignores the description
@@ -62,7 +62,7 @@ class Entry:
 		entry.website		= website
 		entry.username		= username
 		entry.description	= description
-		entry.totp_config	= TOTP.from_uri(totp_uri)
+		entry.totp_config	= TOTP_Config.from_uri(totp_uri)
 
 		return entry
 

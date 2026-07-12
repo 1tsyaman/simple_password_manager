@@ -1,5 +1,9 @@
 from __future__ import annotations
 from urllib.parse import urlparse, parse_qs, unquote
+from pyotp import TOTP
+from base64 import b32decode as decode
+from hashlib import sha1
+
 
 """
 	Example URI: otpauth://totp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&algorithm=SHA1&digits=6&period=30
@@ -11,16 +15,33 @@ from urllib.parse import urlparse, parse_qs, unquote
 			- digits: int		= 6
 			- period: int		= 30
 """
-class TOTP:
-	def __init__(self: TOTP, secret="", issuer="", account="", algorithm="SHA1", digits=6, period=30):
-		self.secret	= secret
-		self.issuer	= issuer
-		self.account	= account
-		self.algorithm	= algorithm
-		self.digits	= digits
-		self.period	= period
+class TOTP_Config:
+	def __init__(self: TOTP_Config, secret="", issuer="", account="", algorithm="SHA1", digits=6, period=30):
+		self.secret : str	= secret
+		self.issuer : str	= issuer
+		self.account : str	= account
+		self.algorithm : str	= algorithm
+		self.digits : int	= digits
+		self.period : int	= period
 
-	def to_json(self: TOTP) -> dict[str, str | int]:
+		self.totp : TOTP | None	= None
+
+	"""
+		Initialises self.totp object with current config
+	"""
+	def update_totp(self: TOTP_Config) -> None:
+		if not _secret_is_valid(self.secret):
+			self.totp = None
+		
+		self.totp = TOTP(s=self.secret, digits=6, digest=sha1, interval=30)
+
+	def generate_totp(self: TOTP_Config) -> str:
+		if self.totp is None:
+			return ""
+		
+		return self.totp.now()
+
+	def to_json(self: TOTP_Config) -> dict[str, str | int]:
 		return {
 			"secret":	self.secret,
 			"issuer":	self.issuer,
@@ -31,7 +52,7 @@ class TOTP:
 		}
 
 	@staticmethod
-	def from_uri(uri: str) -> TOTP | None:
+	def from_uri(uri: str) -> TOTP_Config | None:
 		# ParseResult(scheme='otpauth', netloc='totp', path='', params='', query='', fragment='')
 		parsed = urlparse(uri)
 
@@ -49,7 +70,7 @@ class TOTP:
 
 		params = parse_qs(parsed.query)
 
-		if "secret" not in params or len(params["secret"]) != 1 or len(params["secret"][0]) == 0:
+		if "secret" not in params or len(params["secret"]) != 1 or not _secret_is_valid(params["secret"][0]):
 			return None
 		
 		secret = params["secret"][0]
@@ -78,5 +99,13 @@ class TOTP:
 		except ValueError:
 			return None
 
-		return TOTP(secret=secret, issuer=issuer, account=account)
+		totp = TOTP_Config(secret=secret, issuer=issuer, account=account)
+		totp.update_totp()
 
+		return totp
+
+def _secret_is_valid(secret: str) -> bool:
+	padding = "=" * (-len(secret) % 8)	# padding neccessary padding to reach next length divisible by 8
+	decoded = decode(secret + padding, casefold=True)
+
+	return len(decoded) >= 16
