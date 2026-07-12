@@ -167,3 +167,7 @@ Normal quitting with `[q]` still saves modified vaults automatically.
 * Add optional vault locking and unlocking
 * Improve error messages
 * Package the project for easier installation
+
+## AI Usage Disclaimer
+
+The application code in this repository was written by the author. The automated test suite was generated with the assistance of an AI agent and subsequently reviewed and adjusted to match the project's current design and expected behavior.
