@@ -3,6 +3,7 @@ import random as rand
 from pathlib import Path
 from pyotp import TOTP
 from hashlib import sha1
+from time import sleep
 
 from core.encrypt import encrypt_data, decrypt_data, get_key_from_pwd
 from core.entry import Entry
@@ -242,7 +243,9 @@ class PwdManager:
 		Assumes entry does not exist in the list (simply overrides the value otherwise)
 	"""
 	def __add_entry_pwd_to_key(self: PwdManager, entry: Entry, password: str) -> None:
-		self.entries[entry][PWD] = password
+		self.entries[entry] = {
+			PWD: password
+		}
 
 	"""
 		decrypted_data has the following form:
@@ -291,14 +294,79 @@ class PwdManager:
 			print(f"Something went wrong: {e}")
 			return
 
+		if not PwdManager._has_new_format(data):
+
+			if PwdManager._has_old_format(data):
+				print("Vault is in old format. Please save before quitting to convert it to the new format.")
+				sleep(1)
+				return PwdManager._from_encrypted_file_old(path, pwd)
+			
+			print("Something went wrong during descrption of vault: vault does not have the correct foramt.")
+			return None
+
+		print(f"{path} decryption successful!")
+
+		for tup in data:
+			website, username, description = (
+				value.strip()
+				for value in tup.split(",", 2)
+			)
+			pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
+
+
+		print("Entries loaded successfully!")
+
+		return pwd_manager
+	
+	"""
+		*This is the old format (pre TOTP support)*
+
+		decrypted_data has the following form:
+		{
+			"website, username, description": password,
+			.
+			.
+			.
+		}
+	"""
+	@staticmethod
+	def _from_encrypted_file_old(path: str, pwd: str) -> PwdManager | None:
+		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+
+		if not satisfies:
+			raise KeyError(f"Password does not meet the minimum requirements: {reason}")
+
+		pwd_manager = PwdManager()
+		pwd_manager.file_path = path
+
+
+		try:
+			salt, key = get_key_from_pwd(pwd, path)
+			pwd_manager._key = key
+			pwd_manager._salt = salt
+
+			data: dict[str, str] = decrypt_data(key, path)
+		except FileNotFoundError as e:
+			print(e)
+			return
+
+		except ValueError as e:
+			print(e)
+			return
+
+		except KeyError as e:
+			print(f"Something went wrong: {e}")
+			return
+
 		print(f"{path} decryption successful!")
 
 		try:
 			for tup in data:
-				website, username, description = tup.split(",", 2)
-				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
-
-
+				website, username, description = (
+					value.strip()
+					for value in tup.split(",", 2)
+				)
+				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup])
 		except:
 			print("Something went wrong during descrption of vault: vault does not have the correct foramt.")
 			return pwd_manager
@@ -306,7 +374,7 @@ class PwdManager:
 		print("Entries loaded successfully!")
 
 		return pwd_manager
-	
+
 	@staticmethod
 	def  pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManager:
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
@@ -374,3 +442,24 @@ class PwdManager:
 			return False, 'special'
 
 		return True, ''
+	
+	@staticmethod
+	def _has_new_format(data: dict) -> bool:
+		return bool(data) and all(
+			isinstance(data, dict)
+			and isinstance(key, str)
+			and len(key.split(",", 2)) == 3
+			and isinstance(value, dict)
+			and isinstance(value.get(PWD), str)
+				for key, value in data.items()
+		)
+	
+	@staticmethod
+	def _has_old_format(data: dict) -> bool:
+		return bool(data) and all(
+				isinstance(data, dict)
+				and isinstance(key, str)
+				and len(key.split(",", 2)) == 3
+				and isinstance(value, str)
+				for key, value in data.items()
+			)
