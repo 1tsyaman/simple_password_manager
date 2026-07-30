@@ -11,7 +11,7 @@ import cli.actions as act
 from core.pwd_manager import PwdManager
 from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
-from cli.display import display_list, clear_screen, print_footer, display_password_rejection_reason
+from cli.display import display_list, clear_screen, print_footer
 from cli.util import format_prev_next_str, is_valid_index
 from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
 from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
@@ -130,34 +130,35 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
 	return _specific_entry_options(pwd_manager, entry)
 
 def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
-	print(entry.to_string_with_desc())
-	print_footer()
+	while True:
+		print(entry.to_string_with_desc())
+		print_footer()
 
-	options = ['m', 'd', 'r', 'BACKSPACE']
+		options = ['m', 'd', 'r', 'BACKSPACE']
 
-	totp_message = ""
+		totp_message = ""
 
-	if entry.has_totp():
-		totp_message = " [g] to get TOTP code,"
-		options += ['g']
+		if entry.has_totp():
+			totp_message = " [g] to get TOTP code,"
+			options += ['g']
 
-	print(f"Press [m] to modify, [d] to delete, [r] to retrieve password,{totp_message} [backspace] to go back.")
+		print(f"Press [m] to modify, [d] to delete, [r] to retrieve password,{totp_message} [backspace] to go back.")
 
-	key = poll_for_with_backspace(options)
+		key = poll_for_with_backspace(options)
 
-	match key:
-		case 'm':
-			return act.modify_entry(pwd_manager, entry)
-		case 'd':
-			return act.remove_entry(pwd_manager, entry)
-		case 'r':
-			act.get_password(pwd_manager, entry)
-			return False				# since we don't modify anything here
-		case 'g':
-			act.get_totp_code(pwd_manager, entry)
-			return False
-		case _:
-			return False
+		match key:
+			case 'm':
+				return act.modify_entry(pwd_manager, entry)
+			case 'd':
+				return act.remove_entry(pwd_manager, entry)
+			case 'r':
+				act.get_password(pwd_manager, entry)
+			case 'g':
+				act.get_totp_code(pwd_manager, entry)
+			case _:
+				return False
+
+		clear_screen()
 		
 def cleanup() -> None:
 	clear_screen(header=False)
@@ -176,7 +177,7 @@ if __name__ == "__main__":
 	pwd_manager = _init(sys.argv)
 	try:
 		if not isinstance(pwd_manager, PwdManager):	# returns int if it fails
-			sleep(10)
+			sleep(2)
 			quit_program(exit_code=pwd_manager, message="Failed to initalize PwdManager object.")
 
 		sleep(1)	# show success before clearing the screen

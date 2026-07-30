@@ -251,7 +251,7 @@ def grab_master_password(new=False) -> str:
 		pwd = input_password("Enter master password: ")
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
-		while (not satisfies):
+		while (new and not satisfies):
 			display_password_rejection_reason(reason=reason, min_len=MIN_PWD_LENGTH)
 			pwd = input_password("Enter master password: ")
 			satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)

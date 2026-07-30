@@ -278,7 +278,7 @@ class PwdManager:
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		if not satisfies:
-			raise KeyError(f"Password does not meet the minimum requirements: {reason}")
+			return None	# Password is incorrect
 
 		pwd_manager = PwdManager()
 		pwd_manager.file_path = path
