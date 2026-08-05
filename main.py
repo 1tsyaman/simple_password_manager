@@ -171,7 +171,7 @@ def quit_program(exit_code=0, message='') -> Never:
 	sys.exit(exit_code)
 
 def timeout_exit() -> None:
-	os.kill(os.getpid(), signal.SIGINT)		# sends a ctrl+c interrupt to kill the 
+	os.kill(os.getpid(), signal.SIGINT)		# sends a ctrl+c interrupt to kill the process
 
 if __name__ == "__main__":
 	pwd_manager = _init(sys.argv)
