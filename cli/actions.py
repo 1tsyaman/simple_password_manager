@@ -343,7 +343,7 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 
 	err = pwd_manager.set_totp_config(website=website, username=username, uri=uri)
 
-	if err in [NO_SUCH_TOTP_MESSAGE, NO_SUCH_ENTRY_MESSAGE]:
+	if err is not None:
 		print(err)
 		sleep(2)
 

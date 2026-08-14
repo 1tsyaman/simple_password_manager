@@ -118,7 +118,7 @@ def totp_secret_is_valid(secret: str) -> bool:
 		padding = "=" * (-len(secret) % 8)			# padding neccessary padding to reach next length divisible by 8
 		decoded = decode(secret + padding, casefold=True)
 
-		return len(decoded) >= 16
+		return len(decoded) >= 10
 
 	except Exception:
 		return False
