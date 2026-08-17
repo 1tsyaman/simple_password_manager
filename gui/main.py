@@ -33,8 +33,9 @@ class SimplePasswordManagerApp(MDApp):
 		vault_list : VaultList 				= VaultList()
 
 		for vault in self.vaults:
-			entry = VaultEntry(text=vault)
-	
+			entry = VaultEntry(name=vault)
+			entry.bind(on_release=self.open_vault)
+
 			vault_list.add_widget(entry)
 
 		new_selection_screen = SelectionScreen()
@@ -42,6 +43,10 @@ class SimplePasswordManagerApp(MDApp):
 
 		screen_manager.remove_widget(old_selection_screen)
 		screen_manager.add_widget(new_selection_screen)
+
+	# Bound to vault entries
+	def open_vault(self, instance: VaultEntry) -> None:
+		print(f"Vault opened: {instance.vault_name}")
 
 	def on_start(self):
 		self.load_vault_entries()

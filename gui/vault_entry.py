@@ -4,10 +4,11 @@ from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.list import MDListItem
 
 class VaultEntry(MDListItem):
-	def __init__(self, text="", *args, **kwargs):
+	def __init__(self, name="", *args, **kwargs):
 		super().__init__(*args, **kwargs)
+		self.ids.vault_name.text = name
 
-		self.ids.vault_name.text = text
+		self.vault_name = name
 
 class VaultList(MDScrollView):
 		pass
