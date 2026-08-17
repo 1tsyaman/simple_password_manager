@@ -1,7 +1,7 @@
-from kivy.uix.screenmanager import Screen
+from kivymd.uix.screen import MDScreen
 from kivy.lang.builder import Builder
 
-Builder.load_file("selection_screen.kv")
-
-class SelectionScreen(Screen):
+class SelectionScreen(MDScreen):
 	pass
+
+Builder.load_file("selection_screen.kv")

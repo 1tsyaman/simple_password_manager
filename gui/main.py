@@ -1,19 +1,21 @@
-from kivy.app import App
-from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.lang.builder import Builder
 
-from selection_screen import SelectionScreen
+from kivymd.app import MDApp
+from kivymd.uix.appbar import MDTopAppBar
+
+from gui.selection_screen import SelectionScreen
+
+class TopBar(MDTopAppBar):
+	pass
 
 
-class SimplePasswordManagerApp(App):
+class SimplePasswordManagerApp(MDApp):
 	# Should return the main widget, the selection screen in this case.
 	def build(self):
-		self.screen_manager = ScreenManager()
-		self.selection_screen = SelectionScreen()
+		# Init top bar
+		Builder.load_file("top_bar.kv")
 
-		self.screen_manager.add_widget(self.selection_screen)
-
-		return self.screen_manager
+		return Builder.load_file("main.kv")
 
 if __name__ == "__main__":
 	SimplePasswordManagerApp().run()

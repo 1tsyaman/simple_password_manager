@@ -1,0 +1,31 @@
+#:kivy 2.3.1
+
+<SimplePasswordManagerApp>:
+	md_bg_color: app.theme_cls.backgroundColor
+
+MDScreen:
+	id: app_screen
+
+	BoxLayout:
+		id: app_box_layout
+
+		orientation: "vertical"
+		# Later should be overriden in python based on the system running the app
+#		size_hint_x: None
+#		width: "500dp"
+		md_bg_color: app.theme_cls.secondaryContainerColor
+		size_hint_max_x: dp(500)
+		pos_hint: {"center_x": 0.5}
+        adaptive_height: True
+        spacing: "12dp"
+        pos_hint: {"center_x": .5}
+
+		TopBar:
+			id: top_bar
+
+		ScreenManager:
+			id: screen_manager
+			md_bg_color: app.theme_cls.secondaryContainerColor
+
+			SelectionScreen:
+

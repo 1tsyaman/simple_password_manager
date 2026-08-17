@@ -1,25 +1,16 @@
 #:kivy 2.3.1
 
-<Screen>:
-	id: "selection_screen"
-	size_hint_x: None
-	width: "360dp"
-	pos_hint: {'center_x': 0.5}
-
 <SelectionScreen>:
 	BoxLayout:
-	    orientation: "vertical"
-	    size: root.width, root.height
+		orientation: "vertical"
 
 		Label:
-			id: "first label"
+			id: first_label
 			text: "This is on top"
-		
+
 		Button:
 			text: "click me!"
-			size: root.width, root.height
-			pos_hint: {'center_x': 0.5}
 
 		Label:
-		    id: "second label"
+			id: second_label
 			text: "this is on the bottom"
