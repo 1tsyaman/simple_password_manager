@@ -1,9 +1,40 @@
 import os
+import sys
+import importlib
 
 from pathlib import Path
 from core.pwd_manager import PwdManager
 
+from kivy.utils import platform
+
 INVALID_PATH_ERROR	= "Given vault path does not exist"
+DEBUG = True
+
+"""
+	@returns the private app data path if on android
+	@returns the executable binary directory if on windows/linux
+
+	@raises RunTimeError if run on an unsupported platform
+"""
+def get_app_data_path() -> Path:
+	# TODO: remove before bundling app
+	if DEBUG:
+		return Path('C://Users//y-fao//Desktop//Aktuell//Others//password_manager//')
+
+	if platform == "android":
+		android_storage = importlib.import_module("android.storage")
+		return Path(android_storage.app_storage_path())
+
+	if os.name in ("nt", "posix"):
+		if getattr(sys, "frozen", False):
+			return Path(sys.executable).resolve().parent
+
+		return Path(__file__).resolve().parent
+
+	raise RuntimeError(f"Unsupported platform: {platform}")
+
+def get_vault_list(dir: str) -> list[str]:
+	return [file for file in os.listdir(dir) if file.endswith(".vault")]
 
 def load_vault(path: str, pwd: str) -> PwdManager | None:
 	if not Path(path).exists():

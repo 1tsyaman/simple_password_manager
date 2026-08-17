@@ -1,10 +1,8 @@
 #:kivy 2.3.1
 
-<SimplePasswordManagerApp>:
-	md_bg_color: app.theme_cls.backgroundColor
-
 MDScreen:
 	id: app_screen
+	md_bg_color: app.theme_cls.backgroundColor
 
 	BoxLayout:
 		id: app_box_layout
@@ -25,7 +23,13 @@ MDScreen:
 
 		ScreenManager:
 			id: screen_manager
-			md_bg_color: app.theme_cls.secondaryContainerColor
 
 			SelectionScreen:
+				name: "selection"
+
+				MDLabel:
+					text: "Imported/Created vaults will appear here."
+					adaptive_height: True
+					pos_hint: {"center_x": 0.5, "center_y": 0.5}
+					halign: "center"
 
