@@ -8,6 +8,7 @@ from kivymd.uix.screen import MDScreen
 
 from gui.selection_screen import SelectionScreen
 from gui.vault_entry import VaultEntry, VaultList
+from gui.login import LoginDialog
 import storage.io as io
 
 def init_app():
@@ -34,7 +35,7 @@ class SimplePasswordManagerApp(MDApp):
 
 		for vault in self.vaults:
 			entry = VaultEntry(name=vault)
-			entry.bind(on_release=self.open_vault)
+			entry.bind(on_release=self.open_vault_decrypt_dialog)
 
 			vault_list.add_widget(entry)
 
@@ -44,9 +45,14 @@ class SimplePasswordManagerApp(MDApp):
 		screen_manager.remove_widget(old_selection_screen)
 		screen_manager.add_widget(new_selection_screen)
 
+
 	# Bound to vault entries
-	def open_vault(self, instance: VaultEntry) -> None:
-		print(f"Vault opened: {instance.vault_name}")
+	def open_vault_decrypt_dialog(self, instance: VaultEntry) -> None:
+		self.login_dialog = LoginDialog(vault=instance.vault_name, callback=self.open_vault)
+		self.login_dialog.open()
+
+	def open_vault(self, vault_name: str, password: str):
+		print(f"Openning vault with name {vault_name} and password {password}")
 
 	def on_start(self):
 		self.load_vault_entries()
