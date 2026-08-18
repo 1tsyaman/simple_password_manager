@@ -49,6 +49,12 @@ NO_SUCH_ENTRY_MESSAGE	= "No such entry."
 NO_SUCH_TOTP_MESSAGE	= "There is no TOTP config associated with this entry"
 URI_INVALID_MESSAGE	= "Provided TOTP URI is invalid."
 
+
+class PwdManagerResult:
+	def __init__(self, result: PwdManager | str, error=False) -> None:
+		self.error = error
+		self.result = result
+
 class PwdManager:
 
 	"""
@@ -274,15 +280,14 @@ class PwdManager:
 		}
 	"""
 	@staticmethod
-	def from_encrypted_file(path: str, pwd: str) -> PwdManager | None:
+	def from_encrypted_file(path: str, pwd: str) -> PwdManagerResult:
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		if not satisfies:
-			return None	# Password is incorrect
+			return PwdManagerResult(error=True, result="Password incorrect")	# Password is incorrect
 
 		pwd_manager = PwdManager()
 		pwd_manager.file_path = path
-
 
 		try:
 			salt, key = get_key_from_pwd(pwd, path)
@@ -291,16 +296,14 @@ class PwdManager:
 
 			data = decrypt_data(key, path)
 		except FileNotFoundError as e:
-			print(e)
-			return
+			return PwdManagerResult(error=True, result=str(e))
 
 		except ValueError as e:
-			print(e)
-			return
+			return PwdManagerResult(error=True, result=str(e))
+
 
 		except KeyError as e:
-			print(f"Something went wrong: {e}")
-			return
+			return PwdManagerResult(error=True, result=str(e))
 
 		if not PwdManager._has_new_format(data):
 
@@ -308,9 +311,9 @@ class PwdManager:
 				print("Vault is in old format. Please save before quitting to convert it to the new format.")
 				sleep(1)
 				return PwdManager._from_encrypted_file_old(path, pwd)
-			
-			print("Something went wrong during descrption of vault: vault does not have the correct foramt.")
-			return None
+
+			e = "Something went wrong during descrption of vault: vault does not have the correct foramt."
+			return PwdManagerResult(error=True, result=str(e))
 
 		print(f"{path} decryption successful!")
 
@@ -333,7 +336,7 @@ class PwdManager:
 			
 		print("Entries loaded successfully!")
 
-		return pwd_manager
+		return PwdManagerResult(result=pwd_manager)
 	
 	"""
 		*This is the old format (pre TOTP support)*
@@ -347,7 +350,7 @@ class PwdManager:
 		}
 	"""
 	@staticmethod
-	def _from_encrypted_file_old(path: str, pwd: str) -> PwdManager | None:
+	def _from_encrypted_file_old(path: str, pwd: str) -> PwdManagerResult:
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		if not satisfies:
@@ -364,16 +367,13 @@ class PwdManager:
 
 			data: dict[str, str] = decrypt_data(key, path)
 		except FileNotFoundError as e:
-			print(e)
-			return
+			return PwdManagerResult(error=True, result=str(e))
 
 		except ValueError as e:
-			print(e)
-			return
+			return PwdManagerResult(error=True, result=str(e))
 
 		except KeyError as e:
-			print(f"Something went wrong: {e}")
-			return
+			return PwdManagerResult(error=True, result=str(e))
 
 		print(f"{path} decryption successful!")
 
@@ -385,21 +385,22 @@ class PwdManager:
 				)
 				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup])
 		except:
-			print("Something went wrong during descrption of vault: vault does not have the correct foramt.")
-			return pwd_manager
+			e = "Something went wrong during descrption of vault: vault does not have the correct foramt."
+			return PwdManagerResult(error=True, result=str(e))
 
 		print("Entries loaded successfully!")
 
-		return pwd_manager
+		return PwdManagerResult(result=pwd_manager)
 
 	@staticmethod
-	def  pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManager:
+	def pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManagerResult:
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		if not satisfies:
-			raise KeyError(f"Password does not meet the minimum requirements: {reason}")
+			return PwdManagerResult(error=True, result=f"Password does not meet the minimum requirements: {reason}")
 
-		return PwdManager._pwd_manager_from_pwd(file_path, pwd)
+		pwd_manager = PwdManager._pwd_manager_from_pwd(file_path, pwd)
+		return PwdManagerResult(result=pwd_manager)
 
 	"""
 		creates a PwdManager object and initializes the vault file

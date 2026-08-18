@@ -5,10 +5,10 @@ from kivymd.app import MDApp
 from kivymd.uix.appbar import MDTopAppBar
 from kivymd.uix.screen import MDScreen
 
-
 from gui.selection_screen import SelectionScreen
 from gui.vault_entry import VaultEntry, VaultList
 from gui.login import LoginDialog
+
 import storage.io as io
 
 def init_app():
@@ -51,8 +51,13 @@ class SimplePasswordManagerApp(MDApp):
 		self.login_dialog = LoginDialog(vault=instance.vault_name, callback=self.open_vault)
 		self.login_dialog.open()
 
-	def open_vault(self, vault_name: str, password: str):
-		print(f"Openning vault with name {vault_name} and password {password}")
+	def open_vault(self, vault_name: str, password: str) -> bool:
+		open_result = io.load_vault_for_gui(self.app_data_path, vault_name, password)
+
+		if open_result.error or isinstance(open_result.result, str):
+			return False
+
+		return True
 
 	def on_start(self):
 		self.load_vault_entries()

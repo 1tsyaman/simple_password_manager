@@ -7,6 +7,11 @@ from core.pwd_manager import PwdManager
 
 from kivy.utils import platform
 
+class VaultLoadResult:
+	def __init__(self, result: PwdManager| str, error : bool = False) -> None:
+		self.error = error
+		self.result = result
+
 INVALID_PATH_ERROR	= "Given vault path does not exist"
 DEBUG = True
 
@@ -36,20 +41,34 @@ def get_app_data_path() -> Path:
 def get_vault_list(dir: str) -> list[str]:
 	return [file for file in os.listdir(dir) if file.endswith(".vault")]
 
-def load_vault(path: str, pwd: str) -> PwdManager | None:
+def load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> VaultLoadResult:
+	path = os.path.join(app_data_path, vault_name)
+
+	return load_vault(path=path, pwd=pwd)
+
+def load_vault(path: str, pwd: str) -> VaultLoadResult:
 	if not Path(path).exists():
-			print("Vault path is incorrect")
-			return None
+			return VaultLoadResult(result="Vault path is incorrect", error=True)
 
-	return PwdManager.from_encrypted_file(path, pwd)
+	pwd_manager = PwdManager.from_encrypted_file(path, pwd)
 
-def create_and_load_vault(path: str, pwd: str) -> PwdManager | None:
+	if pwd_manager.error:
+		return VaultLoadResult(error=True, result=pwd_manager.result)
+
+	return VaultLoadResult(result=pwd_manager.result)
+
+def create_and_load_vault(path: str, pwd: str) -> VaultLoadResult:
 	try:
 		Path(path).touch()
 	except FileNotFoundError:
-		raise FileNotFoundError(INVALID_PATH_ERROR)
+		return VaultLoadResult(error=True, result=INVALID_PATH_ERROR)
 	
-	return PwdManager.pwd_manager_from_pwd(path, pwd)
+	return_result = PwdManager.pwd_manager_from_pwd(path, pwd)
+
+	if return_result.error:
+		return VaultLoadResult(error=True, result=return_result.result)
+
+	return VaultLoadResult(result=return_result.result)
 
 def vault_exists(path: str) -> bool:
 	return Path(path).exists()

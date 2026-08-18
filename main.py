@@ -13,7 +13,7 @@ from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
 from cli.display import display_list, clear_screen, print_footer
 from cli.util import format_prev_next_str, is_valid_index
-from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
+from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault, VaultLoadResult
 from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
@@ -29,10 +29,15 @@ def _init(argv: list[str]) -> PwdManager | int:
 
 	if len(argv) == 2:
 		pwd = act.grab_master_password()
-		pwd_manager = load_vault(path, pwd)
+		load_vault_result = load_vault(path, pwd)
 	
-		if not pwd_manager:
+		if not load_vault_result.error:
 			print(GENERAL_ERROR)
+			return -1
+		pwd_manager = load_vault_result.result
+
+		# Should generally not happen
+		if isinstance(pwd_manager, str):
 			return -1
 
 	else:
@@ -46,11 +51,13 @@ def _init(argv: list[str]) -> PwdManager | int:
 				return 0
 
 		pwd = act.grab_master_password(new=True)
-		pwd_manager = create_and_load_vault(path, pwd)
+		return_result = create_and_load_vault(path, pwd)
 
-		if not pwd_manager:
+		if return_result.error or isinstance(return_result.result, str):
 			print(GENERAL_ERROR)
 			return -1
+
+		pwd_manager = return_result.result
 
 	return pwd_manager
 
