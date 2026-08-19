@@ -1,4 +1,5 @@
 #:kivy 2.3.1
+#:import MDSharedAxisTransition kivymd.uix.transition.MDSharedAxisTransition
 
 MDScreen:
 	id: app_screen
@@ -21,15 +22,36 @@ MDScreen:
 		TopBar:
 			id: top_bar
 
-		ScreenManager:
+		MDScreenManager:
 			id: screen_manager
+			transition: MDSharedAxisTransition(transition_axis="x")
 
 			SelectionScreen:
 				name: "selection"
 
+				on_pre_enter:
+					app.root.ids.top_bar.back_callback = None
+					app.root.ids.top_bar.ids.back_button.disabled = True
+					app.root.ids.top_bar.ids.back_button.opacity = 0
+
 				MDLabel:
+					id: empty_vault_list
 					text: "Imported/Created vaults will appear here."
 					adaptive_height: True
 					pos_hint: {"center_x": 0.5, "center_y": 0.5}
 					halign: "center"
+			
+			VaultScreen:
+				name: "vault"
 
+				on_pre_enter:
+					app.root.ids.top_bar.back_callback = app.back_to_selection
+					app.root.ids.top_bar.ids.back_button.disabled = False
+					app.root.ids.top_bar.ids.back_button.opacity = 1
+				
+				MDLabel:
+					id: empty_account_list
+					text: "Accounts will appear here."
+					adaptive_height: True
+					pos_hint: {"center_x": 0.5, "center_y": 0.5}
+					halign: "center"

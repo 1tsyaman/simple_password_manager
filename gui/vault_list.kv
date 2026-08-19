@@ -15,3 +15,24 @@
 		id: vault_list
 		orientation: "vertical"
 		adaptive_height: True
+
+<AccountEntry>:
+	pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+	MDListItemLeadingIcon:
+		icon: "account"
+	MDListItemHeadlineText:
+		id: website
+	MDListItemSupportingText:
+		id: username
+
+<AccountList>:
+	do_scroll_x: False
+
+	MDBoxLayout:
+		id: account_list
+		orientation: "vertical"
+		adaptive_height: True
+		spacing: "8dp"
+		padding: "4dp"
+	

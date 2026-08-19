@@ -1,5 +1,6 @@
 from kivy.lang.builder import Builder
 from kivy.uix.screenmanager import ScreenManager
+from kivy.uix.boxlayout import BoxLayout
 
 from kivymd.app import MDApp
 from kivymd.uix.appbar import MDTopAppBar
@@ -7,20 +8,27 @@ from kivymd.uix.screen import MDScreen
 from kivymd.uix.appbar import MDActionTopAppBarButton
 
 from gui.selection_screen import SelectionScreen
-from gui.vault_entry import VaultEntry, VaultList
+from gui.vault_entry import VaultEntry, VaultList, AccountEntry, AccountList
 from gui.login import LoginDialog, NewVaultDialog, InputField
 
 import storage.io as io
 
 from core.errors import (PasswordError, KeyLengthError, KeyDerivationError,
 						 	VaultFormatError, CorruptedVaultError, PasswordRequirementsError)
-
+import traceback
 
 def init_app():
 	Builder.load_file("top_bar.kv")
 
 class TopBar(MDTopAppBar):
-	pass
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.back_callback = None			# indirect on_release callback for the back button
+
+	# direct on_release callback for the back button
+	def on_back(self):
+		if self.back_callback is not None:
+			self.back_callback()
 
 
 class SimplePasswordManagerApp(MDApp):
@@ -30,12 +38,19 @@ class SimplePasswordManagerApp(MDApp):
 		self.app_data_path = str(io.get_app_data_path())
 		self.vaults = io.get_vault_list(self.app_data_path)
 
-	def load_vault_entries(self):
+	def switch_screen(self, screen: str):
+		if screen in ["selection", "vault"]:
+			self.root.ids.screen_manager.current = screen
+
+	def back_to_selection(self):
+		self.switch_screen("selection")
+
+	def load_vaults_to_screen(self):
 		if len(self.vaults) == 0:
 			return
 
 		screen_manager : ScreenManager 		= self.root.ids.screen_manager
-		old_selection_screen : MDScreen 	= screen_manager.get_screen("selection")
+		selection_screen : MDScreen 		= screen_manager.get_screen("selection")
 		vault_list : VaultList 				= VaultList()
 
 		for vault in self.vaults:
@@ -44,12 +59,41 @@ class SimplePasswordManagerApp(MDApp):
 
 			vault_list.add_vault(entry)
 
-		new_selection_screen = SelectionScreen(name="selection")
-		new_selection_screen.add_widget(vault_list)
+		# Remove empty list label if it exists
+		empty_list_label = self.root.ids.get("empty_vault_list")
 
-		screen_manager.remove_widget(old_selection_screen)
-		screen_manager.add_widget(new_selection_screen)
+		if empty_list_label is not None and empty_list_label.parent is not None:
+			empty_list_label.parent.remove_widget(empty_list_label)
 
+		container : BoxLayout = selection_screen.ids.selection_screen_box
+		container.clear_widgets()
+		container.add_widget(vault_list)
+
+	def load_vault_entries_to_screen(self):
+		accounts = self.pwd_manager.get_website_username_list()
+
+		if len(accounts) == 0:
+			return
+
+		screen_manager : ScreenManager 		= self.root.ids.screen_manager
+		vault_screen: MDScreen				= screen_manager.get_screen("vault")
+		account_list : AccountList 			= AccountList()
+
+		for website, username in accounts:
+			entry = AccountEntry(website=website, username=username)
+			#entry.bind(on_release=self.show_open_vault_dialog)
+
+			account_list.add_account(entry)
+
+		# Remove empty list label if it exists
+		empty_list_label = self.root.ids.get("empty_account_list")
+
+		if empty_list_label is not None and empty_list_label.parent is not None:
+			empty_list_label.parent.remove_widget(empty_list_label)
+
+		container : BoxLayout = vault_screen.ids.vault_screen_box
+		container.clear_widgets()
+		container.add_widget(account_list)
 
 	# Bound to vault entries
 	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
@@ -59,7 +103,9 @@ class SimplePasswordManagerApp(MDApp):
 	def open_vault(self, login_dialog: LoginDialog, vault_name: str, password: str) -> bool:
 		error_widget = login_dialog.password_field.error_widget
 		try:
-			pwd_manager = io.load_vault_for_gui(self.app_data_path, vault_name, password)
+			self.pwd_manager = io.load_vault_for_gui(self.app_data_path, vault_name, password)
+			self.load_vault_entries_to_screen()
+			self.switch_screen("vault")
 			return True
 
 		except PasswordError:
@@ -76,6 +122,7 @@ class SimplePasswordManagerApp(MDApp):
 			error_widget.text = "Incorrect password or corrupted vault"
 		except Exception as e:
 			print(f"Something went wrong while opening the vault: {e}")
+			traceback.print_exc()
 			error_widget.text = "Something went wrong, check log"
 		
 		return False
@@ -112,7 +159,7 @@ class SimplePasswordManagerApp(MDApp):
 
 		try:
 			io.create_and_load_vault_for_gui(self.app_data_path, name, password)
-			self.load_vault_entries()
+			self.load_vaults_to_screen()
 			return True
 
 		except FileNotFoundError:
@@ -139,7 +186,7 @@ class SimplePasswordManagerApp(MDApp):
 		return False
 
 	def on_start(self):
-		self.load_vault_entries()
+		self.load_vaults_to_screen()
 		top_bar : TopBar = self.root.ids.top_bar
 
 		# bind new vault button

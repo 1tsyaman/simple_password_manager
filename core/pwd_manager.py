@@ -66,9 +66,9 @@ class PwdManager:
 	"""
 	def __init__(self, path="", key=bytes(0), salt=bytes(0)):
 		self.entries: dict[Entry, dict[str, str]]		= {}
-		self.file_path: str					= path
-		self._key: bytes					= key
-		self._salt: bytes					= salt
+		self.file_path: str								= path
+		self._key: bytes								= key
+		self._salt: bytes								= salt
 
 	"""
 		Does nothing if entry is already in the list (should use modify_entry instead)
@@ -184,6 +184,12 @@ class PwdManager:
 			
 	def get_entry_list(self: PwdManager) -> list[Entry]:
 		return [entry for entry in self.entries]
+
+	def get_website_username_list(self: PwdManager) -> list[tuple[str, str]]:
+		return [
+			(entry.get_website(), entry.get_username())
+				for entry in self.get_entry_list()
+		]
 
 	"""
 		@raises:
