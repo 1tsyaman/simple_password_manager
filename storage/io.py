@@ -1,16 +1,10 @@
 import os
 import sys
 import importlib
-
-from pathlib import Path
-from core.pwd_manager import PwdManager
-
 from kivy.utils import platform
+from pathlib import Path
 
-class VaultLoadResult:
-	def __init__(self, result: PwdManager| str, error : bool = False) -> None:
-		self.error = error
-		self.result = result
+from core.pwd_manager import PwdManager
 
 INVALID_PATH_ERROR	= "Given vault path does not exist"
 DEBUG = True
@@ -19,7 +13,10 @@ DEBUG = True
 	@returns the private app data path if on android
 	@returns the executable binary directory if on windows/linux
 
-	@raises RunTimeError if run on an unsupported platform
+	@raises:
+		- RuntimeError: unsupported platform
+		- ModuleNotFoundError: android.storage is unavailable
+		- OSError: resolving the executable/source path fails
 """
 def get_app_data_path() -> Path:
 	# TODO: remove before bundling app
@@ -38,49 +35,73 @@ def get_app_data_path() -> Path:
 
 	raise RuntimeError(f"Unsupported platform: {platform}")
 
+"""
+	@raises:
+		- OSError
+"""
 def get_vault_list(dir: str) -> list[str]:
 	return [file for file in os.listdir(dir) if file.endswith(".vault")]
 
-def load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> VaultLoadResult:
+"""
+	@raises:
+			- PasswordError
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- KeyDerivationError
+			- VaultFormatError
+			- CorruptedVaultError
+			- OSError
+"""
+def load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdManager:
 	path = os.path.join(app_data_path, vault_name)
 
 	return load_vault(path=path, pwd=pwd)
 
-def load_vault(path: str, pwd: str) -> VaultLoadResult:
+"""
+	@raises:
+			- PasswordError
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- KeyDerivationError
+			- VaultFormatError
+			- CorruptedVaultError
+			- OSError
+"""
+def load_vault(path: str, pwd: str) -> PwdManager:
 	if not Path(path).exists():
-			return VaultLoadResult(result="Vault path is incorrect", error=True)
+		raise FileNotFoundError
 
 	pwd_manager = PwdManager.from_encrypted_file(path, pwd)
 
-	if pwd_manager.error:
-		return VaultLoadResult(error=True, result=pwd_manager.result)
+	return pwd_manager
 
-	return VaultLoadResult(result=pwd_manager.result)
 
-def create_and_load_vault(path: str, pwd: str) -> VaultLoadResult:
-	try:
-		Path(path).touch()
-	except FileNotFoundError:
-		return VaultLoadResult(error=True, result=INVALID_PATH_ERROR)
+"""
+	@raises:
+		- FileNotFoundError(path) [OSError]
+		- PasswordRequirementsError(reason)
+		- KeyLengthError
+		- KeyDerivationError
+		- OSError
+"""
+def create_and_load_vault(path: str, pwd: str) -> PwdManager:
 	
-	return_result = PwdManager.pwd_manager_from_pwd(path, pwd)
+	Path(path).touch()
+	
+	pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
 
-	if return_result.error:
-		return VaultLoadResult(error=True, result=return_result.result)
+	return pwd_manager
 
-	return VaultLoadResult(result=return_result.result)
-
+"""
+	@raises:
+		- OSError
+"""
 def vault_exists(path: str) -> bool:
 	return Path(path).exists()
 
 """
-	raises FileNotFound if path is incorrect
-	raises OSError if path is a directory
+	@raises: 
+		- OSError
 """
 def delete_vault(path: str) -> None:
-	try:
-		os.remove(Path(path))
-	except FileNotFoundError:
-		raise FileNotFoundError(INVALID_PATH_ERROR)
-	except OSError:
-		raise OSError("Given vault path is a directory")
+	os.remove(Path(path))

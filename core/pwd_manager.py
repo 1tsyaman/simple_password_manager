@@ -5,10 +5,12 @@ from pyotp import TOTP
 from hashlib import sha1
 from time import sleep
 
-from core.encrypt import encrypt_data, decrypt_data, get_key_from_pwd
+from core.encrypt import (encrypt_data, decrypt_data, get_key_from_pwd,
+						  	KeyLengthError, VaultFormatError, CorruptedVaultError)
 from core.entry import Entry
 from core.keys import derrive_key
 from core.totp import TOTP_Config
+from core.errors import PasswordError, PasswordRequirementsError
 
 LETTERS_LOWER =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
@@ -48,12 +50,6 @@ PWD_LENGTH	=	24
 NO_SUCH_ENTRY_MESSAGE	= "No such entry."
 NO_SUCH_TOTP_MESSAGE	= "There is no TOTP config associated with this entry"
 URI_INVALID_MESSAGE	= "Provided TOTP URI is invalid."
-
-
-class PwdManagerResult:
-	def __init__(self, result: PwdManager | str, error=False) -> None:
-		self.error = error
-		self.result = result
 
 class PwdManager:
 
@@ -100,13 +96,34 @@ class PwdManager:
 		if reference is not None:
 			self.__remove_entry(reference)
 
+	"""
+		@raises:
+			- PasswordRequirementsError(reason)
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- KeyDerivationError
+			- OverflowError
+			- OSError
+	"""
 	def modify_master_password(self: PwdManager, pwd: str) -> None:
+		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+
+		if not satisfies:
+			raise PasswordRequirementsError(reason=reason)
+
 		salt, key = derrive_key(pwd)
+		old_key, old_salt = self._key, self._salt
+
 		self._key = key
 		self._salt = salt
 
 		# rewrite the vault file to update the password
-		self.encrypt()
+		try:
+			self.encrypt()
+		except BaseException:
+			self._key = old_key
+			self._salt = old_salt
+			raise
 
 	def get_password(self: PwdManager, website: str, username: str) -> str:
 		entry = self.__get_entry_with_username_or_None(website, username)
@@ -168,6 +185,10 @@ class PwdManager:
 	def get_entry_list(self: PwdManager) -> list[Entry]:
 		return [entry for entry in self.entries]
 
+	"""
+		@raises:
+			- IndexError
+	"""
 	def get_entry_by_index(self: PwdManager, index: int) -> Entry:
 		ls = list(self.entries)
 		
@@ -220,6 +241,12 @@ class PwdManager:
 								TOTP_URI	uri
 							}
 		}
+
+		@raises:
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- OverflowError
+			- OSError
 	"""
 	def encrypt(self: PwdManager) -> None:
 		data = {
@@ -230,9 +257,6 @@ class PwdManager:
 				}
 				for entry in self.entries
 		}
-
-		if self.file_path == "" or not Path(self.file_path).exists():
-			return print("File path is not valid!")
 
 		encrypt_data(data=data, key=self._key, salt=self._salt, file_path=self.file_path, associated_data="")
 
@@ -278,42 +302,39 @@ class PwdManager:
 			.
 			.
 		}
+
+		@raises:
+			- PasswordError
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- KeyDerivationError
+			- VaultFormatError
+			- CorruptedVaultError
+			- OSError
 	"""
 	@staticmethod
-	def from_encrypted_file(path: str, pwd: str) -> PwdManagerResult:
+	def from_encrypted_file(path: str, pwd: str) -> PwdManager:
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		if not satisfies:
-			return PwdManagerResult(error=True, result="Password incorrect")	# Password is incorrect
+			raise PasswordError
 
 		pwd_manager = PwdManager()
 		pwd_manager.file_path = path
 
-		try:
-			salt, key = get_key_from_pwd(pwd, path)
-			pwd_manager._key = key
-			pwd_manager._salt = salt
+		salt, key = get_key_from_pwd(pwd, path)
 
-			data = decrypt_data(key, path)
-		except FileNotFoundError as e:
-			return PwdManagerResult(error=True, result=str(e))
+		pwd_manager._key = key
+		pwd_manager._salt = salt
 
-		except ValueError as e:
-			return PwdManagerResult(error=True, result=str(e))
-
-
-		except KeyError as e:
-			return PwdManagerResult(error=True, result=str(e))
+		data = decrypt_data(key, path)
 
 		if not PwdManager._has_new_format(data):
 
 			if PwdManager._has_old_format(data):
-				print("Vault is in old format. Please save before quitting to convert it to the new format.")
-				sleep(1)
 				return PwdManager._from_encrypted_file_old(path, pwd)
 
-			e = "Something went wrong during descrption of vault: vault does not have the correct foramt."
-			return PwdManagerResult(error=True, result=str(e))
+			raise VaultFormatError
 
 		print(f"{path} decryption successful!")
 
@@ -333,10 +354,10 @@ class PwdManager:
 					# data loss warning message (should not happen normally)
 					print(f"Invalid TOTP URI for entry ({website}, {username}).")
 					sleep(5)
-			
+
 		print("Entries loaded successfully!")
 
-		return PwdManagerResult(result=pwd_manager)
+		return pwd_manager
 	
 	"""
 		*This is the old format (pre TOTP support)*
@@ -348,32 +369,31 @@ class PwdManager:
 			.
 			.
 		}
+
+		@raises:
+			- PasswordError
+			- FileNotFoundError [OSError]
+			- KeyLengthError
+			- KeyDerivationError
+			- VaultFormatError
+			- CorruptedVaultError
+			- OSError
 	"""
 	@staticmethod
-	def _from_encrypted_file_old(path: str, pwd: str) -> PwdManagerResult:
+	def _from_encrypted_file_old(path: str, pwd: str) -> PwdManager:
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		if not satisfies:
-			raise KeyError(f"Password does not meet the minimum requirements: {reason}")
+			raise PasswordError(f"Password does not meet the minimum requirements: {reason}")
 
 		pwd_manager = PwdManager()
 		pwd_manager.file_path = path
 
+		salt, key = get_key_from_pwd(pwd, path)
+		pwd_manager._key = key
+		pwd_manager._salt = salt
 
-		try:
-			salt, key = get_key_from_pwd(pwd, path)
-			pwd_manager._key = key
-			pwd_manager._salt = salt
-
-			data: dict[str, str] = decrypt_data(key, path)
-		except FileNotFoundError as e:
-			return PwdManagerResult(error=True, result=str(e))
-
-		except ValueError as e:
-			return PwdManagerResult(error=True, result=str(e))
-
-		except KeyError as e:
-			return PwdManagerResult(error=True, result=str(e))
+		data: dict[str, str] = decrypt_data(key, path)
 
 		print(f"{path} decryption successful!")
 
@@ -384,26 +404,38 @@ class PwdManager:
 					for value in tup.split(",", 2)
 				)
 				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup])
-		except:
-			e = "Something went wrong during descrption of vault: vault does not have the correct foramt."
-			return PwdManagerResult(error=True, result=str(e))
+		except (KeyError, TypeError, ValueError) as e:
+			raise VaultFormatError from e
 
 		print("Entries loaded successfully!")
 
-		return PwdManagerResult(result=pwd_manager)
+		return pwd_manager
 
+	"""
+		@raises:
+			- PasswordRequirementsError(reason)
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- KeyDerivationError
+			- OSError
+	"""
 	@staticmethod
-	def pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManagerResult:
+	def pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManager:
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
 		if not satisfies:
-			return PwdManagerResult(error=True, result=f"Password does not meet the minimum requirements: {reason}")
+			raise PasswordRequirementsError(reason=reason)
 
 		pwd_manager = PwdManager._pwd_manager_from_pwd(file_path, pwd)
-		return PwdManagerResult(result=pwd_manager)
+		return pwd_manager
 
 	"""
 		creates a PwdManager object and initializes the vault file
+		@raises:
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- KeyDerivationError
+			- OSError
 	"""
 	@staticmethod
 	def _pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManager:
@@ -462,10 +494,9 @@ class PwdManager:
 		return True, ''
 	
 	@staticmethod
-	def _has_new_format(data: dict) -> bool:
-		return all(
-			isinstance(data, dict)
-			and isinstance(key, str)
+	def _has_new_format(data: object) -> bool:
+		return isinstance(data, dict) and all(
+			isinstance(key, str)
 			and len(key.split(",", 2)) == 3
 			and isinstance(value, dict)
 			and isinstance(value.get(PWD), str)

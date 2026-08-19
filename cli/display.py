@@ -15,12 +15,12 @@ RESET = "\033[0m"
 	- index represents 'page number' and is used to calculate which options to show
 	@returns list of available options (between 0 and 9)
 """
-def display_list(ls: list, index=0) -> list[int]:
+def display_list(ls: list, index=0) -> list[str]:
 	options, output = display_list_str(ls, index)
 	print(output)
 	return options
 
-def display_list_str(ls: list, index=0) -> tuple[list[int], str]:
+def display_list_str(ls: list, index=0) -> tuple[list[str], str]:
 	if index < 0:
 		raise IndexError("Calling display_list with negative index.")
 

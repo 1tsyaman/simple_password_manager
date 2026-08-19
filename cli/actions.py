@@ -2,9 +2,11 @@ import sys
 from time import sleep
 from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, NO_SUCH_TOTP_MESSAGE, MIN_PWD_LENGTH
 from core.entry import Entry
+from core.errors import KeyLengthError, KeyDerivationError, PasswordRequirementsError
 from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke, get_input, input_password
 from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
 from cli.util import filter_list, list_diff, format_prev_next_str
+
 
 
 def add_entry(pwd_manager: PwdManager) -> bool:
@@ -159,9 +161,34 @@ def modify_master_password(pwd_manager: PwdManager) -> bool:
 		key = poll_y_n_backspace()
 
 		if key == "y":
-			pwd_manager.modify_master_password(pwd)
-			
-			print("Master password updated successfully,")
+			try:
+				pwd_manager.modify_master_password(pwd)
+
+			except FileNotFoundError as e:
+				print(f"Master password update failed: Vault file path is incorrect: {e}")
+				return False
+
+			except PasswordRequirementsError as e:
+				print(f"Master password update failed: Password does not satisfy the minimum requirements: Reason: {e.reason}")
+				return False
+
+			except KeyLengthError:
+				print("Master password update failed: Key length is not as expected.")
+				return False
+
+			except KeyDerivationError:
+				print("Master password update failed: Could not derive encryption key.")
+				return False
+
+			except OverflowError:
+				print("Master password update failed: Vault is too large to encrypt.")
+				return False
+
+			except OSError as e:
+				print(f"Master password update failed: {e}")
+				return False
+
+			print("Master password updated successfully.")
 
 			sleep(1)
 			return True
@@ -169,9 +196,26 @@ def modify_master_password(pwd_manager: PwdManager) -> bool:
 		return False
 
 def save_changes(pwd_manager: PwdManager) -> bool:
+	try:
+		pwd_manager.encrypt()
+	except FileNotFoundError as e:
+		print(f"Saving failed: Vault file path is incorrect: {e}")
+		return False
+
+	except KeyLengthError:
+		print(f"Saving failed: Key length is not as expected.")
+		return False
+
+	except OverflowError:
+		print("Saving failed: Vault is too large to encrypt.")
+		return False
+
+	except OSError as e:
+		print(f"Saving failed: {e}")
+		return False
+
 	print("Changes saved.")
 	sleep(1)
-	pwd_manager.encrypt()
 	return True
 
 def handle_query(pwd_manager: PwdManager) -> list[Entry]:

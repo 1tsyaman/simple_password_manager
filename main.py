@@ -13,8 +13,12 @@ from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
 from cli.display import display_list, clear_screen, print_footer
 from cli.util import format_prev_next_str, is_valid_index
-from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault, VaultLoadResult
+from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
 from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
+
+from core.errors import (KeyLengthError, KeyDerivationError, PasswordError,
+							VaultFormatError, CorruptedVaultError,
+							PasswordRequirementsError)
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
 
@@ -29,35 +33,67 @@ def _init(argv: list[str]) -> PwdManager | int:
 
 	if len(argv) == 2:
 		pwd = act.grab_master_password()
-		load_vault_result = load_vault(path, pwd)
-	
-		if not load_vault_result.error:
-			print(GENERAL_ERROR)
-			return -1
-		pwd_manager = load_vault_result.result
 
-		# Should generally not happen
-		if isinstance(pwd_manager, str):
+		try:
+			pwd_manager = load_vault(path, pwd)
+		except PasswordError:
+			print("Vault loading failed: Password incorrect")
+			return -1
+		except FileNotFoundError as e:
+			print(f"Vault loading failed: Vault file path is incorrect: {e}")
+			return -1
+		except KeyLengthError:
+			print("Vault loading failed: Key length is unexpected")
+			return -1
+		except KeyDerivationError:
+			print("Vault loading failed: Could not derive encryption key")
+			return -1
+		except VaultFormatError:
+			print("Vault loading failed: Vault format is unexpected")
+			return -1
+		except CorruptedVaultError:
+			print("Vault loading failed: Incorrect password or corrupted vault")
+			return -1
+		except OSError as e:
+			print(f"Vault loading failed: {e}")
 			return -1
 
 	else:
-		if (vault_exists(path)):
+		try:
+			path_exists = vault_exists(path)
+		except OSError as e:
+			print(f"Checking vault path failed: {e}")
+			return -1
+
+		if path_exists:
 			ans = act.double_check_deletion(message1="Vault already exists. Overwrite it? Y/n",
 						message2="Permanently delete the given vault? Y/n")
 			if ans:
-				delete_vault(path)
+				try:
+					delete_vault(path)
+				except OSError as e:
+					print(f"Deleting vault failed: {e}")
+					return -1
 			else:
 				print("Goodbye.")
 				return 0
 
 		pwd = act.grab_master_password(new=True)
-		return_result = create_and_load_vault(path, pwd)
 
-		if return_result.error or isinstance(return_result.result, str):
-			print(GENERAL_ERROR)
+		try:
+			pwd_manager = create_and_load_vault(path, pwd)
+		except KeyLengthError:
+			print("Vault creation failed: Key length is unexpected")
 			return -1
-
-		pwd_manager = return_result.result
+		except KeyDerivationError:
+			print("Vault creation failed: Could not derive encryption key")
+			return -1
+		except PasswordRequirementsError as e:
+			print(f"Vault creation failed: Password does not satisfy the minimum requirements: Reason: {e.reason}")
+			return -1
+		except OSError as e:
+			print(f"Vault creation failed: {e}")
+			return -1
 
 	return pwd_manager
 
@@ -181,8 +217,11 @@ def timeout_exit() -> None:
 	os.kill(os.getpid(), signal.SIGINT)		# sends a ctrl+c interrupt to kill the process
 
 if __name__ == "__main__":
-	pwd_manager = _init(sys.argv)
+	pwd_manager: PwdManager | int = -1
+
 	try:
+		pwd_manager = _init(sys.argv)
+
 		if not isinstance(pwd_manager, PwdManager):	# returns int if it fails
 			sleep(2)
 			quit_program(exit_code=pwd_manager, message="Failed to initalize PwdManager object.")
@@ -206,13 +245,20 @@ if __name__ == "__main__":
 				pwd_manager.encrypt()
 		except KeyboardInterrupt:				# in case CTRL+C is pressed again, we just quit without saving
 			pass
+		except FileNotFoundError as e:
+			print(f"Saving failed: Vault file path is incorrect: {e}")
+		except KeyLengthError:
+			print(f"Saving failed: Key length is not as expected.")
+		except OverflowError:
+			print("Saving failed: Vault is too large to encrypt.")
+		except OSError as e:
+			print(f"Saving failed: {e}")
 
 		quit_program(exit_code=0, message="Goodbye")
 
-	except Exception as e:	#	big net to avoid crashing
-		clear_screen(header=False)
+	except Exception as e:	# big net to avoid crashing
 		message = f"Something went wrong. Unsaved changes will not be saved.\nException: {e!r}"
 		cleanup()
+		print(message)
 		traceback.print_exc()
 		sys.exit(-1)
-		quit_program(exit_code=-1, message=message)
