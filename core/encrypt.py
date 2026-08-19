@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
 
 
-from core.keys import derrive_key, KEY_LEN, SALT_LEN
+from core.keys import derive_key, KEY_LEN, SALT_LEN
 from core.errors import KeyLengthError, VaultFormatError, CorruptedVaultError
 
 NONCE		= "nonce"
@@ -96,7 +96,7 @@ def get_key_from_pwd(pwd: str, file_path: str) -> tuple[bytes, bytes]:
 	if len(salt) != SALT_LEN:
 		raise VaultFormatError
 
-	return derrive_key(pwd, salt)
+	return derive_key(pwd, salt)
 
 """
 	@raises:

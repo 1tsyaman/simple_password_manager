@@ -27,6 +27,8 @@ class InputField(MDTextField):
 		if not password:
 			return super().__init__(*args, **kwargs)
 
+		self.error_widget = MDTextFieldHelperText(text="Initial message", mode="on_error")
+
 		if password:
 			super().__init__(
 				MDTextFieldLeadingIcon(
@@ -35,10 +37,7 @@ class InputField(MDTextField):
 					icon_color_normal="mediumaquamarine",
 					icon_color_focus="tan",
 				),
-				MDTextFieldHelperText(
-					text="Incorrect password",
-					mode="on_error",
-				),
+				self.error_widget,
 				MDTextFieldHintText(
 					text="Password",
 					text_color_normal="mediumaquamarine",
@@ -105,7 +104,7 @@ class LoginDialog(MDDialog):
 		password = self.password_field.text
 		self.password_field.text = ""
 
-		if self.callback(vault_name=self.vault, password=password):
+		if self.callback(login_dialog=self, vault_name=self.vault, password=password):
 			return self.dismiss()	# should trigger transition into the new screen, perhaps.
 
 		self.password_field.error = True

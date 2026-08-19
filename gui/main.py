@@ -11,6 +11,10 @@ from gui.login import LoginDialog
 
 import storage.io as io
 
+from core.errors import (PasswordError, KeyLengthError, KeyDerivationError,
+						 	VaultFormatError, CorruptedVaultError)
+
+
 def init_app():
 	Builder.load_file("top_bar.kv")
 
@@ -37,7 +41,7 @@ class SimplePasswordManagerApp(MDApp):
 			entry = VaultEntry(name=vault)
 			entry.bind(on_release=self.open_vault_decrypt_dialog)
 
-			vault_list.add_widget(entry)
+			vault_list.add_vault(entry)
 
 		new_selection_screen = SelectionScreen()
 		new_selection_screen.add_widget(vault_list)
@@ -51,13 +55,29 @@ class SimplePasswordManagerApp(MDApp):
 		self.login_dialog = LoginDialog(vault=instance.vault_name, callback=self.open_vault)
 		self.login_dialog.open()
 
-	def open_vault(self, vault_name: str, password: str) -> bool:
-		open_result = io.load_vault_for_gui(self.app_data_path, vault_name, password)
+	def open_vault(self, login_dialog: LoginDialog, vault_name: str, password: str) -> bool:
+		error_widget = login_dialog.password_field.error_widget
+		try:
+			pwd_manager = io.load_vault_for_gui(self.app_data_path, vault_name, password)
+			return True
 
-		if open_result.error or isinstance(open_result.result, str):
-			return False
-
-		return True
+		except PasswordError:
+			error_widget.text = "Incorrect Password"
+		except FileNotFoundError:
+			error_widget.text = f"Vault path not valid"
+		except KeyLengthError:
+			error_widget.text = "Derived key has incorrect length, contact developer"
+		except KeyDerivationError:
+			error_widget.text = "Failed to derive key from password"
+		except VaultFormatError:
+			error_widget.text = "Vault format incorrect"
+		except CorruptedVaultError:
+			error_widget.text = "Incorrect password or corrupted vault"
+		except Exception as e:
+			print(f"Something went wrong while opening the vault: {e}")
+			error_widget.text = "Something went wrong, check log"
+		
+		return False
 
 	def on_start(self):
 		self.load_vault_entries()

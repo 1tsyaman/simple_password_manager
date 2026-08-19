@@ -8,7 +8,7 @@ from time import sleep
 from core.encrypt import (encrypt_data, decrypt_data, get_key_from_pwd,
 						  	KeyLengthError, VaultFormatError, CorruptedVaultError)
 from core.entry import Entry
-from core.keys import derrive_key
+from core.keys import derive_key
 from core.totp import TOTP_Config
 from core.errors import PasswordError, PasswordRequirementsError
 
@@ -111,7 +111,7 @@ class PwdManager:
 		if not satisfies:
 			raise PasswordRequirementsError(reason=reason)
 
-		salt, key = derrive_key(pwd)
+		salt, key = derive_key(pwd)
 		old_key, old_salt = self._key, self._salt
 
 		self._key = key
@@ -439,7 +439,7 @@ class PwdManager:
 	"""
 	@staticmethod
 	def _pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManager:
-		salt, key = derrive_key(pwd)
+		salt, key = derive_key(pwd)
 		
 		pwd_manager = PwdManager(file_path, key, salt)
 

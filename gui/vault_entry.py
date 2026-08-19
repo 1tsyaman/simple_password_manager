@@ -11,6 +11,7 @@ class VaultEntry(MDListItem):
 		self.vault_name = name
 
 class VaultList(MDScrollView):
-		pass
+		def add_vault(self, vault: VaultEntry):
+			self.ids.vault_list.add_widget(vault)
 
 Builder.load_file("vault_list.kv")

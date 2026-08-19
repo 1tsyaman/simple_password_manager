@@ -16,7 +16,7 @@ ARGON2_PARALLELISM	= 1
 		- OSError
 		- KeyDerivationError
 """
-def derrive_key(pwd: str, salt=bytes(0)) -> tuple[bytes,bytes]:
+def derive_key(pwd: str, salt=bytes(0)) -> tuple[bytes,bytes]:
 	if len(salt) == 0:
 		salt = os.urandom(SALT_LEN)
 
@@ -34,4 +34,5 @@ def derrive_key(pwd: str, salt=bytes(0)) -> tuple[bytes,bytes]:
 	except (HashingError, UnicodeEncodeError) as e:
 		raise KeyDerivationError from e
 
-	return salt, key
+#	return salt, key
+	return salt, bytes(0)
