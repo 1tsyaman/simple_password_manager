@@ -34,5 +34,4 @@ def derive_key(pwd: str, salt=bytes(0)) -> tuple[bytes,bytes]:
 	except (HashingError, UnicodeEncodeError) as e:
 		raise KeyDerivationError from e
 
-#	return salt, key
-	return salt, bytes(0)
+	return salt, key

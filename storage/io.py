@@ -75,6 +75,22 @@ def load_vault(path: str, pwd: str) -> PwdManager:
 
 	return pwd_manager
 
+"""
+	@raises:
+		- FileNotFoundError(path) [OSError]
+		- PasswordRequirementsError(reason)
+		- KeyLengthError
+		- KeyDerivationError
+		- OSError
+"""
+def create_and_load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdManager:
+	path = os.path.join(app_data_path, vault_name + ".vault")
+
+	try:
+		return create_and_load_vault(path=path, pwd=pwd)
+	except Exception:
+		os.remove(path)	# remove file if created
+		raise			# raise the exception that was caught here
 
 """
 	@raises:
@@ -97,6 +113,14 @@ def create_and_load_vault(path: str, pwd: str) -> PwdManager:
 		- OSError
 """
 def vault_exists(path: str) -> bool:
+	return Path(path).exists()
+
+"""
+	@raises:
+		- OSError
+"""
+def vault_exists_for_gui(app_data_path: str, vault_name: str):
+	path = os.path.join(app_data_path, vault_name + ".vault")
 	return Path(path).exists()
 
 """

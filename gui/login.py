@@ -20,44 +20,46 @@ from kivymd.uix.textfield import (
 )
 
 """
-	Possible improvement: different dialogs, different subclasses (with a generic parent class)?
+	To communicate incorrect input:
+		input = InputField(...)
+		...
+		input.error_widget.text = "Some error meesage"
+		input.error = True
 """
 class InputField(MDTextField):
-	def __init__(self, *args, password=False, **kwargs):
-		if not password:
-			return super().__init__(*args, **kwargs)
-
+	def __init__(self, *args, title: str, icon: str = "", password=False, **kwargs):
 		self.error_widget = MDTextFieldHelperText(text="Initial message", mode="on_error")
 
-		if password:
-			super().__init__(
-				MDTextFieldLeadingIcon(
-					icon="lock",
-					theme_icon_color="Custom",
-					icon_color_normal="mediumaquamarine",
-					icon_color_focus="tan",
-				),
-				self.error_widget,
-				MDTextFieldHintText(
-					text="Password",
-					text_color_normal="mediumaquamarine",
-					text_color_focus="tan",
-				),
-				mode="outlined",
-				fill_color_normal="lightcyan",
-				fill_color_focus="lightsteelblue",
-				theme_line_color="Custom",
-				line_color_normal="mediumaquamarine",
-				line_color_focus="tan",
-			)
+		super().__init__(
+			MDTextFieldLeadingIcon(
+				icon=icon,
+				theme_icon_color="Custom",
+				icon_color_normal="mediumaquamarine",
+				icon_color_focus="tan",
+			),
+			self.error_widget,
+			MDTextFieldHintText(
+				text=title,
+				text_color_normal="mediumaquamarine",
+				text_color_focus="tan",
+			),
+			*args,
+			mode="outlined",
+			fill_color_normal="lightcyan",
+			fill_color_focus="lightsteelblue",
+			theme_line_color="Custom",
+			line_color_normal="mediumaquamarine",
+			line_color_focus="tan",
+			**kwargs
+		)
 
-			self.password=password
-			self.password_mask="\u2022" # "●"
+		self.password=password
+		self.password_mask="\u2022" # "●"
 
 
 class LoginDialog(MDDialog):
 	def __init__(self, vault, callback, *args, **kwargs):
-		self.password_field = InputField(password=True)
+		self.password_field = InputField(title="Password", icon="lock", password=True)
 		self.vault = vault
 		self.callback = callback
 
@@ -108,3 +110,65 @@ class LoginDialog(MDDialog):
 			return self.dismiss()	# should trigger transition into the new screen, perhaps.
 
 		self.password_field.error = True
+
+class NewVaultDialog(MDDialog):
+	def __init__(self, callback, *args, **kwargs):
+		self.name_field				= InputField(title="Name")
+		self.password_field			= InputField(title="Password", password=True)
+		self.confirm_password_field	= InputField(title="Confirm Password", password=True)
+		self.callback = callback
+
+		super().__init__(
+			MDDialogIcon(
+				icon="safe",
+			),
+
+			MDDialogHeadlineText(
+				text=f"Create vault",
+			),
+
+			MDDialogContentContainer(
+				self.name_field,
+				self.password_field,
+				self.confirm_password_field,
+				orientation="vertical",
+				spacing="30dp"
+			),
+
+			MDDialogButtonContainer(
+				Widget(),
+
+				MDButton(
+					MDButtonText(text="Cancel"),
+					style="text",
+					on_release=self._dismiss
+				),
+
+				MDButton(
+					MDButtonText(text="Create"),
+					style="text",
+					on_release=self._create
+				),
+
+				spacing="8dp",
+			),
+			*args,
+			**kwargs,
+		)
+
+	def _dismiss(self, instance):
+		self.dismiss()
+		self.name_field.text = ""
+		self.password_field.text = ""
+		self.confirm_password_field.text = ""
+
+	def _create(self, instance):
+		name			= self.name_field.text
+		password		= self.password_field.text
+		conf_password	= self.confirm_password_field.text
+
+		if self.callback(dialog=self, name=name, password=password, conf_password=conf_password):
+			self.name_field.text = ""
+			self.password_field.text = ""
+			self.confirm_password_field.text = ""
+			return self.dismiss()
