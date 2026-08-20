@@ -1,6 +1,8 @@
 from kivy.lang.builder import Builder
 from kivy.uix.widget import Widget
 
+from kivymd.uix.button import MDButton, MDButtonText
+from kivymd.uix.progressindicator import MDCircularProgressIndicator
 from kivymd.uix.dialog import (
 	MDDialog,
 	MDDialogButtonContainer,
@@ -9,7 +11,6 @@ from kivymd.uix.dialog import (
 	MDDialogIcon,
 	MDDialogSupportingText,
 )
-from kivymd.uix.button import MDButton, MDButtonText
 from kivymd.uix.textfield import (
 	MDTextField,
 	MDTextFieldHelperText,
@@ -60,6 +61,13 @@ class InputField(MDTextField):
 class LoginDialog(MDDialog):
 	def __init__(self, vault, callback, *args, **kwargs):
 		self.password_field = InputField(title="Password", icon="lock", password=True)
+		self.loading_indicator = MDCircularProgressIndicator(
+			size_hint=(None, None),
+			pos_hint={"center_x": 0.5},
+			size=("32dp", "32dp"), 
+			active=False,	# active -> visible
+		)
+
 		self.vault = vault
 		self.callback = callback
 
@@ -74,7 +82,9 @@ class LoginDialog(MDDialog):
 
 			MDDialogContentContainer(
 				self.password_field,
+				self.loading_indicator,
 				orientation="vertical",
+				spacing="10dp",
 			),
 
 			MDDialogButtonContainer(
@@ -106,10 +116,7 @@ class LoginDialog(MDDialog):
 		password = self.password_field.text
 		self.password_field.text = ""
 
-		if self.callback(login_dialog=self, vault_name=self.vault, password=password):
-			return self.dismiss()	# should trigger transition into the new screen, perhaps.
-
-		self.password_field.error = True
+		self.callback(login_dialog=self, vault_name=self.vault, password=password)
 
 class NewVaultDialog(MDDialog):
 	def __init__(self, callback, *args, **kwargs):

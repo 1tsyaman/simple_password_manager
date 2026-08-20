@@ -1,6 +1,16 @@
 #:kivy 2.3.1
 #:import MDSharedAxisTransition kivymd.uix.transition.MDSharedAxisTransition
 
+<NoAccountsLabel>:
+	text: "Accounts will appear here."
+	halign: "center"	# horizontal alignment
+	valign: "middle"	# vertical alignmnet
+
+<NoVaultsLabel>:
+	text: "Imported/Created vaults will appear here."
+	halign: "center"
+	valign: "middle"
+
 MDScreen:
 	id: app_screen
 	md_bg_color: app.theme_cls.backgroundColor
@@ -30,28 +40,19 @@ MDScreen:
 				name: "selection"
 
 				on_pre_enter:
-					app.root.ids.top_bar.back_callback = None
-					app.root.ids.top_bar.ids.back_button.disabled = True
-					app.root.ids.top_bar.ids.back_button.opacity = 0
+					app.refresh_selection_screen()
 
-				MDLabel:
-					id: empty_vault_list
-					text: "Imported/Created vaults will appear here."
-					adaptive_height: True
-					pos_hint: {"center_x": 0.5, "center_y": 0.5}
-					halign: "center"
-			
+				on_leave:
+					app.clear_selection_screen()
+
 			VaultScreen:
 				name: "vault"
 
 				on_pre_enter:
-					app.root.ids.top_bar.back_callback = app.back_to_selection
-					app.root.ids.top_bar.ids.back_button.disabled = False
-					app.root.ids.top_bar.ids.back_button.opacity = 1
-				
-				MDLabel:
-					id: empty_account_list
-					text: "Accounts will appear here."
-					adaptive_height: True
-					pos_hint: {"center_x": 0.5, "center_y": 0.5}
-					halign: "center"
+					app.refresh_vault_screen()
+
+				on_enter:
+					app._resume_loading_account_batch()
+
+				on_leave:
+					app.clear_vault_screen()

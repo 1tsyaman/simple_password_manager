@@ -1,11 +1,17 @@
+import traceback
+from collections.abc import Callable
+
 from kivy.lang.builder import Builder
 from kivy.uix.screenmanager import ScreenManager
 from kivy.uix.boxlayout import BoxLayout
+from kivy.clock import Clock		# for scheduling kivy jobs
 
 from kivymd.app import MDApp
+from kivymd.uix.label import MDLabel
 from kivymd.uix.appbar import MDTopAppBar
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.appbar import MDActionTopAppBarButton
+from kivymd.uix.progressindicator import MDCircularProgressIndicator
 
 from gui.selection_screen import SelectionScreen
 from gui.vault_entry import VaultEntry, VaultList, AccountEntry, AccountList
@@ -15,7 +21,6 @@ import storage.io as io
 
 from core.errors import (PasswordError, KeyLengthError, KeyDerivationError,
 						 	VaultFormatError, CorruptedVaultError, PasswordRequirementsError)
-import traceback
 
 def init_app():
 	Builder.load_file("top_bar.kv")
@@ -23,30 +28,68 @@ def init_app():
 class TopBar(MDTopAppBar):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.back_callback = None			# indirect on_release callback for the back button
+		self.back_callback : Callable | None = None			# indirect on_release callback for the back button
 
 	# direct on_release callback for the back button
 	def on_back(self):
 		if self.back_callback is not None:
 			self.back_callback()
 
+class NoAccountsLabel(MDLabel):
+	pass
+
+class NoVaultsLabel(MDLabel):
+	pass
+
 
 class SimplePasswordManagerApp(MDApp):
-	def __init__(self, **kwargs):
-		super().__init__(**kwargs)
-
-		self.app_data_path = str(io.get_app_data_path())
-		self.vaults = io.get_vault_list(self.app_data_path)
-
 	def switch_screen(self, screen: str):
 		if screen in ["selection", "vault"]:
-			self.root.ids.screen_manager.current = screen
+			self.screen_manager.current = screen
 
 	def back_to_selection(self):
 		self.switch_screen("selection")
 
+	def refresh_selection_screen(self):
+		top_bar : TopBar = self.top_bar
+		back_button : MDActionTopAppBarButton = self.back_button
+
+		# Disable back button
+		top_bar.back_callback = None
+		back_button.disabled = True
+		back_button.opacity = 0
+
+		self.load_vaults_to_screen()
+
+	def refresh_vault_screen(self):
+		top_bar : TopBar = self.top_bar
+		back_button : MDActionTopAppBarButton = self.back_button
+
+		# Enable back button
+		top_bar.back_callback = self.back_to_selection
+		back_button.disabled = False
+		back_button.opacity = 1
+
+	def clear_vault_screen(self):
+		# Cancel loading if we quit while loading wasn't finished
+		if hasattr(self, "account_load_event"):
+			self.account_load_event.cancel()
+
+		self.vault_screen_box.clear_widgets()
+		self.vault_screen_box.add_widget(NoAccountsLabel())
+
+	def clear_selection_screen(self):
+		self.selection_screen_box.clear_widgets()
+		self.selection_screen_box.add_widget(NoVaultsLabel())
+
 	def load_vaults_to_screen(self):
+		# refresh vault list
+		self.vaults = io.get_vault_list(self.app_data_path)
+
 		if len(self.vaults) == 0:
+			# Add no_vaults_label
+			self.selection_screen_box.clear_widgets()
+			self.selection_screen_box.add_widget(NoVaultsLabel())
 			return
 
 		screen_manager : ScreenManager 		= self.root.ids.screen_manager
@@ -59,73 +102,108 @@ class SimplePasswordManagerApp(MDApp):
 
 			vault_list.add_vault(entry)
 
-		# Remove empty list label if it exists
-		empty_list_label = self.root.ids.get("empty_vault_list")
-
-		if empty_list_label is not None and empty_list_label.parent is not None:
-			empty_list_label.parent.remove_widget(empty_list_label)
-
-		container : BoxLayout = selection_screen.ids.selection_screen_box
+		container : BoxLayout = self.selection_screen_box
 		container.clear_widgets()
 		container.add_widget(vault_list)
 
-	def load_vault_entries_to_screen(self):
+	def load_vault_entries_to_screen(self, login_dialog: LoginDialog):
+#		loading_indicator : MDCircularProgressIndicator = self.login_dialog.loading_indicator
+		self.account_list : AccountList = AccountList()
+
 		accounts = self.pwd_manager.get_website_username_list()
+		self.number_accounts = len(accounts)		# store number of accounts
+		self.account_iterator = iter(accounts)	# create an iterator
+#		loading_indicator.active = True (no longer needed)
 
-		if len(accounts) == 0:
-			return
+		if self.number_accounts == 0:
+			self.vault_screen_box.clear_widgets()
+			self.vault_screen_box.add_widget(NoAccountsLabel())
 
-		screen_manager : ScreenManager 		= self.root.ids.screen_manager
-		vault_screen: MDScreen				= screen_manager.get_screen("vault")
-		account_list : AccountList 			= AccountList()
+			self.login_dialog.dismiss()
 
-		for website, username in accounts:
+			return self.switch_screen("vault")
+
+		# Function signature:
+		# 	Clock.schedule_interval(self, callback(self, dt: float) -> bool, intervall in sec)
+		self.account_load_event = Clock.schedule_interval(self._load_account_batch, 0)
+
+	def _load_account_batch(self, dt: float) -> bool:
+		batch_size = min(10, self.number_accounts)
+		done = False
+
+		# Add accounts in batches of 10
+		for _ in range(batch_size):
+			try:
+				website, username = next(self.account_iterator)
+
+			# Whenever we're done
+			except StopIteration:
+				done = True
+				break
+
 			entry = AccountEntry(website=website, username=username)
-			#entry.bind(on_release=self.show_open_vault_dialog)
+			self.account_list.add_account(entry)
 
-			account_list.add_account(entry)
+		# only switch the screen once, after one batch is added
+		if self.screen_manager.current != "vault":
+			container : BoxLayout = self.vault_screen_box
+			container.clear_widgets()
+			container.add_widget(self.account_list)
 
-		# Remove empty list label if it exists
-		empty_list_label = self.root.ids.get("empty_account_list")
+			self.login_dialog.dismiss()
+			self.switch_screen("vault")
 
-		if empty_list_label is not None and empty_list_label.parent is not None:
-			empty_list_label.parent.remove_widget(empty_list_label)
+			# stop loading while transitioning screens
+			return False
 
-		container : BoxLayout = vault_screen.ids.vault_screen_box
-		container.clear_widgets()
-		container.add_widget(account_list)
+		# if done = True, we return False -> don't schedule again
+		return not done	
+
+	"""
+		Resumes loading the entries after screen has loaded
+	"""
+	def _resume_loading_account_batch(self):
+		if self.number_accounts != 0:
+			self.account_load_event = Clock.schedule_interval(self._load_account_batch, 0)
 
 	# Bound to vault entries
 	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
 		self.login_dialog = LoginDialog(vault=instance.vault_name, callback=self.open_vault)
 		self.login_dialog.open()
 
-	def open_vault(self, login_dialog: LoginDialog, vault_name: str, password: str) -> bool:
-		error_widget = login_dialog.password_field.error_widget
+
+	def open_vault(self, login_dialog: LoginDialog, vault_name: str, password: str):
+		password_field : InputField = login_dialog.password_field 
+		error_widget = password_field.error_widget
+
 		try:
 			self.pwd_manager = io.load_vault_for_gui(self.app_data_path, vault_name, password)
-			self.load_vault_entries_to_screen()
-			self.switch_screen("vault")
-			return True
+			self.load_vault_entries_to_screen(login_dialog=login_dialog)
 
 		except PasswordError:
 			error_widget.text = "Incorrect Password"
+			password_field.error = True
 		except FileNotFoundError:
 			error_widget.text = f"Vault path not valid"
+			password_field.error = True
 		except KeyLengthError:
 			error_widget.text = "Derived key has incorrect length, contact developer"
+			password_field.error = True
 		except KeyDerivationError:
 			error_widget.text = "Failed to derive key from password"
+			password_field.error = True
 		except VaultFormatError:
 			error_widget.text = "Vault format incorrect"
+			password_field.error = True
 		except CorruptedVaultError:
 			error_widget.text = "Incorrect password or corrupted vault"
+			password_field.error = True
 		except Exception as e:
 			print(f"Something went wrong while opening the vault: {e}")
 			traceback.print_exc()
 			error_widget.text = "Something went wrong, check log"
-		
-		return False
+			password_field.error = True
+
 
 	def show_new_vault_dialog(self, instance: MDActionTopAppBarButton):
 		self.new_vault_dialog = NewVaultDialog(callback=self.create_vault)
@@ -138,7 +216,7 @@ class SimplePasswordManagerApp(MDApp):
 
 		try:
 			vault_exists = io.vault_exists_for_gui(self.app_data_path, name)
-		except OSError:
+		except OSError as e:
 			print(f"Something went wrong while creating vault: {e}")
 			name_field.error_widget.text = "Something went wrong, check log"
 			name_field.error = True
@@ -186,13 +264,27 @@ class SimplePasswordManagerApp(MDApp):
 		return False
 
 	def on_start(self):
-		self.load_vaults_to_screen()
-		top_bar : TopBar = self.root.ids.top_bar
+		# Top bar
+		self.top_bar : TopBar							= self.root.ids.top_bar
+		self.new_vault_button : MDActionTopAppBarButton = self.top_bar.ids.new_vault_button
+		self.back_button : MDActionTopAppBarButton		= self.top_bar.ids.back_button
 
-		# bind new vault button
-		new_vault_button : MDActionTopAppBarButton = top_bar.ids.new_vault_button
-		new_vault_button.bind(on_release=self.show_new_vault_dialog)
+		# Screen manager
+		self.screen_manager : ScreenManager 			= self.root.ids.screen_manager
 
+		# Selection screen
+		self.selection_screen: MDScreen					= self.screen_manager.get_screen("selection")
+		self.selection_screen_box : BoxLayout			= self.selection_screen.ids.selection_screen_box
+
+		# Vault screen
+		self.vault_screen: MDScreen						= self.screen_manager.get_screen("vault")
+		self.vault_screen_box : BoxLayout				= self.vault_screen.ids.vault_screen_box
+
+		self.app_data_path = str(io.get_app_data_path())
+
+		# init app
+		self.new_vault_button.bind(on_release=self.show_new_vault_dialog)
+		self.refresh_selection_screen()
 
 	# Should return the main widget, the selection screen in this case.
 	def build(self):
