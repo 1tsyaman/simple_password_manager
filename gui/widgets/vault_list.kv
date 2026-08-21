@@ -1,0 +1,17 @@
+#:kivy 2.3.1
+
+<VaultEntry>:
+	pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+	MDListItemLeadingIcon:
+		icon: "safe"
+	MDListItemHeadlineText:
+		id: vault_name
+
+<VaultList>:
+	do_scroll_x: False
+
+	MDBoxLayout:
+		id: vault_list
+		orientation: "vertical"
+		adaptive_height: True
