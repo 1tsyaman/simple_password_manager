@@ -1,5 +1,25 @@
+from collections.abc import Callable
+
+from kivy.uix.widget import Widget
+
+from kivymd.uix.button import MDButton, MDButtonText
+from kivymd.uix.dialog import (
+	MDDialog,
+	MDDialogIcon,
+	MDDialogHeadlineText,
+	MDDialogContentContainer,
+	MDDialogButtonContainer
+)
+
+from gui.widgets.input_field import InputField
+
 class NewAccountDialog(MDDialog):
-	def __init__(self, add_account_callback, *args, **kwargs):
+	def __init__(
+		self,
+		add_account_callback: Callable,
+		*args,
+		**kwargs
+	):
 		self.website_field				= InputField(title="Website")
 		self.username_field				= InputField(title="Username")
 		self.password_field				= InputField(title="Password", password=True)
@@ -12,7 +32,7 @@ class NewAccountDialog(MDDialog):
 			),
 
 			MDDialogHeadlineText(
-				text=f"Add new account",
+				text="Add new account",
 			),
 
 			MDDialogContentContainer(
@@ -47,10 +67,6 @@ class NewAccountDialog(MDDialog):
 
 	def _dismiss(self, instance):
 		self.dismiss()
-		self.website_field.text = ""
-		self.username_field.text = ""
-		self.password_field.text = ""
-		self.description_field.text = ""
 
 	def _add(self, instance):
 		website			= self.website_field.text
@@ -58,5 +74,10 @@ class NewAccountDialog(MDDialog):
 		password		= self.password_field.text
 		description		= self.description_field.text
 
-		self.add_account_callback(dialog=self, website=website, username=username,
-							   		password=password, description=description)
+		self.add_account_callback(
+			dialog=self,
+			website=website,
+			username=username,
+			password=password,
+			description=description
+		)

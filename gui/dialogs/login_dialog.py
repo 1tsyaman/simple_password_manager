@@ -1,15 +1,36 @@
-class LoginDialog(MDDialog):
-	def __init__(self, vault, login_callback, *args, **kwargs):
-		self.password_field = InputField(title="Password", icon="lock", password=True)
-		self.loading_indicator = MDCircularProgressIndicator(
-			size_hint=(None, None),
-			pos_hint={"center_x": 0.5},
-			size=("32dp", "32dp"), 
-			active=False,	# active -> visible
-		)
+from collections.abc import Callable
 
+from kivy.uix.widget import Widget
+
+from kivymd.uix.button import MDButton, MDButtonText
+from kivymd.uix.dialog import (
+	MDDialog,
+	MDDialogIcon,
+	MDDialogHeadlineText,
+	MDDialogContentContainer,
+	MDDialogButtonContainer
+)
+
+from gui.widgets.input_field import InputField
+
+class LoginDialog(MDDialog):
+	def __init__(
+		self,
+		vault: str,
+		login_callback: Callable,
+		*args,
+		**kwargs
+	):
+		self.password_field = InputField(title="Password", icon="lock", password=True)
 		self.vault = vault
 		self.login_callback = login_callback
+
+#		self.loading_indicator = MDCircularProgressIndicator(	We don't need loading indicator for now
+#			size_hint=(None, None),
+#			pos_hint={"center_x": 0.5},
+#			size=("32dp", "32dp"), 
+#			active=False,	# active -> visible
+#		)
 
 		super().__init__(
 			MDDialogIcon(
@@ -22,7 +43,7 @@ class LoginDialog(MDDialog):
 
 			MDDialogContentContainer(
 				self.password_field,
-				self.loading_indicator,
+#				self.loading_indicator,
 				orientation="vertical",
 				spacing="10dp",
 			),
@@ -48,12 +69,13 @@ class LoginDialog(MDDialog):
 			**kwargs,
 		)
 
-	def _dismiss(self, instance):
+	def _dismiss(self, _):
 		self.dismiss()
-		self.password_field.text = ""
 
-	def _accept(self, instance):
+	def _accept(self, _):
 		password = self.password_field.text
-		self.password_field.text = ""
-
-		self.login_callback(login_dialog=self, vault_name=self.vault, password=password)
+		self.login_callback(
+			dialog=self,
+			vault_name=self.vault,
+			password=password
+		)

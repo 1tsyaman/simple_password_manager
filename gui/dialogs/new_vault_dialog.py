@@ -1,9 +1,29 @@
+from collections.abc import Callable
+
+from kivy.uix.widget import Widget
+
+from kivymd.uix.button import MDButton, MDButtonText
+from kivymd.uix.dialog import (
+	MDDialog,
+	MDDialogIcon,
+	MDDialogHeadlineText,
+	MDDialogContentContainer,
+	MDDialogButtonContainer
+)
+
+from gui.widgets.input_field import InputField
+
 class NewVaultDialog(MDDialog):
-	def __init__(self, create_vault_callback, *args, **kwargs):
+	def __init__(
+		self,
+		create_vault_callback: Callable,
+		*args,
+		**kwargs
+	):
 		self.name_field				= InputField(title="Name")
 		self.password_field			= InputField(title="Password", password=True)
 		self.confirm_password_field	= InputField(title="Confirm Password", password=True)
-		self.create_vault_callback 		= create_vault_callback
+		self.create_vault_callback 	= create_vault_callback
 
 		super().__init__(
 			MDDialogIcon(
@@ -11,7 +31,7 @@ class NewVaultDialog(MDDialog):
 			),
 
 			MDDialogHeadlineText(
-				text=f"Create vault",
+				text="Create vault",
 			),
 
 			MDDialogContentContainer(
@@ -43,19 +63,17 @@ class NewVaultDialog(MDDialog):
 			**kwargs,
 		)
 
-	def _dismiss(self, instance):
+	def _dismiss(self, _):
 		self.dismiss()
-		self.name_field.text = ""
-		self.password_field.text = ""
-		self.confirm_password_field.text = ""
 
-	def _create(self, instance):
+	def _create(self, _):
 		name			= self.name_field.text
 		password		= self.password_field.text
 		conf_password	= self.confirm_password_field.text
 
-		if self.create_vault_callback(dialog=self, name=name, password=password, conf_password=conf_password):
-			self.name_field.text = ""
-			self.password_field.text = ""
-			self.confirm_password_field.text = ""
-			return self.dismiss()
+		self.create_vault_callback(
+			dialog=self,
+			name=name,
+			password=password,
+			conf_password=conf_password
+		)
