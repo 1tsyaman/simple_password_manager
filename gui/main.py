@@ -1,5 +1,6 @@
 import traceback
 from collections.abc import Callable
+from threading import Thread
 
 from kivy.lang.builder import Builder
 from kivy.uix.screenmanager import ScreenManager
@@ -15,7 +16,7 @@ from kivymd.uix.progressindicator import MDCircularProgressIndicator
 
 from gui.selection_screen import SelectionScreen
 from gui.vault_entry import VaultEntry, VaultList, AccountEntry, AccountList
-from gui.login import LoginDialog, NewVaultDialog, InputField, NewAccountDialog
+from gui.login import LoginDialog, NewVaultDialog, InputField, NewAccountDialog, ErrorDialog
 
 import storage.io as io
 
@@ -34,6 +35,7 @@ class TopBar(MDTopAppBar):
 
 	# direct on_release callback for the back button
 	def on_back(self, instance=None):
+		print("clicked!")
 		if self.back_callback is not None:
 			self.back_callback()
 
@@ -49,12 +51,20 @@ class NoVaultsLabel(MDLabel):
 
 
 class SimplePasswordManagerApp(MDApp):
-	def switch_screen(self, screen: str):
-		if screen in ["selection", "vault"]:
-			self.screen_manager.current = screen
+	def switch_screen(self, screen: str, on_exit: bool = False):
+		if screen in ["selection", "vault"] \
+			and (
+					self.screen_manager.current != "vault"
+					or self.vault_screen_can_switch(on_exit=on_exit)	# current = vault? -> check if we can exit
+				):
+				self.screen_manager.current = screen
+
+	def vault_screen_can_switch(self, on_exit: bool = False):
+		return self.force_exit_vault \
+				or (not self.changes_made or self.sync_pwd_manager(on_exit=on_exit))	# changes made -> sync
 
 	def back_to_selection(self):
-		self.switch_screen("selection")
+		self.switch_screen("selection", on_exit=True)
 
 	def refresh_selection_screen(self):
 		top_bar : TopBar = self.top_bar
@@ -73,6 +83,8 @@ class SimplePasswordManagerApp(MDApp):
 	def refresh_vault_screen(self):
 		top_bar : TopBar = self.top_bar
 		back_button : MDActionTopAppBarButton = self.back_button
+
+		self.force_exit_vault = False
 
 		# New account button
 		top_bar.plus_callback = self.show_add_account_dialog
@@ -105,8 +117,6 @@ class SimplePasswordManagerApp(MDApp):
 			self.selection_screen_box.add_widget(NoVaultsLabel())
 			return
 
-		screen_manager : ScreenManager 		= self.root.ids.screen_manager
-		selection_screen : MDScreen 		= screen_manager.get_screen("selection")
 		vault_list : VaultList 				= VaultList()
 
 		for vault in self.vaults:
@@ -193,16 +203,62 @@ class SimplePasswordManagerApp(MDApp):
 		try:
 			self.pwd_manager.add_entry(website=website, username=username, password=password, description=description)
 		except EntryExistsError:
-			website_field = dialog.website_field
-			error_widget = website_field.error_widget
+			username_field = dialog.username_field
+			error_widget = username_field.error_widget
 
 			error_widget.text = "website/username combination already exists"
-			website_field.error = True
+			username_field.error = True
+			return
 
 		# Add account to list (without refreshing the whole list)
 		entry = AccountEntry(website=website, username=username)
 		self.account_list.add_account(entry)
+		self.changes_made = True
+
+		self.sync_thread = Thread(target=self.sync_pwd_manager, kwargs={"on_exit": False}, daemon=False)	# daemon=False -> program will not exit until thread returns
+		self.sync_thread.start()
+
 		dialog.dismiss()
+
+	def sync_pwd_manager(self, on_exit: bool = False) -> bool:
+		try:
+			self.pwd_manager.encrypt()
+			self.changes_made = False	# need to introduce locks here
+			return True
+		except FileNotFoundError as e:
+			reason = ""
+		except KeyLengthError:
+			reason = ""
+		except OverflowError:
+			reason = ""
+		except OSError:
+			reason = ""
+
+		kwargs = {
+					"error_title": "Error: Changes not saved",
+					"error_message": reason,
+					"first_button_label": "Dismiss",
+					"first_button_callback": lambda dialog: dialog.dismiss(),
+				}
+		if on_exit:
+			kwargs["second_button_label"]		= "Exit anyways"
+			kwargs["second_button_callback"]	= self.force_exist_vault_screen
+
+		# because UI work should only happen on the main thread
+		Clock.schedule_once(
+			lambda dt: self.show_error_dialog(kwargs=kwargs),
+			0
+		)
+		return False
+
+	def show_error_dialog(self, kwargs: dict):
+		self.error_dialog = ErrorDialog(**kwargs)
+		self.error_dialog.open()
+
+	def force_exist_vault_screen(self, dialog: ErrorDialog):
+		dialog.dismiss()
+		self.force_exit_vault = True
+		self.switch_screen("selection", on_exit=True)
 
 	def open_vault(self, login_dialog: LoginDialog, vault_name: str, password: str):
 		password_field : InputField = login_dialog.password_field 
@@ -211,6 +267,7 @@ class SimplePasswordManagerApp(MDApp):
 		try:
 			self.pwd_manager = io.load_vault_for_gui(self.app_data_path, vault_name, password)
 			self.load_vault_entries_to_screen(login_dialog=login_dialog)
+			self.changes_made = False
 
 		except PasswordError:
 			error_widget.text = "Incorrect Password"
@@ -314,6 +371,8 @@ class SimplePasswordManagerApp(MDApp):
 		# Vault screen
 		self.vault_screen: MDScreen						= self.screen_manager.get_screen("vault")
 		self.vault_screen_box : BoxLayout				= self.vault_screen.ids.vault_screen_box
+		self.force_exit_vault = False
+		self.changes_made = False
 
 		self.app_data_path = str(io.get_app_data_path())
 
