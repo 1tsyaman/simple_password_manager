@@ -15,12 +15,13 @@ from kivymd.uix.progressindicator import MDCircularProgressIndicator
 
 from gui.selection_screen import SelectionScreen
 from gui.vault_entry import VaultEntry, VaultList, AccountEntry, AccountList
-from gui.login import LoginDialog, NewVaultDialog, InputField
+from gui.login import LoginDialog, NewVaultDialog, InputField, NewAccountDialog
 
 import storage.io as io
 
 from core.errors import (PasswordError, KeyLengthError, KeyDerivationError,
-						 	VaultFormatError, CorruptedVaultError, PasswordRequirementsError)
+						 	VaultFormatError, CorruptedVaultError, PasswordRequirementsError,
+							EntryExistsError)
 
 def init_app():
 	Builder.load_file("top_bar.kv")
@@ -29,11 +30,16 @@ class TopBar(MDTopAppBar):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.back_callback : Callable | None = None			# indirect on_release callback for the back button
+		self.plus_callback : Callable | None = None
 
 	# direct on_release callback for the back button
-	def on_back(self):
+	def on_back(self, instance=None):
 		if self.back_callback is not None:
 			self.back_callback()
+
+	def on_plus(self, instance=None):
+		if self.plus_callback is not None:
+			self.plus_callback()
 
 class NoAccountsLabel(MDLabel):
 	pass
@@ -54,6 +60,9 @@ class SimplePasswordManagerApp(MDApp):
 		top_bar : TopBar = self.top_bar
 		back_button : MDActionTopAppBarButton = self.back_button
 
+		# New vault button
+		top_bar.plus_callback = self.show_new_vault_dialog
+
 		# Disable back button
 		top_bar.back_callback = None
 		back_button.disabled = True
@@ -65,10 +74,14 @@ class SimplePasswordManagerApp(MDApp):
 		top_bar : TopBar = self.top_bar
 		back_button : MDActionTopAppBarButton = self.back_button
 
+		# New account button
+		top_bar.plus_callback = self.show_add_account_dialog
+
 		# Enable back button
 		top_bar.back_callback = self.back_to_selection
 		back_button.disabled = False
 		back_button.opacity = 1
+
 
 	def clear_vault_screen(self):
 		# Cancel loading if we quit while loading wasn't finished
@@ -166,11 +179,30 @@ class SimplePasswordManagerApp(MDApp):
 		if self.number_accounts != 0:
 			self.account_load_event = Clock.schedule_interval(self._load_account_batch, 0)
 
+	def show_add_account_dialog(self):
+		self.new_account_dialog = NewAccountDialog(add_account_callback=self.add_account)
+		self.new_account_dialog.open()
+
 	# Bound to vault entries
 	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
-		self.login_dialog = LoginDialog(vault=instance.vault_name, callback=self.open_vault)
+		self.login_dialog = LoginDialog(vault=instance.vault_name, login_callback=self.open_vault)
 		self.login_dialog.open()
 
+
+	def add_account(self, dialog: NewAccountDialog, website: str, username: str, password: str, description: str):
+		try:
+			self.pwd_manager.add_entry(website=website, username=username, password=password, description=description)
+		except EntryExistsError:
+			website_field = dialog.website_field
+			error_widget = website_field.error_widget
+
+			error_widget.text = "website/username combination already exists"
+			website_field.error = True
+
+		# Add account to list (without refreshing the whole list)
+		entry = AccountEntry(website=website, username=username)
+		self.account_list.add_account(entry)
+		dialog.dismiss()
 
 	def open_vault(self, login_dialog: LoginDialog, vault_name: str, password: str):
 		password_field : InputField = login_dialog.password_field 
@@ -205,8 +237,8 @@ class SimplePasswordManagerApp(MDApp):
 			password_field.error = True
 
 
-	def show_new_vault_dialog(self, instance: MDActionTopAppBarButton):
-		self.new_vault_dialog = NewVaultDialog(callback=self.create_vault)
+	def show_new_vault_dialog(self):
+		self.new_vault_dialog = NewVaultDialog(create_vault_callback=self.create_vault)
 		self.new_vault_dialog.open()
 
 	def create_vault(self, dialog: NewVaultDialog, name: str, password: str, conf_password: str):
@@ -266,8 +298,11 @@ class SimplePasswordManagerApp(MDApp):
 	def on_start(self):
 		# Top bar
 		self.top_bar : TopBar							= self.root.ids.top_bar
-		self.new_vault_button : MDActionTopAppBarButton = self.top_bar.ids.new_vault_button
+		self.plus_button : MDActionTopAppBarButton 		= self.top_bar.ids.new_vault_button
 		self.back_button : MDActionTopAppBarButton		= self.top_bar.ids.back_button
+
+		self.back_button.bind(on_release=self.top_bar.on_back)
+		self.plus_button.bind(on_release=self.top_bar.on_plus)
 
 		# Screen manager
 		self.screen_manager : ScreenManager 			= self.root.ids.screen_manager
@@ -283,7 +318,6 @@ class SimplePasswordManagerApp(MDApp):
 		self.app_data_path = str(io.get_app_data_path())
 
 		# init app
-		self.new_vault_button.bind(on_release=self.show_new_vault_dialog)
 		self.refresh_selection_screen()
 
 	# Should return the main widget, the selection screen in this case.

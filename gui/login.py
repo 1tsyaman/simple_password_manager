@@ -59,7 +59,7 @@ class InputField(MDTextField):
 
 
 class LoginDialog(MDDialog):
-	def __init__(self, vault, callback, *args, **kwargs):
+	def __init__(self, vault, login_callback, *args, **kwargs):
 		self.password_field = InputField(title="Password", icon="lock", password=True)
 		self.loading_indicator = MDCircularProgressIndicator(
 			size_hint=(None, None),
@@ -69,7 +69,7 @@ class LoginDialog(MDDialog):
 		)
 
 		self.vault = vault
-		self.callback = callback
+		self.login_callback = login_callback
 
 		super().__init__(
 			MDDialogIcon(
@@ -116,14 +116,14 @@ class LoginDialog(MDDialog):
 		password = self.password_field.text
 		self.password_field.text = ""
 
-		self.callback(login_dialog=self, vault_name=self.vault, password=password)
+		self.login_callback(login_dialog=self, vault_name=self.vault, password=password)
 
 class NewVaultDialog(MDDialog):
-	def __init__(self, callback, *args, **kwargs):
+	def __init__(self, create_vault_callback, *args, **kwargs):
 		self.name_field				= InputField(title="Name")
 		self.password_field			= InputField(title="Password", password=True)
 		self.confirm_password_field	= InputField(title="Confirm Password", password=True)
-		self.callback = callback
+		self.create_vault_callback 		= create_vault_callback
 
 		super().__init__(
 			MDDialogIcon(
@@ -174,8 +174,72 @@ class NewVaultDialog(MDDialog):
 		password		= self.password_field.text
 		conf_password	= self.confirm_password_field.text
 
-		if self.callback(dialog=self, name=name, password=password, conf_password=conf_password):
+		if self.create_vault_callback(dialog=self, name=name, password=password, conf_password=conf_password):
 			self.name_field.text = ""
 			self.password_field.text = ""
 			self.confirm_password_field.text = ""
 			return self.dismiss()
+
+
+class NewAccountDialog(MDDialog):
+	def __init__(self, add_account_callback, *args, **kwargs):
+		self.website_field				= InputField(title="Website")
+		self.username_field				= InputField(title="Username")
+		self.password_field				= InputField(title="Password", password=True)
+		self.description_field			= InputField(title="Description")
+		self.add_account_callback		= add_account_callback
+
+		super().__init__(
+			MDDialogIcon(
+				icon="account",
+			),
+
+			MDDialogHeadlineText(
+				text=f"Add new account",
+			),
+
+			MDDialogContentContainer(
+				self.website_field,
+				self.username_field,
+				self.password_field,
+				self.description_field,
+				orientation="vertical",
+				spacing="30dp"
+			),
+
+			MDDialogButtonContainer(
+				Widget(),
+
+				MDButton(
+					MDButtonText(text="Cancel"),
+					style="text",
+					on_release=self._dismiss
+				),
+
+				MDButton(
+					MDButtonText(text="Add"),
+					style="text",
+					on_release=self._add
+				),
+
+				spacing="8dp",
+			),
+			*args,
+			**kwargs,
+		)
+
+	def _dismiss(self, instance):
+		self.dismiss()
+		self.website_field.text = ""
+		self.username_field.text = ""
+		self.password_field.text = ""
+		self.description_field.text = ""
+
+	def _add(self, instance):
+		website			= self.website_field.text
+		username		= self.username_field.text
+		password		= self.password_field.text
+		description		= self.description_field.text
+
+		self.add_account_callback(dialog=self, website=website, username=username,
+							   		password=password, description=description)

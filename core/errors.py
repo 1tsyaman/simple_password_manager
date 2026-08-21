@@ -18,3 +18,6 @@ class PasswordRequirementsError(PasswordError):
 		super().__init__(*args)
 
 		self.reason = reason
+
+class EntryExistsError(Exception):
+	pass

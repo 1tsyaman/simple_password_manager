@@ -2,7 +2,7 @@ import sys
 from time import sleep
 from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, NO_SUCH_TOTP_MESSAGE, MIN_PWD_LENGTH
 from core.entry import Entry
-from core.errors import KeyLengthError, KeyDerivationError, PasswordRequirementsError
+from core.errors import KeyLengthError, KeyDerivationError, PasswordRequirementsError, EntryExistsError
 from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke, get_input, input_password
 from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
 from cli.util import filter_list, list_diff, format_prev_next_str
@@ -37,7 +37,13 @@ def add_entry(pwd_manager: PwdManager) -> bool:
 	ans = poll_y_n_backspace()
 
 	if ans == 'y':
-		pwd_manager.add_entry(website, username, password, description)
+		try:
+			pwd_manager.add_entry(website, username, password, description)
+		except EntryExistsError:
+			print("Entry already exists!")
+			sleep(2)
+			return False
+
 		return True
 	
 	return False

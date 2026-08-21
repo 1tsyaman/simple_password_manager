@@ -10,7 +10,7 @@ from core.encrypt import (encrypt_data, decrypt_data, get_key_from_pwd,
 from core.entry import Entry
 from core.keys import derive_key
 from core.totp import TOTP_Config
-from core.errors import PasswordError, PasswordRequirementsError
+from core.errors import PasswordError, PasswordRequirementsError, EntryExistsError
 
 LETTERS_LOWER =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
@@ -73,6 +73,9 @@ class PwdManager:
 	"""
 		Does nothing if entry is already in the list (should use modify_entry instead)
 		Does not set totp config (should be done in a separate stage)
+
+		@raises
+			- EntryExistsError
 	"""
 	def add_entry(self: PwdManager, website: str, username: str, password: str, description: str) -> None:
 		entry = Entry.create_entry(website, username, description)
@@ -80,7 +83,7 @@ class PwdManager:
 		if not self.entry_exists(entry):
 			return self.__add_entry_pwd_to_key(entry, password)
 
-		print("An entry with the same website-username combination already exists! You can either modify it or remove it and start over.")
+		raise EntryExistsError
 
 	"""
 		If no username is provided, all entries associated with the website will be deleted
@@ -349,8 +352,19 @@ class PwdManager:
 				value.strip()
 				for value in tup.split(",", 2)
 			)
-			pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
-			
+			try:
+				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
+			except EntryExistsError:
+				# Fallback to avoid data loss
+				while True:
+					random = rand.randint(1, 1000)
+					website = website + f"_dup_{random}"
+					try:
+						pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
+						break
+					except EntryExistsError:
+						continue
+
 			uri = data[tup][TOTP_URI]
 
 			if len(uri) > 0:
@@ -409,7 +423,20 @@ class PwdManager:
 					value.strip()
 					for value in tup.split(",", 2)
 				)
-				pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup])
+
+				try:
+					pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup])
+				except EntryExistsError:
+					# Fallback to avoid data loss
+					while True:
+						random = rand.randint(1, 1000)
+						website = website + f"_dup_{random}"
+						try:
+							pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
+							break
+						except EntryExistsError:
+							continue
+
 		except (KeyError, TypeError, ValueError) as e:
 			raise VaultFormatError from e
 
