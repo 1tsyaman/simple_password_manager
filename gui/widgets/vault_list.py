@@ -1,13 +1,43 @@
-class VaultEntry(MDListItem):
-	def __init__(self, name="", *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		# Add text to label
-		self.ids.vault_name.text = name
+from kivymd.uix.scrollview import MDScrollView
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.list import (
+	MDListItem,
+	MDListItemLeadingIcon,
+	MDListItemHeadlineText
+)
 
+class VaultEntry(MDListItem):
+	def __init__(self,
+		name: str,
+		*args,
+		**kwargs
+	):
 		self.vault_name = name
 
-class VaultList(MDScrollView):
-		def add_vault(self, vault: VaultEntry):
-			self.ids.vault_list.add_widget(vault)
+		super().__init__(
+			MDListItemLeadingIcon(icon="safe"),
+			MDListItemHeadlineText(text=name),
+			pos_hint={
+				"center_x": 0.5,
+				"center_y": 0.5
+			},
+			*args,
+			**kwargs
+		)
 
-Builder.load_file("vault_list.kv")
+class VaultList(MDScrollView):
+	def __init__(self, *args, **kwargs):
+		self.vault_list = MDBoxLayout(
+			orientation="vertical",
+			adaptive_height=True
+		)
+
+		super().__init__(
+			self.vault_list,
+			do_scroll_x=False,
+			*args,
+			**kwargs
+		)
+
+	def add_vault(self, vault: VaultEntry):
+		self.vault_list.add_widget(vault)

@@ -1,3 +1,10 @@
+from kivymd.uix.textfield import (
+	MDTextField,
+	MDTextFieldHelperText,
+	MDTextFieldHintText,
+	MDTextFieldLeadingIcon
+)
+
 """
 	To communicate incorrect input:
 		input = InputField(...)
@@ -6,8 +13,18 @@
 		input.error = True
 """
 class InputField(MDTextField):
-	def __init__(self, *args, title: str, icon: str = "", password=False, **kwargs):
-		self.error_widget = MDTextFieldHelperText(text="Initial message", mode="on_error")
+	def __init__(
+		self,
+		*args,
+		title: str,
+		icon: str = "",
+		password: bool = False,	# defines if text is masked or not
+		**kwargs
+	):
+		self.error_widget = MDTextFieldHelperText(
+			text="Initial message",
+			mode="on_error"
+		)
 
 		super().__init__(
 			MDTextFieldLeadingIcon(
@@ -16,21 +33,24 @@ class InputField(MDTextField):
 				icon_color_normal="mediumaquamarine",
 				icon_color_focus="tan",
 			),
+
 			self.error_widget,
+
 			MDTextFieldHintText(
 				text=title,
 				text_color_normal="mediumaquamarine",
 				text_color_focus="tan",
 			),
-			*args,
+
 			mode="outlined",
 			fill_color_normal="lightcyan",
 			fill_color_focus="lightsteelblue",
 			theme_line_color="Custom",
 			line_color_normal="mediumaquamarine",
 			line_color_focus="tan",
+			password=password,
+			password_mask="\u2022", # "●"
+
+			*args,
 			**kwargs
 		)
-
-		self.password=password
-		self.password_mask="\u2022" # "●"
