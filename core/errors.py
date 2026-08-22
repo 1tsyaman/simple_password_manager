@@ -1,3 +1,5 @@
+import traceback
+
 class KeyLengthError(Exception):
 	pass
 
@@ -21,3 +23,12 @@ class PasswordRequirementsError(PasswordError):
 
 class EntryExistsError(Exception):
 	pass
+
+def log(message: str, error: Exception | None = None):
+	print(message)
+
+	if error is not None:
+		print(f"Exception: {error}")
+
+	print("Traceback:")
+	traceback.print_exc()

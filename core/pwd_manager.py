@@ -498,31 +498,31 @@ class PwdManager:
 	@staticmethod
 	def _pwd_satisfies_conditions(pwd: str, len_min=PWD_LENGTH) -> tuple[bool, str]:
 		if len(pwd) < len_min:
-			return False, 'len'
+			return False, f'must be at least {len_min} characters long'
 
 		for digit in DIGITS:
 			if digit in pwd:
 				break
 		else:
-			return False, 'digit'
+			return False, 'must contain at least one digit'
 
 		for letter in LETTERS_LOWER:
 			if letter in pwd:
 				break
 		else:
-			return False, 'lower'
-		
+			return False, 'must contain at least one lowercase character'
+
 		for letter in LETTERS_UPPER:
 			if letter in pwd:
 				break
 		else:
-			return False, 'upper'
-		
+			return False, 'must contain at least one uppercase character'
+
 		for spec in SPECIAL_CHARS:
 			if spec in pwd:
 				break
 		else:
-			return False, 'special'
+			return False, 'must contain at least one special character'
 
 		return True, ''
 	

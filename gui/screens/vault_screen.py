@@ -50,7 +50,7 @@ class VaultScreen(MDScreen):
 		dialog = self.login_dialog
 
 		# Enable back button
-		top_bar.back_callback = self.back_to_selection
+		top_bar.back_callback = self.screen_manager.back_to_selection
 		back_button.disabled = False
 		back_button.opacity = 1
 
@@ -216,7 +216,7 @@ class VaultScreen(MDScreen):
 
 		# because UI work should only happen on the main thread
 		Clock.schedule_once(
-			lambda _: self.show_error_dialog(kwargs=kwargs),
+			lambda _: self.screen_manager.show_error_dialog(kwargs=kwargs),
 			0
 		)
 		return False
