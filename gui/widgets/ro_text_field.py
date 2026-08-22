@@ -29,11 +29,13 @@ class ReadOnlyTextField(MDBoxLayout):
 			*args,
 			**kwargs
 		)
+		self.password = password
 
 		self.field = MDTextField(
 			MDTextFieldLeadingIcon(
 				icon=leading_icon
 			),
+
 			text=text,
 			readonly=True,
 			size_hint_x=1,
@@ -52,3 +54,19 @@ class ReadOnlyTextField(MDBoxLayout):
 
 		self.add_widget(self.field)
 		self.add_widget(self.copy_button)
+
+	def set_text(self, text: str):
+		self.field.text = text
+
+	def get_text(self) -> str:
+		return self.field.text
+
+	def set_read_only(self):
+		self.field.readonly = True
+
+		if self.password:
+			self.field.password = True
+
+	def allow_writing(self):
+		self.field.readonly = False
+		self.field.password = False

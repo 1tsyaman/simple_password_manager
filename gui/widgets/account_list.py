@@ -18,18 +18,20 @@ class AccountEntry(MDListItem):
 		*args,
 		**kwargs
 	):
+		self.website_label = MDListItemHeadlineText(
+								text=website
+							)
+		self.username_label = MDListItemSupportingText(
+								text=username
+							)
+
 		super().__init__(
 			MDListItemLeadingIcon(
 				icon="account"
 			),
 
-			MDListItemHeadlineText(
-				text=website
-			),
-
-			MDListItemSupportingText(
-				text=username
-			),
+			self.website_label,
+			self.username_label,
 
 			pos_hint={
 				"center_x": 0.5,
@@ -40,6 +42,17 @@ class AccountEntry(MDListItem):
 			*args,
 			**kwargs
 		)
+
+		self.website = website
+		self.username = username
+
+	def update_labels(
+		self,
+		website: str,
+		username: str
+	):
+		self.website_label.text = website
+		self.username_label.text = username
 
 		self.website = website
 		self.username = username

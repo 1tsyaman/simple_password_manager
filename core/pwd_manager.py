@@ -211,6 +211,29 @@ class PwdManager:
 		self.entries[entry][TOTP_SECRET] = secret
 		self.entries[entry][TOTP_URI] = uri
 
+	"""
+		@raises:
+			- NoSuchEntryError
+	"""
+	def update_entry(
+		self,
+		website: str,
+		username: str,
+		new_website: str,
+		new_username: str,
+		new_password: str,
+		new_description: str		
+	):
+		entry = self.__get_entry_with_username_or_None(website, username)
+
+		if entry is None:
+			raise NoSuchEntryError
+
+		entry.set_website(new_website)
+		entry.set_username(new_username)
+		entry.set_description(new_description)
+
+		self.entries[entry][PWD] = new_password
 
 	def get_entry_list(self: PwdManager) -> list[Entry]:
 		return [entry for entry in self.entries]

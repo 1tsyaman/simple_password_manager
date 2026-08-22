@@ -12,6 +12,7 @@ from kivymd.uix.dialog import (
 )
 
 from gui.widgets.ro_text_field import ReadOnlyTextField
+from gui.widgets.account_list import AccountEntry
 
 class AccountDetailsDialog(MDDialog):
 	def __init__(
@@ -22,11 +23,22 @@ class AccountDetailsDialog(MDDialog):
 		description: str,
 		copy_callback: Callable,
 		modify_callback: Callable,
+		account_entry: AccountEntry,
 		totp_code: str = "",
 		totp_callback: Callable | None = None,
 		*args,
 		**kwargs
 	):
+		# Save original details
+		self.website = website
+		self.username = username
+		self.password = password
+		self.description = description
+
+		# For updating the labels on the vault screen
+		self.account_entry = account_entry
+
+		# Save callbacks
 		self.copy_callback = copy_callback
 		self.modify_callback = modify_callback
 		self.totp_callback = totp_callback
@@ -71,6 +83,13 @@ class AccountDetailsDialog(MDDialog):
 
 			fields.append(self.totp_field)
 
+		# Store a reference for the button labels for modification
+		self.dismiss_button_label = MDButtonText(text="Cancel")		
+		self.modify_button_label= MDButtonText(text="Modify")
+
+		# Modification state (determines the behaviours of the buttons)
+		self.modification_in_process = False
+
 		super().__init__(
 			MDDialogIcon(
 				icon="account-details",
@@ -90,21 +109,100 @@ class AccountDetailsDialog(MDDialog):
 				Widget(),
 
 				MDButton(
-					MDButtonText(text="Cancel"),
+					self.dismiss_button_label,
 					style="text",
-					on_release=lambda _: self.dismiss()
+					on_release=self._dismiss_or_cancel
 				),
 
 				MDButton(
-					MDButtonText(text="Modify"),
+					self.modify_button_label,
 					style="text",
-					on_release=self._modify
+					on_release=self._modify_or_save
 				),
+
 				spacing="8dp",
 			),
 			*args,
 			**kwargs,
 		)
 
-	def _modify(self, instance):
-		print("Modified!")
+
+	def _modify(self):
+		self.modification_in_process = True
+	
+		# Allow modifying
+		self.website_field.allow_writing()
+		self.username_field.allow_writing()
+		self.password_field.allow_writing()
+		self.description_field.allow_writing()
+
+		# Change the button labels
+		self.dismiss_button_label.text	= "Cancel"
+		self.modify_button_label.text	= "Save"
+
+	def _save(self):
+		new_website = self.website_field.get_text()
+		new_username = self.username_field.get_text()
+		new_password = self.password_field.get_text()
+		new_description = self.description_field.get_text()
+
+		if not self.modify_callback(
+			website=self.website,
+			username=self.username,
+			new_website=new_website,
+			new_username=new_username,
+			new_password=new_password,
+			new_description=new_description,
+			account_entry=self.account_entry,
+		):
+			# TODO: emit error somehow, we should not dismiss directly (to allow user to copy changes)
+			print("Failed to save")
+			return
+
+		self.modification_in_process = False
+		# Update stored values
+		self.website = new_website
+		self.username = new_username
+		self.password = new_password
+		self.description = new_description
+
+		# Disable modification
+		self.website_field.set_read_only()
+		self.username_field.set_read_only()
+		self.password_field.set_read_only()
+		self.description_field.set_read_only()
+
+		# Change the button labels back
+		self.dismiss_button_label.text	= "Dismiss"
+		self.modify_button_label.text	= "Modify"
+
+	def _cancel(self):
+		self.modification_in_process = False
+
+		# Restore original values
+		self.website_field.set_text(self.website)
+		self.username_field.set_text(self.username)
+		self.password_field.set_text(self.password)
+		self.description_field.set_text(self.description)
+
+		# Disable modification
+		self.website_field.set_read_only()
+		self.username_field.set_read_only()
+		self.password_field.set_read_only()
+		self.description_field.set_read_only()
+
+		# Change the button labels back
+		self.dismiss_button_label.text	= "Dismiss"
+		self.modify_button_label.text	= "Modify"
+
+	def _modify_or_save(self, instance):
+		if not self.modification_in_process:
+			self._modify()
+		else:
+			self._save()
+
+	def _dismiss_or_cancel(self, instance):
+		if not self.modification_in_process:
+			self.dismiss()
+		else:
+			self._cancel()

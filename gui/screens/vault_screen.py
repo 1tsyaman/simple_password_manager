@@ -250,13 +250,50 @@ class VaultScreen(MDScreen):
 			password=password,
 			description=description,
 			copy_callback=copy_text,
-			modify_callback=self.modify_account_details
+			modify_callback=self.modify_account_details,
+			account_entry=instance,
 		).open()
 
-	def modify_account_details(self, dialog: AccountDetailsDialog):
-		pass
+	def modify_account_details(
+		self,
+		website: str,
+		username: str,
+		new_website: str,
+		new_username: str,
+		new_password: str,
+		new_description: str,
+		account_entry: AccountEntry,
+	) -> bool:
+		try:
+			self.pwd_manager.update_entry(
+				website=website,
+				username=username,
+				new_website=new_website,
+				new_username=new_username,
+				new_password=new_password,
+				new_description=new_description
+			)
+		except NoSuchEntryError:
+			return False
 
-	def sync_pwd_manager(self, on_exit: bool = False) -> bool:
+		self.changes_made = True
+
+		account_entry.update_labels(
+			website=new_website,
+			username=new_username
+		)
+
+		return self.sync_pwd_manager(
+			on_exit=False,
+			error_dialog=False
+		)
+
+
+	def sync_pwd_manager(
+		self,
+		on_exit: bool = False,
+		error_dialog: bool = True,
+	) -> bool:
 		if not self.changes_made:
 			return True
 
@@ -277,6 +314,10 @@ class VaultScreen(MDScreen):
 				message=reason,
 				error=e
 			)
+
+		# Only show error dialog if requested
+		if not error_dialog:
+			return False
 
 		kwargs = {
 					"error_title": "Error: Changes not saved",
