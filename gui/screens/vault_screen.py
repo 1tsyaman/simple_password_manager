@@ -244,14 +244,27 @@ class VaultScreen(MDScreen):
 		password = password_desc["password"]
 		description = password_desc["description"]
 
+		kwargs = {
+			"website":			website,
+			"username":			username,
+			"password":			password,
+			"description":		description,
+			"copy_callback":		copy_text,
+			"modify_callback":	self.modify_account_details,
+			"account_entry":		instance,
+		}
+
+		try:
+			totp_code, time_remaining = self.pwd_manager.get_totp(website=website, username=username)
+			kwargs["totp_code"] = totp_code
+			kwargs["totp_time_remaining"] = time_remaining
+			kwargs["totp_callback"] = self.pwd_manager.get_totp
+		except:
+			# TODO: emit eroor!
+			pass
+
 		AccountDetailsDialog(
-			website=website,
-			username=username,
-			password=password,
-			description=description,
-			copy_callback=copy_text,
-			modify_callback=self.modify_account_details,
-			account_entry=instance,
+			**kwargs
 		).open()
 
 	def modify_account_details(
@@ -287,7 +300,6 @@ class VaultScreen(MDScreen):
 			on_exit=False,
 			error_dialog=False
 		)
-
 
 	def sync_pwd_manager(
 		self,

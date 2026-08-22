@@ -25,6 +25,7 @@ class AccountDetailsDialog(MDDialog):
 		modify_callback: Callable,
 		account_entry: AccountEntry,
 		totp_code: str = "",
+		totp_time_remaining: int = 0,
 		totp_callback: Callable | None = None,
 		*args,
 		**kwargs

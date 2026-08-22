@@ -154,7 +154,7 @@ class PwdManager:
 			- NoSuchEntryError
 			- EntryHasNoTotp
 	"""
-	def get_totp(self: PwdManager, website: str, username: str) -> str:
+	def get_totp(self: PwdManager, website: str, username: str) -> tuple[str, int]:
 		entry = self.__get_entry_with_username_or_None(website, username)
 
 		if entry is None:
@@ -167,7 +167,10 @@ class PwdManager:
 
 		secret = self.entries[entry][TOTP_SECRET]
 
-		return f"Code: {TOTP(s=secret, digits=totp_config.digits, digest=sha1, interval=totp_config.period).now()}. Valid for {totp_config.seconds_remaining()} seconds."
+		totp_code = TOTP(s=secret, digits=totp_config.digits, digest=sha1, interval=totp_config.period).now()
+		time_remaining = totp_config.seconds_remaining()
+
+		return totp_code, time_remaining
 
 	def has_totp(self: PwdManager, website: str, username: str) -> bool:
 		entry = self.__get_entry_with_username_or_None(website, username)

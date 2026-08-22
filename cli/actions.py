@@ -107,7 +107,8 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 	username = entry.get_username()
 
 	try:
-		totp_message = pwd_manager.get_totp(website=website, username=username)
+		totp_code, time_remaining = pwd_manager.get_totp(website=website, username=username)
+		totp_message = f"Code: {totp_code}. Valid for {time_remaining} seconds"
 	except EntryHasNoTotp:
 		return print(NO_SUCH_TOTP_MESSAGE)
 	except NoSuchEntryError:
