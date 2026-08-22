@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.list import (
@@ -12,6 +14,7 @@ class AccountEntry(MDListItem):
 		self,
 		website: str,
 		username: str,
+		on_click_callback: Callable,	# on_click(instance: AccountEntry)
 		*args,
 		**kwargs
 	):
@@ -33,6 +36,7 @@ class AccountEntry(MDListItem):
 				"center_y": 0.5
 			},
 
+			on_release=on_click_callback,
 			*args,
 			**kwargs
 		)

@@ -2,7 +2,15 @@ import sys
 from time import sleep
 from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, NO_SUCH_TOTP_MESSAGE, MIN_PWD_LENGTH
 from core.entry import Entry
-from core.errors import KeyLengthError, KeyDerivationError, PasswordRequirementsError, EntryExistsError
+from core.errors import (
+	KeyLengthError,
+	KeyDerivationError,
+	PasswordRequirementsError,
+	EntryExistsError,
+	NoSuchEntryError,
+	EntryHasNoTotp,
+	TotpUriError,
+)
 from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke, get_input, input_password
 from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
 from cli.util import filter_list, list_diff, format_prev_next_str
@@ -71,9 +79,10 @@ def get_password(pwd_manager: PwdManager, entry: Entry) -> None:
 	website = entry.get_website()
 	username = entry.get_username()
 
-	pwd = pwd_manager.get_password(website, username)
+	try:
+		pwd = pwd_manager.get_password(website, username)
 
-	if pwd == NO_SUCH_ENTRY_MESSAGE:
+	except NoSuchEntryError:
 		return print(NO_SUCH_ENTRY_MESSAGE)
 
 	print(f"Website: {website}\nUsername: {username}\nPassword: {pwd}")
@@ -97,11 +106,13 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 	website = entry.get_website()
 	username = entry.get_username()
 
-	totp_message = pwd_manager.get_totp(website=website, username=username)
+	try:
+		totp_message = pwd_manager.get_totp(website=website, username=username)
+	except EntryHasNoTotp:
+		return print(NO_SUCH_TOTP_MESSAGE)
+	except NoSuchEntryError:
+		return print(NO_SUCH_ENTRY_MESSAGE)
 
-	if totp_message in [NO_SUCH_TOTP_MESSAGE, NO_SUCH_ENTRY_MESSAGE]:
-		return print(totp_message)
-	
 	print(f"Website: {website}\nUsername: {username}\nTOTP Code: {totp_message}")
 
 	print("Press [c] to copy to clipboard or [any key] to return to go back.")
@@ -372,7 +383,12 @@ def _modify_password(pwd_manager: PwdManager, entry: Entry) -> bool:
 	website = entry.get_website()
 	username = entry.get_username()
 
-	pwd_manager.set_password(website, username, password)
+	try:
+		pwd_manager.set_password(website, username, password)
+	except NoSuchEntryError:
+		print("Could not set password, entry does not exist!")
+		sleep(2)
+		return False
 
 	return True
 
@@ -391,12 +407,14 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 	if len(uri) == 0:
 		return False
 
-	err = pwd_manager.set_totp_config(website=website, username=username, uri=uri)
-
-	if err is not None:
-		print(err)
+	try:
+		pwd_manager.set_totp_config(website=website, username=username, uri=uri)
+	except (NoSuchEntryError, TotpUriError) as e:
+		if isinstance(e, NoSuchEntryError):
+			print("Could not set TOTP, entry does not exist!")
+		else:
+			print("Could not set TOTP, URI is invalid!")
 		sleep(2)
-
 		return False
 	
 	return True

@@ -50,6 +50,7 @@ def get_vault_list(dir: str) -> list[str]:
 			- KeyDerivationError
 			- VaultFormatError
 			- CorruptedVaultError
+			- InconsistentVaultState
 			- OSError
 """
 def load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdManager:
@@ -65,6 +66,7 @@ def load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdMana
 			- KeyDerivationError
 			- VaultFormatError
 			- CorruptedVaultError
+			- InconsistentVaultState
 			- OSError
 """
 def load_vault(path: str, pwd: str) -> PwdManager:

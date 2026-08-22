@@ -10,12 +10,19 @@ from kivymd.uix.screen import MDScreen
 
 from gui.dialogs.login_dialog import LoginDialog
 from gui.dialogs.new_account_dialog import NewAccountDialog
+from gui.dialogs.account_details_dialog import AccountDetailsDialog
 from gui.widgets.account_list import AccountEntry, AccountList
 from gui.widgets.labels import NoAccountsLabel
 from gui.widgets.top_bar import TopBar
+from gui.utils.clipboard import copy_text
 
 from core.pwd_manager import PwdManager
-from core.errors import EntryExistsError, KeyLengthError, log
+from core.errors import (
+	EntryExistsError,
+	KeyLengthError,
+	NoSuchEntryError,
+	log
+)
 
 # to avoid cicular import issues
 if TYPE_CHECKING:
@@ -60,12 +67,19 @@ class VaultScreen(MDScreen):
 	def refresh(self):
 		top_bar = self.top_bar
 		back_button : MDActionTopAppBarButton = top_bar.back_button
+		import_button: MDActionTopAppBarButton = top_bar.import_vault_button
+
 		dialog = self.login_dialog
 
 		# Enable back button
 		top_bar.back_callback = self.screen_manager.back_to_selection
 		back_button.disabled = False
 		back_button.opacity = 1
+
+		# Disable import button
+		top_bar.import_callback = None
+		import_button.disabled = True
+		import_button.opacity = 0
 
 		# New account button
 		top_bar.plus_callback = self.show_add_account_dialog
@@ -129,7 +143,11 @@ class VaultScreen(MDScreen):
 				done = True
 				break
 
-			entry = AccountEntry(website=website, username=username)
+			entry = AccountEntry(
+				website=website,
+				username=username,
+				on_click_callback=self.show_account_details_dialog
+			)
 			self.account_list.add_account(entry)
 
 		# only switch the screen *once*, after one batch is added
@@ -187,7 +205,11 @@ class VaultScreen(MDScreen):
 			return
 
 		# Add account to list (without refreshing the whole list)
-		entry = AccountEntry(website=website, username=username)
+		entry = AccountEntry(
+			website=website,
+			username=username,
+			on_click_callback=self.show_account_details_dialog
+		)
 		self.account_list.add_account(entry)
 
 		if self.number_accounts == 0:
@@ -205,6 +227,34 @@ class VaultScreen(MDScreen):
 		self.sync_thread.start()
 
 		dialog.dismiss()
+
+	def show_account_details_dialog(self, instance: AccountEntry):
+		website = instance.website
+		username = instance.username
+
+		try:
+			password_desc = self.pwd_manager.get_password_and_description(
+				website=website,
+				username=username
+			)
+		except NoSuchEntryError:
+			# Emit error!
+			return
+
+		password = password_desc["password"]
+		description = password_desc["description"]
+
+		AccountDetailsDialog(
+			website=website,
+			username=username,
+			password=password,
+			description=description,
+			copy_callback=copy_text,
+			modify_callback=self.modify_account_details
+		).open()
+
+	def modify_account_details(self, dialog: AccountDetailsDialog):
+		pass
 
 	def sync_pwd_manager(self, on_exit: bool = False) -> bool:
 		if not self.changes_made:

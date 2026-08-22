@@ -16,9 +16,15 @@ from cli.util import format_prev_next_str, is_valid_index
 from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
 from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
 
-from core.errors import (KeyLengthError, KeyDerivationError, PasswordError,
-							VaultFormatError, CorruptedVaultError,
-							PasswordRequirementsError)
+from core.errors import (
+	KeyLengthError,
+	KeyDerivationError,
+	PasswordError,
+	VaultFormatError,
+	CorruptedVaultError,
+	PasswordRequirementsError,
+	InconsistentVaultState,
+)
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
 
@@ -53,6 +59,9 @@ def _init(argv: list[str]) -> PwdManager | int:
 			return -1
 		except CorruptedVaultError:
 			print("Vault loading failed: Incorrect password or corrupted vault")
+			return -1
+		except InconsistentVaultState:
+			print("Vault loading failed, check log")
 			return -1
 		except OSError as e:
 			print(f"Vault loading failed: {e}")

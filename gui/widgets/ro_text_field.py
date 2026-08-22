@@ -1,0 +1,54 @@
+from collections.abc import Callable
+
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.button import MDIconButton
+from kivy.uix.behaviors import ButtonBehavior
+from kivymd.uix.textfield import (
+	MDTextField,
+	MDTextFieldLeadingIcon,
+	MDTextFieldTrailingIcon,
+)
+
+class ClickableTrailingIcon(ButtonBehavior, MDTextFieldTrailingIcon):
+	pass
+
+class ReadOnlyTextField(MDBoxLayout):
+	def __init__(
+		self,
+		leading_icon: str,
+		text: str,
+		copy_callback: Callable,
+		password: bool = False,
+		*args,
+		**kwargs
+	):
+		super().__init__(
+			orientation="horizontal",
+			adaptive_height=True,
+			spacing="4dp",
+			*args,
+			**kwargs
+		)
+
+		self.field = MDTextField(
+			MDTextFieldLeadingIcon(
+				icon=leading_icon
+			),
+			text=text,
+			readonly=True,
+			size_hint_x=1,
+			password=password,
+			password_mask="\u2022", # "●",
+		)
+
+		self.copy_button = MDIconButton(
+			icon="content-copy",
+			pos_hint={
+				"center_x": 0.5,
+				"center_y": 0.5,
+			},
+			on_release=lambda _: copy_callback(self.field.text)
+		)
+
+		self.add_widget(self.field)
+		self.add_widget(self.copy_button)

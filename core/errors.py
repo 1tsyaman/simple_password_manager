@@ -24,6 +24,24 @@ class PasswordRequirementsError(PasswordError):
 class EntryExistsError(Exception):
 	pass
 
+class NoSuchEntryError(Exception):
+	pass
+
+class EntryHasNoTotp(Exception):
+	pass
+
+class TotpUriError(Exception):
+	pass
+
+"""
+	Raised whenever some impossible incosistency occures.
+	
+	Should not be ignored, as reencrypting the vault in an inconsistent
+		state could result in data loss
+"""
+class InconsistentVaultState(Exception):
+	pass
+
 def log(message: str, error: Exception | None = None):
 	print(message)
 

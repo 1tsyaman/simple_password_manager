@@ -26,8 +26,9 @@ class TopBar(MDTopAppBar):
 		)
 
 		# indirect callback for the buttons (to avoid binding and unbinding buttons)
-		self.back_callback : Callable | None = None
-		self.plus_callback : Callable | None = None
+		self.back_callback		: Callable | None = None
+		self.plus_callback		: Callable | None = None
+		self.import_callback	: Callable | None = None
 
 		super().__init__(
 			MDTopAppBarLeadingButtonContainer(
@@ -56,3 +57,7 @@ class TopBar(MDTopAppBar):
 	def on_plus(self, instance=None):
 		if self.plus_callback is not None:
 			self.plus_callback()
+
+	def on_import(self, instance=None):
+		if self.import_callback is not None:
+			self.import_callback()

@@ -10,7 +10,16 @@ from core.encrypt import (encrypt_data, decrypt_data, get_key_from_pwd,
 from core.entry import Entry
 from core.keys import derive_key
 from core.totp import TOTP_Config
-from core.errors import PasswordError, PasswordRequirementsError, EntryExistsError
+from core.errors import (
+	PasswordError,
+	PasswordRequirementsError,
+	EntryExistsError,
+	NoSuchEntryError,
+	EntryHasNoTotp,
+	TotpUriError,
+	InconsistentVaultState,
+	log
+)
 
 LETTERS_LOWER =	[
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
@@ -128,25 +137,34 @@ class PwdManager:
 			self._salt = old_salt
 			raise
 
+	"""
+		@raises:
+			- NoSuchEntryError
+	"""
 	def get_password(self: PwdManager, website: str, username: str) -> str:
 		entry = self.__get_entry_with_username_or_None(website, username)
 
 		if (entry is not None):
 			return self.entries[entry][PWD]
 
-		return NO_SUCH_ENTRY_MESSAGE
-	
+		raise NoSuchEntryError
+
+	"""
+		@raises:
+			- NoSuchEntryError
+			- EntryHasNoTotp
+	"""
 	def get_totp(self: PwdManager, website: str, username: str) -> str:
 		entry = self.__get_entry_with_username_or_None(website, username)
 
 		if entry is None:
-			return NO_SUCH_ENTRY_MESSAGE
+			raise NoSuchEntryError
 
 		totp_config = entry.get_totp_config()
 
 		if totp_config is None:
-			return NO_SUCH_TOTP_MESSAGE
-				
+			raise EntryHasNoTotp
+
 		secret = self.entries[entry][TOTP_SECRET]
 
 		return f"Code: {TOTP(s=secret, digits=totp_config.digits, digest=sha1, interval=totp_config.period).now()}. Valid for {totp_config.seconds_remaining()} seconds."
@@ -159,32 +177,41 @@ class PwdManager:
 
 		return entry.get_totp_config() is not None
 
+	"""
+		@raises:
+			- NoSuchEntryError
+	"""
 	def set_password(self: PwdManager, website: str, username: str, password: str):
 		entry = self.__get_entry_with_username_or_None(website, username)
 
 		if entry is None:
-			return NO_SUCH_ENTRY_MESSAGE
-		
+			raise NoSuchEntryError
+
 		self.entries[entry][PWD] = password
-	
+
+	"""
+		@raises:
+			- NoSuchEntryError
+			- TotpUriError
+	"""
 	def set_totp_config(self: PwdManager,website: str, username: str, uri: str):
 		entry = self.__get_entry_with_username_or_None(website=website, username=username)
 
 		if entry is None:
-			return NO_SUCH_ENTRY_MESSAGE
-	
+			raise NoSuchEntryError
+
 		config = TOTP_Config.from_uri(uri)
-		
+
 		if config is None:
-			return URI_INVALID_MESSAGE
-		
+			raise TotpUriError
+
 		totp_config, secret = config
 
 		entry.set_totp_config(totp_config=totp_config)
 		self.entries[entry][TOTP_SECRET] = secret
 		self.entries[entry][TOTP_URI] = uri
 
-			
+
 	def get_entry_list(self: PwdManager) -> list[Entry]:
 		return [entry for entry in self.entries]
 
@@ -200,7 +227,7 @@ class PwdManager:
 	"""
 	def get_entry_by_index(self: PwdManager, index: int) -> Entry:
 		ls = list(self.entries)
-		
+
 		if index < 0 or index > len(self.entries) - 1:
 			raise IndexError("Trying to access an entry with an invalid index!")
 
@@ -211,7 +238,7 @@ class PwdManager:
 	def entry_exists(self: PwdManager, entry: Entry) -> bool:
 		if self._get_entry_reference_or_None(entry) is not None:
 			return True
-	
+
 		return False
 
 	def get_username_and_description(self: PwdManager, website: str) -> list[tuple[str, str]]:
@@ -235,6 +262,25 @@ class PwdManager:
 		return [
 			entry for entry in self.entries if entry.get_username() == username
 		]
+
+	"""
+		@raises:
+			- NoSuchEntryError
+	"""
+	def get_password_and_description(
+		self: PwdManager,
+		website: str,
+		username: str
+	) -> dict[str, str]:
+		entry = self.__get_entry_with_username_or_None(website=website, username=username)
+
+		if entry is None:
+			raise NoSuchEntryError
+
+		return {
+			"password": 	self.get_password(website=website, username=username),
+			"description":	entry.get_description()
+		}
 
 	def remove_website_entries(self: PwdManager, website: str) -> None:
 		for entry in list(self.entries):		# similar to creating a list of keys and iterating over it rather than
@@ -283,7 +329,7 @@ class PwdManager:
 		for e in self.entries:
 			if e.is_equal(entry):
 				return e
-		
+
 		return None
 
 
@@ -305,7 +351,7 @@ class PwdManager:
 		{
 			"website, username, description": {
 								PWD: 		"password",
-								TOTP_URI: 	"valid_uri" 
+								TOTP_URI: 	"valid_uri"
 							  },
 			.
 			.
@@ -319,6 +365,7 @@ class PwdManager:
 			- KeyDerivationError
 			- VaultFormatError
 			- CorruptedVaultError
+			- InconsistentVaultState
 			- OSError
 	"""
 	@staticmethod
@@ -368,7 +415,11 @@ class PwdManager:
 			uri = data[tup][TOTP_URI]
 
 			if len(uri) > 0:
-				message = pwd_manager.set_totp_config(website=website, username=username, uri=uri)
+				try:
+					message = pwd_manager.set_totp_config(website=website, username=username, uri=uri)
+				except (NoSuchEntryError, TotpUriError):
+					log(message=f"Failed while setting up TOTP config.")
+					raise InconsistentVaultState
 
 				if message == URI_INVALID_MESSAGE:
 					# data loss warning message (should not happen normally)
@@ -378,7 +429,7 @@ class PwdManager:
 		print("Entries loaded successfully!")
 
 		return pwd_manager
-	
+
 	"""
 		*This is the old format (pre TOTP support)*
 
@@ -432,7 +483,7 @@ class PwdManager:
 						random = rand.randint(1, 1000)
 						website = website + f"_dup_{random}"
 						try:
-							pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup][PWD])
+							pwd_manager.add_entry(website=website, username=username, description=description, password=data[tup])
 							break
 						except EntryExistsError:
 							continue
@@ -473,7 +524,7 @@ class PwdManager:
 	@staticmethod
 	def _pwd_manager_from_pwd(file_path: str, pwd: str) -> PwdManager:
 		salt, key = derive_key(pwd)
-		
+
 		pwd_manager = PwdManager(file_path, key, salt)
 
 		pwd_manager.encrypt()
@@ -488,13 +539,13 @@ class PwdManager:
 
 			for i in range(PWD_LENGTH):
 				pwd += rand.choice(CHARS)
-			
+
 			satisfies, _ = PwdManager._pwd_satisfies_conditions(pwd)
 			if satisfies:
 				break
 
 		return pwd
-	
+
 	@staticmethod
 	def _pwd_satisfies_conditions(pwd: str, len_min=PWD_LENGTH) -> tuple[bool, str]:
 		if len(pwd) < len_min:
@@ -525,7 +576,7 @@ class PwdManager:
 			return False, 'must contain at least one special character'
 
 		return True, ''
-	
+
 	@staticmethod
 	def _has_new_format(data: object) -> bool:
 		return isinstance(data, dict) and all(
@@ -536,7 +587,7 @@ class PwdManager:
 			and isinstance(value.get(TOTP_URI), str)
 				for key, value in data.items()
 		)
-	
+
 	@staticmethod
 	def _has_old_format(data: object) -> bool:
 		return isinstance(data, dict) and all(
