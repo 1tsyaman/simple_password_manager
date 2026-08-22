@@ -1,4 +1,4 @@
-from kivy.uix.boxlayout import BoxLayout
+from kivymd.uix.boxlayout import MDBoxLayout
 
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
@@ -10,16 +10,13 @@ from core.pwd_manager import PwdManager
 import storage.io as io
 
 class SimplePasswordManagerApp(MDApp):
-	def on_start(self):
-		self.app_data_path = str(io.get_app_data_path())
-
 	def build(self):
-		self.app_screen = MDScreen()
-		self.box_container = BoxLayout(
+		self.app_screen = MDScreen(
+			md_bg_color=self.theme_cls.backgroundColor
+		)
+		self.box_container = MDBoxLayout(
 			orientation="vertical",
 			size_hint_max_x="500dp",
-			adaptive_height=True,
-			spacing="12dp",
 			pos_hint={
 				"center_x": 0.5
 			},

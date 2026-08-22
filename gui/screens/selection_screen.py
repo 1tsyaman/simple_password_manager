@@ -1,9 +1,11 @@
-from kivy.uix.boxlayout import BoxLayout
+from typing import TYPE_CHECKING
 
+from kivymd.uix.boxlayout import MDBoxLayout
+
+from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.appbar import MDActionTopAppBarButton
 
-from gui.screens.screen_manager import AppScreenManager
 from gui.widgets.top_bar import TopBar
 from gui.widgets.labels import NoVaultsLabel
 from gui.widgets.input_field import InputField
@@ -19,27 +21,40 @@ from core.errors import (
 	log
 )
 
+# to avoid cicular import issues
+if TYPE_CHECKING:
+	from gui.screens.screen_manager import AppScreenManager
+
 class SelectionScreen(MDScreen):
 	def __init__(
 		self,
-		screen_manager: AppScreenManager,
+		app_data_path: str,
+		screen_manager: "AppScreenManager",	# forward reference for type checking
+		top_bar: TopBar,
 		*args,
 		**kwargs
 	):
+		self.app_data_path = app_data_path
 		self.screen_manager = screen_manager
-		self.box_container = BoxLayout(
+		self.top_bar = top_bar
+
+		self.box_container = MDBoxLayout(
 			orientation="vertical"
 		)
+
+		app = MDApp.get_running_app()
+		assert app is not None
 
 		super().__init__(
 			self.box_container,
 			name="selection",
-			on_pre_enter=self.refresh,
-			on_leave=self.clear,
-			md_bg_color=self.root.theme_cls.secondaryContainerColor
+			md_bg_color=app.theme_cls.secondaryContainerColor,
 			*args,
 			**kwargs
 		)
+
+	def on_pre_enter(self, *args):
+		self.refresh()
 
 	"""
 		is called before entering the screen
@@ -60,8 +75,9 @@ class SelectionScreen(MDScreen):
 
 	def load_vaults(self):
 		# refresh vault list
-		container : BoxLayout = self.box_container
-		self.vaults = io.get_vault_list(self.app_data_path)
+		app_data_path = self.app_data_path
+		container : MDBoxLayout = self.box_container
+		self.vaults = io.get_vault_list(app_data_path)
 
 		if len(self.vaults) == 0:
 			# Add no_vaults_label
@@ -79,6 +95,9 @@ class SelectionScreen(MDScreen):
 
 		container.clear_widgets()
 		container.add_widget(vault_list)
+
+	def on_leave(self, *args):
+		self.clear()
 
 	"""
 		is called when leaving the screen
@@ -103,7 +122,7 @@ class SelectionScreen(MDScreen):
 		password_field			: InputField = dialog.password_field
 		confirm_password_field	: InputField = dialog.confirm_password_field
 
-		app_data_path = self.root.app_data_path
+		app_data_path = self.app_data_path
 
 		try:
 			vault_exists = io.vault_exists_for_gui(app_data_path, name)
@@ -128,8 +147,9 @@ class SelectionScreen(MDScreen):
 			return
 
 		try:
-			io.create_and_load_vault_for_gui(self.app_data_path, name, password)
-			self.load_vaults_to_screen()
+			app_data_path = self.app_data_path
+			io.create_and_load_vault_for_gui(app_data_path, name, password)
+			self.load_vaults()
 			dialog.dismiss()
 
 		except FileNotFoundError:

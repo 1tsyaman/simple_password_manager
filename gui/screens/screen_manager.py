@@ -28,13 +28,19 @@ class AppScreenManager(MDScreenManager):
 		*args,
 		**kwargs
 	):
+		self.app_data_path = str(io.get_app_data_path())
+
 		self.top_bar = top_bar
 		self.selection_screen = SelectionScreen(
-			screen_manager=self
+			app_data_path=self.app_data_path,
+			screen_manager=self,
+			top_bar=top_bar
 		)
 		self.vault_screen = VaultScreen(
+			app_data_path=self.app_data_path,
 			screen_manager=self,
-			pwd_manager=pwd_manager
+			pwd_manager=pwd_manager,
+			top_bar=top_bar
 		)
 
 		super().__init__(
@@ -62,7 +68,8 @@ class AppScreenManager(MDScreenManager):
 		error_message = ""
 
 		try:
-			pwd_manager = io.load_vault_for_gui(self.app_data_path, vault_name, password)
+			app_data_path = self.app_data_path
+			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
 			self.vault_screen.pwd_manager = pwd_manager
 			self.vault_screen.login_dialog = dialog
 			self.switch_screen("vault")
@@ -93,7 +100,7 @@ class AppScreenManager(MDScreenManager):
 	def switch_screen(self, screen: str, on_exit: bool = False):
 		if (screen in ["selection", "vault"] \
 			and (
-					self.screen_manager.current != "vault"
+					self.current != "vault"
 					or self.vault_screen_can_switch()	# current = vault? -> check if we can exit
 			)
 		):
@@ -113,7 +120,7 @@ class AppScreenManager(MDScreenManager):
 				return
 
 			screen_object.top_bar = self.top_bar
-			self.screen_manager.current = screen
+			self.current = screen
 
 	def vault_screen_can_switch(self):
 		vault_screen = self.vault_screen
@@ -123,7 +130,7 @@ class AppScreenManager(MDScreenManager):
 
 	def force_exist_vault_screen(self, dialog: ErrorDialog):
 		dialog.dismiss()
-		self.force_exit_vault = True
+		self.vault_screen.force_exit_vault = True
 		self.switch_screen("selection", on_exit=True)
 
 	def back_to_selection(self):

@@ -1,52 +1,65 @@
 from threading import Thread
+from typing import TYPE_CHECKING
 
-from kivy.uix.boxlayout import BoxLayout
+from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.clock import Clock
 
+from kivymd.app import MDApp
 from kivymd.uix.appbar import MDActionTopAppBarButton
 from kivymd.uix.screen import MDScreen
 
-from gui.screens.screen_manager import AppScreenManager
-from gui.widgets.account_list import AccountEntry, AccountList
 from gui.dialogs.login_dialog import LoginDialog
 from gui.dialogs.new_account_dialog import NewAccountDialog
-from gui.widgets.top_bar import TopBar
+from gui.widgets.account_list import AccountEntry, AccountList
 from gui.widgets.labels import NoAccountsLabel
+from gui.widgets.top_bar import TopBar
 
 from core.pwd_manager import PwdManager
 from core.errors import EntryExistsError, KeyLengthError, log
 
+# to avoid cicular import issues
+if TYPE_CHECKING:
+	from gui.screens.screen_manager import AppScreenManager
+
 class VaultScreen(MDScreen):
 	def __init__(
 		self,
-		screen_manager: AppScreenManager,
+		app_data_path: str,
+		screen_manager: "AppScreenManager",	# forward reference for type checking
 		pwd_manager: PwdManager,
+		top_bar: TopBar,
 		*args,
 		**kwargs
 	):
+		self.app_data_path = app_data_path
 		self.screen_manager = screen_manager
 		self.pwd_manager = pwd_manager
-		self.box_container = BoxLayout(
+		self.top_bar = top_bar
+
+		self.box_container = MDBoxLayout(
 			orientation="vertical"
 		)
+
+		app = MDApp.get_running_app()
+		assert app is not None
 
 		super().__init__(
 			self.box_container,
 			name="vault",
-			on_pre_enter=self.refresh,
-			on_enter=self.resume_loading_accounts,
-			on_leave=self.clear,
-			md_bg_color=self.root.theme_cls.secondaryContainerColor
+			md_bg_color=app.theme_cls.secondaryContainerColor,
 			*args,
 			**kwargs
 		)
+
+	def on_pre_enter(self, *args):
+		self.refresh()
 
 	"""
 		Called on pre_enter
 	"""
 	def refresh(self):
-		back_button : MDActionTopAppBarButton = self.back_button
 		top_bar = self.top_bar
+		back_button : MDActionTopAppBarButton = top_bar.back_button
 		dialog = self.login_dialog
 
 		# Enable back button
@@ -61,6 +74,9 @@ class VaultScreen(MDScreen):
 		self.force_exit_vault = False
 
 		self.load_accounts(dialog=dialog)
+
+	def on_leave(self, *args):
+		self.clear()
 
 	"""
 		Called on leave
@@ -82,8 +98,8 @@ class VaultScreen(MDScreen):
 
 		# Case: No accounts to load
 		if self.number_accounts == 0:
-			self.vault_screen_box.clear_widgets()
-			self.vault_screen_box.add_widget(NoAccountsLabel())
+			self.box_container.clear_widgets()
+			self.box_container.add_widget(NoAccountsLabel())
 
 			dialog.dismiss()
 			return
@@ -93,11 +109,12 @@ class VaultScreen(MDScreen):
 			Function signature:
 				Clock.schedule_interval(self, callback(self, dt: float) -> bool, intervall in sec)
 		"""
-		self._load_account_batch(dialog=dialog)
+		self._load_account_batch(dialog=dialog, first_batch=True)
 
 	def _load_account_batch(
 			self,
-			dialog: LoginDialog | None = None	# is only needed for the first batch
+			dialog: LoginDialog | None = None,	# is only needed for the first batch
+			first_batch: bool = False
 		) -> bool:
 		batch_size = min(10, self.number_accounts)
 		done = False
@@ -116,8 +133,8 @@ class VaultScreen(MDScreen):
 			self.account_list.add_account(entry)
 
 		# only switch the screen *once*, after one batch is added
-		if self.screen_manager.current != "vault":
-			container : BoxLayout = self.box_container
+		if first_batch:
+			container : MDBoxLayout = self.box_container
 			container.clear_widgets()
 			container.add_widget(self.account_list)
 
@@ -129,6 +146,9 @@ class VaultScreen(MDScreen):
 
 		# if done = True, we return False -> don't schedule again
 		return not done	
+
+	def on_enter(self, *args):
+		self.resume_loading_accounts()
 
 	"""
 		Called on enter: Resumes loading the entries after screen has loaded
@@ -142,7 +162,6 @@ class VaultScreen(MDScreen):
 
 	def show_add_account_dialog(self):
 		NewAccountDialog(add_account_callback=self.add_account).open()
-
 
 	def add_account(
 			self,
@@ -170,6 +189,12 @@ class VaultScreen(MDScreen):
 		# Add account to list (without refreshing the whole list)
 		entry = AccountEntry(website=website, username=username)
 		self.account_list.add_account(entry)
+
+		if self.number_accounts == 0:
+			container : MDBoxLayout = self.box_container
+			container.clear_widgets()
+			container.add_widget(self.account_list)
+
 		self.changes_made = True
 
 		self.sync_thread = Thread(
