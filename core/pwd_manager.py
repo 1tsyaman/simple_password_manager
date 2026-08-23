@@ -4,6 +4,7 @@ from pathlib import Path
 from pyotp import TOTP
 from hashlib import sha1
 from time import sleep
+from copy import deepcopy
 
 from core.encrypt import (encrypt_data, decrypt_data, get_key_from_pwd,
 						  	KeyLengthError, VaultFormatError, CorruptedVaultError)
@@ -313,6 +314,20 @@ class PwdManager:
 								# iterating over the dictionary while modifying it
 			if entry.get_website().strip().lower() == website.strip().lower():
 				del self.entries[entry]
+
+	"""
+		Returns a carbon copy of the current password manager
+	"""
+	def get_snapshot(self) -> PwdManager:
+		pwd_manager_copy = PwdManager(
+			path=self.file_path,
+			key=self._key,
+			salt=self._salt
+		)
+
+		pwd_manager_copy.entries = deepcopy(self.entries)
+
+		return pwd_manager_copy
 
 	"""
 		encrypts the PwdManager object and writes it into the vault file

@@ -1,4 +1,4 @@
-from threading import Thread
+from threading import Thread, Lock
 from typing import TYPE_CHECKING
 
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -44,6 +44,34 @@ class VaultScreen(MDScreen):
 		self.pwd_manager = pwd_manager
 		self.top_bar = top_bar
 
+		"""
+			Guards self.pwd_manager from being modified concurrently
+				- Used by self.sync_pwd_manager to create a sound copy of the password manager
+					for encryption
+		"""
+		self.pwd_manager_lock = Lock()
+
+		"""
+			Guards self.sync_pwd_manager() calls
+			- Prevents two sync threads from creating an inconsistent vault state
+		"""
+		self.sync_lock = Lock()
+
+		"""
+			Locking mechanism to prevent changes made while an asynchronous
+				sync thread is already running from being ignored
+			
+			- Whenever changes are made: Acquire lock -> self.change_version += 1
+			- Sync thread aquires lock	-> stores the version -> actually syncs
+										-> acquires the lock again
+										-> only sets self.synced_verion = self.change_verion
+											if the change version did not change during this sync operation
+											since otherwise another sync thread has been queued.
+		"""
+		self.change_lock = Lock()
+		self.change_version = 0
+		self.synced_version = 0
+
 		self.box_container = MDBoxLayout(
 			orientation="vertical"
 		)
@@ -85,7 +113,10 @@ class VaultScreen(MDScreen):
 		# New account button
 		top_bar.plus_callback = self.show_add_account_dialog
 
-		self.changes_made = False
+		with self.change_lock:
+			self.change_version = 0
+			self.synced_version = 0
+
 		self.force_exit_vault = False
 
 		self.load_accounts(dialog=dialog)
@@ -194,12 +225,14 @@ class VaultScreen(MDScreen):
 			description: str
 		):
 		try:
-			self.pwd_manager.add_entry(
-				website=website,
-				username=username,
-				password=password,
-				description=description
-			)
+			# Lock the pwd_manager before modifying it
+			with self.pwd_manager_lock:
+				self.pwd_manager.add_entry(
+					website=website,
+					username=username,
+					password=password,
+					description=description
+				)
 		except EntryExistsError:
 			username_field = dialog.username_field
 			error_widget = username_field.error_widget
@@ -221,8 +254,10 @@ class VaultScreen(MDScreen):
 			container.clear_widgets()
 			container.add_widget(self.account_list)
 
-		self.changes_made = True
-		self.sync_thread = Thread(
+		with self.change_lock:
+			self.change_version += 1
+
+		Thread(
 			target=self.sync_pwd_manager,
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
@@ -289,14 +324,15 @@ class VaultScreen(MDScreen):
 		account_entry: AccountEntry,
 	) -> bool:
 		try:
-			self.pwd_manager.update_entry(
-				website=website,
-				username=username,
-				new_website=new_website,
-				new_username=new_username,
-				new_password=new_password,
-				new_description=new_description
-			)
+			with self.pwd_manager_lock:
+				self.pwd_manager.update_entry(
+					website=website,
+					username=username,
+					new_website=new_website,
+					new_username=new_username,
+					new_password=new_password,
+					new_description=new_description
+				)
 		except NoSuchEntryError:
 			self.screen_manager.show_error_dialog(
 				error_title="Error: Changes not saved",
@@ -309,8 +345,10 @@ class VaultScreen(MDScreen):
 			username=new_username
 		)
 
-		self.changes_made = True
-		self.sync_thread = Thread(
+		with self.change_lock:
+			self.change_version += 1
+
+		Thread(
 			target=self.sync_pwd_manager,
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
@@ -327,57 +365,77 @@ class VaultScreen(MDScreen):
 		username: str,
 		account_entry: AccountEntry,
 	):
-		self.pwd_manager.remove_entry(
-			website=website,
-			username=username
-		)
+		with self.pwd_manager_lock:
+			self.pwd_manager.remove_entry(
+				website=website,
+				username=username
+			)
 
 		self.account_list.remove_account(account_entry)
 
-		self.changes_made = True
-		self.sync_thread = Thread(
+		with self.change_lock:
+			self.change_version += 1
+
+		Thread(
 			target=self.sync_pwd_manager,
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
 		).start()
 
-
+	"""
+		Creates a snapshot of the current state of self.pwd_manager and encrypts it.
+			- Acquires self.sync_lock.
+	"""
 	def sync_pwd_manager(
 		self,
 		on_exit: bool = False,
 		error_dialog: bool = True,
 	) -> bool:
-		if not self.changes_made:
-			return True
+		with self.sync_lock:
 
-		try:
-			self.pwd_manager.encrypt()
-			self.changes_made = False	# need to introduce locks here
-			return True
+			with self.change_lock:
+				if self.change_version == self.synced_version:
+					return True
 
-		except FileNotFoundError as e:
-			reason = "Vault file does not exist"
-		except KeyLengthError:
-			reason = "Password did not produce correct key length, contact developer"
-		except OverflowError:
-			reason = "Encryption failed"
-		except OSError as e:
-			reason = "Something went wrong, check log"
-			log(
-				message=reason,
-				error=e
-			)
+				version = self.change_version
 
-		# Only show error dialog if requested
-		if not error_dialog:
-			return False
+			# Create a snap shot of the current state
+			with self.pwd_manager_lock:
+				pwd_manager = self.pwd_manager.get_snapshot()
 
-		kwargs = {
-					"error_title": "Error: Changes not saved",
-					"error_message": reason,
-					"first_button_label": "Dismiss",
-					"first_button_callback": lambda dialog: dialog.dismiss(),
-				}
+			try:
+				# Encrypt the snapshot
+				pwd_manager.encrypt()
+
+				# Update the synced version
+				with self.change_lock:
+					self.synced_version = version
+
+				return True
+
+			except FileNotFoundError as e:
+				reason = "Vault file does not exist"
+			except KeyLengthError:
+				reason = "Password did not produce correct key length, contact developer"
+			except OverflowError:
+				reason = "Encryption failed"
+			except OSError as e:
+				reason = "Something went wrong, check log"
+				log(
+					message=reason,
+					error=e
+				)
+
+			# Only show error dialog if requested
+			if not error_dialog:
+				return False
+
+			kwargs = {
+						"error_title": "Error: Changes not saved",
+						"error_message": reason,
+						"first_button_label": "Dismiss",
+						"first_button_callback": lambda dialog: dialog.dismiss(),
+					}
 
 		if on_exit:
 			kwargs["second_button_label"]		= "Exit anyways"
