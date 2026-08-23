@@ -10,6 +10,7 @@ from gui.widgets.top_bar import TopBar
 from gui.widgets.labels import NoVaultsLabel
 from gui.widgets.input_field import InputField
 from gui.widgets.vault_list import VaultEntry, VaultList
+from gui.widgets.file_picker import ImportFilePicker
 from gui.dialogs.login_dialog import LoginDialog
 from gui.dialogs.new_vault_dialog import NewVaultDialog
 
@@ -70,6 +71,9 @@ class SelectionScreen(MDScreen):
 
 		# New vault button
 		top_bar.plus_callback = self.show_new_vault_dialog
+
+		# Import vault button
+		top_bar.import_callback = self.show_import_vault_file_picker
 
 		self.load_vaults()
 
@@ -176,10 +180,19 @@ class SelectionScreen(MDScreen):
 				error=e
 			)
 
+
 ##	Open Vault Function	##
 
 	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
 		login_dialog = LoginDialog(
 			vault=instance.vault_name,
 			login_callback=self.screen_manager.open_vault
+		).open()
+
+##	Import Vault Function	##
+
+	def show_import_vault_file_picker(self):
+		ImportFilePicker(
+			app_data_path=self.app_data_path,
+			refresh_callback=self.refresh
 		).open()

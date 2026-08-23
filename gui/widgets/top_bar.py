@@ -15,7 +15,8 @@ class TopBar(MDTopAppBar):
 			on_release=self.on_back
 		)
 		self.import_vault_button	= MDActionTopAppBarButton(
-			icon="file-import"
+			icon="file-import",
+			on_release=self.on_import
 		)
 		self.plus_button			= MDActionTopAppBarButton(
 			icon="plus",
