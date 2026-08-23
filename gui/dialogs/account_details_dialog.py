@@ -14,6 +14,7 @@ from kivymd.uix.dialog import (
 
 from gui.widgets.ro_text_field import ReadOnlyTextField
 from gui.widgets.account_list import AccountEntry
+from gui.dialogs.yes_no_dialog import YesNoDialog
 
 class AccountDetailsDialog(MDDialog):
 	def __init__(
@@ -103,7 +104,7 @@ class AccountDetailsDialog(MDDialog):
     			text_color=app.theme_cls.errorColor,
 			),
 			style="text",
-			on_release=self._delete
+			on_release=self.show_delete_confirmation_dialog
 		)
 
 		# Modification state (determines the behaviours of the buttons)
@@ -238,5 +239,21 @@ class AccountDetailsDialog(MDDialog):
 		else:
 			self._cancel()
 
-	def _delete(self, instance):
-		pass
+	def show_delete_confirmation_dialog(self, instance):
+		YesNoDialog(
+			headline="Are you sure?",
+			message="Deleted accounts cannot be restored",
+			no_callback=lambda dialog: dialog.dismiss(),
+			yes_callback=self._delete,
+			icon="alert-circle" 
+		).open()
+
+	def _delete(self, dialog):
+		self.delete_callback(
+			website=self.website,
+			username=self.username,
+			account_entry=self.account_entry
+		)
+
+		dialog.dismiss()
+		self.dismiss()

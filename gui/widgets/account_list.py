@@ -76,3 +76,6 @@ class AccountList(MDScrollView):
 
 	def add_account(self, account: AccountEntry):
 		self.account_list.add_widget(account)
+
+	def remove_account(self, account: AccountEntry):
+		self.account_list.remove_widget(account)

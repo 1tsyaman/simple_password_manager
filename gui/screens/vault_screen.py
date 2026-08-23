@@ -182,6 +182,9 @@ class VaultScreen(MDScreen):
 	def show_add_account_dialog(self):
 		NewAccountDialog(add_account_callback=self.add_account).open()
 
+	"""
+		Adds the account and starts an *asynchronous* thread to sync vault
+	"""
 	def add_account(
 			self,
 			dialog: NewAccountDialog,
@@ -219,13 +222,11 @@ class VaultScreen(MDScreen):
 			container.add_widget(self.account_list)
 
 		self.changes_made = True
-
 		self.sync_thread = Thread(
 			target=self.sync_pwd_manager,
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
-		)
-		self.sync_thread.start()
+		).start()
 
 		dialog.dismiss()
 
@@ -274,6 +275,9 @@ class VaultScreen(MDScreen):
 			**kwargs
 		).open()
 
+	"""
+		Updates the internal state and starts an *asynchronous* thread to sync vault
+	"""
 	def modify_account_details(
 		self,
 		website: str,
@@ -300,20 +304,43 @@ class VaultScreen(MDScreen):
 			)
 			return False
 
-		self.changes_made = True
-
 		account_entry.update_labels(
 			website=new_website,
 			username=new_username
 		)
 
-		return self.sync_pwd_manager(
-			on_exit=False,
-			error_dialog=False
+		self.changes_made = True
+		self.sync_thread = Thread(
+			target=self.sync_pwd_manager,
+			kwargs={"on_exit": False},
+			daemon=False	# daemon=False -> program will not exit until thread returns
+		).start()
+
+		return True
+
+	"""
+		Deletes the account and starts an *asynchronous* thread to sync vault
+	"""
+	def delete_account(
+		self,
+		website: str,
+		username: str,
+		account_entry: AccountEntry,
+	):
+		self.pwd_manager.remove_entry(
+			website=website,
+			username=username
 		)
 
-	def delete_account(self):
-		pass
+		self.account_list.remove_account(account_entry)
+
+		self.changes_made = True
+		self.sync_thread = Thread(
+			target=self.sync_pwd_manager,
+			kwargs={"on_exit": False},
+			daemon=False	# daemon=False -> program will not exit until thread returns
+		).start()
+
 
 	def sync_pwd_manager(
 		self,
