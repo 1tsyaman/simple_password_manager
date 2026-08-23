@@ -27,7 +27,6 @@ class ErrorDialog(MDDialog):
 		*args,
 		**kwargs
 	):
-
 		self.first_button_callback = first_button_callback
 		self.second_button_callback = second_button_callback
 
@@ -75,6 +74,8 @@ class ErrorDialog(MDDialog):
 	def _first_callback(self, _):
 		if self.first_button_callback is not None:
 			self.first_button_callback(dialog=self)
+		else:	# Default behaviour for first button
+			self.dismiss()
 
 	def _second_callback(self, _):
 		if self.second_button_callback is not None:

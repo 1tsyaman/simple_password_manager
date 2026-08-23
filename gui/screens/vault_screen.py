@@ -21,6 +21,7 @@ from core.errors import (
 	EntryExistsError,
 	KeyLengthError,
 	NoSuchEntryError,
+	EntryHasNoTotp,
 	log
 )
 
@@ -251,6 +252,7 @@ class VaultScreen(MDScreen):
 			"description":		description,
 			"copy_callback":		copy_text,
 			"modify_callback":	self.modify_account_details,
+			"delete_callback":	self.delete_account,
 			"account_entry":		instance,
 		}
 
@@ -259,9 +261,14 @@ class VaultScreen(MDScreen):
 			kwargs["totp_code"] = totp_code
 			kwargs["totp_time_remaining"] = time_remaining
 			kwargs["totp_callback"] = self.pwd_manager.get_totp
-		except:
-			# TODO: emit eroor!
-			pass
+		except NoSuchEntryError:
+			self.screen_manager.show_error_dialog(
+				error_title="Error: Inconsistent internal state",
+				error_message="Selected entry does not exist",
+			)
+			return
+		except EntryHasNoTotp:
+			pass	# No TOTP, no problem
 
 		AccountDetailsDialog(
 			**kwargs
@@ -287,6 +294,10 @@ class VaultScreen(MDScreen):
 				new_description=new_description
 			)
 		except NoSuchEntryError:
+			self.screen_manager.show_error_dialog(
+				error_title="Error: Changes not saved",
+				error_message="Vault state is inconsistent: Modified entry does not exist!"
+			)
 			return False
 
 		self.changes_made = True
@@ -300,6 +311,9 @@ class VaultScreen(MDScreen):
 			on_exit=False,
 			error_dialog=False
 		)
+
+	def delete_account(self):
+		pass
 
 	def sync_pwd_manager(
 		self,
@@ -344,7 +358,7 @@ class VaultScreen(MDScreen):
 
 		# because UI work should only happen on the main thread
 		Clock.schedule_once(
-			lambda _: self.screen_manager.show_error_dialog(kwargs=kwargs),
+			lambda _: self.screen_manager.show_error_dialog(**kwargs),
 			0
 		)
 		return False

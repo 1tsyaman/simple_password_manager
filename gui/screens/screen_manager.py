@@ -136,6 +136,6 @@ class AppScreenManager(MDScreenManager):
 	def back_to_selection(self):
 		self.switch_screen("selection", on_exit=True)
 
-	def show_error_dialog(self, kwargs: dict):
+	def show_error_dialog(self, **kwargs):
 		self.error_dialog = ErrorDialog(**kwargs)
 		self.error_dialog.open()

@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from kivy.uix.widget import Widget
 
+from kivymd.app import MDApp
 from kivymd.uix.button import MDButton, MDButtonText
 from kivymd.uix.dialog import (
 	MDDialog,
@@ -23,6 +24,7 @@ class AccountDetailsDialog(MDDialog):
 		description: str,
 		copy_callback: Callable,
 		modify_callback: Callable,
+		delete_callback: Callable,
 		account_entry: AccountEntry,
 		totp_code: str = "",
 		totp_time_remaining: int = 0,
@@ -42,6 +44,7 @@ class AccountDetailsDialog(MDDialog):
 		# Save callbacks
 		self.copy_callback = copy_callback
 		self.modify_callback = modify_callback
+		self.delete_callback = delete_callback
 		self.totp_callback = totp_callback
 
 		self.website_field = ReadOnlyTextField(
@@ -88,6 +91,21 @@ class AccountDetailsDialog(MDDialog):
 		self.dismiss_button_label = MDButtonText(text="Cancel")		
 		self.modify_button_label= MDButtonText(text="Modify")
 
+		# Get app for the app themes
+		app = MDApp.get_running_app()
+		assert app is not None
+
+		# Store a reference for the button to be able to disable it when in modification view
+		self.delete_button = MDButton(
+			MDButtonText(
+				text="Delete",
+				theme_text_color="Custom",
+    			text_color=app.theme_cls.errorColor,
+			),
+			style="text",
+			on_release=self._delete
+		)
+
 		# Modification state (determines the behaviours of the buttons)
 		self.modification_in_process = False
 
@@ -121,6 +139,8 @@ class AccountDetailsDialog(MDDialog):
 					on_release=self._modify_or_save
 				),
 
+				self.delete_button,
+
 				spacing="8dp",
 			),
 			*args,
@@ -141,6 +161,10 @@ class AccountDetailsDialog(MDDialog):
 		self.dismiss_button_label.text	= "Cancel"
 		self.modify_button_label.text	= "Save"
 
+		# Disable the delete button
+		self.delete_button.disabled = True
+		self.delete_button.opacity = 0.5
+
 	def _save(self):
 		new_website = self.website_field.get_text()
 		new_username = self.username_field.get_text()
@@ -156,8 +180,6 @@ class AccountDetailsDialog(MDDialog):
 			new_description=new_description,
 			account_entry=self.account_entry,
 		):
-			# TODO: emit error somehow, we should not dismiss directly (to allow user to copy changes)
-			print("Failed to save")
 			return
 
 		self.modification_in_process = False
@@ -176,6 +198,10 @@ class AccountDetailsDialog(MDDialog):
 		# Change the button labels back
 		self.dismiss_button_label.text	= "Dismiss"
 		self.modify_button_label.text	= "Modify"
+
+		# Enable the delete button
+		self.delete_button.disabled = False
+		self.delete_button.opacity = 1
 
 	def _cancel(self):
 		self.modification_in_process = False
@@ -196,6 +222,10 @@ class AccountDetailsDialog(MDDialog):
 		self.dismiss_button_label.text	= "Dismiss"
 		self.modify_button_label.text	= "Modify"
 
+		# Enable the delete button
+		self.delete_button.disabled = False
+		self.delete_button.opacity = 1
+
 	def _modify_or_save(self, instance):
 		if not self.modification_in_process:
 			self._modify()
@@ -207,3 +237,6 @@ class AccountDetailsDialog(MDDialog):
 			self.dismiss()
 		else:
 			self._cancel()
+
+	def _delete(self, instance):
+		pass
