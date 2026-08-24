@@ -7,7 +7,7 @@ from pathlib import Path
 from core.pwd_manager import PwdManager
 
 INVALID_PATH_ERROR	= "Given vault path does not exist"
-DEBUG = True
+DEBUG = False
 
 """
 	@returns the private app data path if on android
