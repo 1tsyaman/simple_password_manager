@@ -43,6 +43,7 @@ class VaultScreen(MDScreen):
 		self.screen_manager = screen_manager
 		self.pwd_manager = pwd_manager
 		self.top_bar = top_bar
+		self.vault_name = ""
 
 		"""
 			Guards self.pwd_manager from being modified concurrently
@@ -100,10 +101,10 @@ class VaultScreen(MDScreen):
 
 		dialog = self.login_dialog
 
-		# Enable back button
-		top_bar.back_callback = self.screen_manager.back_to_selection
-		back_button.disabled = False
-		back_button.opacity = 1
+		top_bar.add_back_button(
+			callback=self.screen_manager.back_to_selection
+		)
+		top_bar.set_title(self.vault_name)
 
 		# Disable import button
 		top_bar.import_callback = None

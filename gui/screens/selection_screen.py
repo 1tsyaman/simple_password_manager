@@ -62,13 +62,10 @@ class SelectionScreen(MDScreen):
 	"""
 	def refresh(self):
 		top_bar: TopBar = self.top_bar
-		back_button: MDActionTopAppBarButton = top_bar.back_button
 		import_button: MDActionTopAppBarButton = top_bar.import_vault_button
 
-		# Disable back button
-		top_bar.back_callback = None
-		back_button.disabled = True
-		back_button.opacity = 0
+		top_bar.remove_back_button()
+		top_bar.reset_title()
 
 		# Enable import button
 		top_bar.import_callback = self.show_import_vault_file_picker

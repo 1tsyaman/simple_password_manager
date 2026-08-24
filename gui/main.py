@@ -7,7 +7,8 @@ from gui.screens.screen_manager import AppScreenManager
 from gui.widgets.top_bar import TopBar
 
 from core.pwd_manager import PwdManager
-import storage.io as io
+
+APP_NAME = "Simple Password Manager"
 
 class SimplePasswordManagerApp(MDApp):
 	def build(self):
@@ -23,7 +24,9 @@ class SimplePasswordManagerApp(MDApp):
 			md_bg_color=self.theme_cls.secondaryContainerColor
 		)
 
-		self.top_bar = TopBar()
+		self.top_bar = TopBar(
+			title=APP_NAME
+		)
 		self.screen_manager = AppScreenManager(
 			top_bar=self.top_bar,
 			pwd_manager=PwdManager()	# dummy pwd manager to initialize vault screen

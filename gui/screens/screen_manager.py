@@ -72,7 +72,10 @@ class AppScreenManager(MDScreenManager):
 			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
 			self.vault_screen.pwd_manager = pwd_manager
 			self.vault_screen.login_dialog = dialog
-			self.switch_screen("vault")
+			self.switch_screen(
+				"vault",
+				vault_name=vault_name
+			)
 			return
 
 		except PasswordError:
@@ -97,7 +100,12 @@ class AppScreenManager(MDScreenManager):
 		error_widget.text = error_message
 		password_field.error = True
 
-	def switch_screen(self, screen: str, on_exit: bool = False):
+	def switch_screen(
+		self,
+		screen: str,
+		vault_name: str ="",
+		on_exit: bool = False
+	):
 		if (screen in ["selection", "vault"] \
 			and (
 					self.current != "vault"
@@ -118,6 +126,9 @@ class AppScreenManager(MDScreenManager):
 				)
 
 				return
+
+			if screen == "vault":
+				screen_object.vault_name = vault_name
 
 			screen_object.top_bar = self.top_bar
 			self.current = screen
