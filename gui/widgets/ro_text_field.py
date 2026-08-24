@@ -4,10 +4,11 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDIconButton
 from kivy.uix.behaviors import ButtonBehavior
 from kivymd.uix.textfield import (
-	MDTextField,
 	MDTextFieldLeadingIcon,
 	MDTextFieldTrailingIcon,
 )
+
+from gui.widgets.focusable_text_field import FocusableTextField
 
 class ClickableTrailingIcon(ButtonBehavior, MDTextFieldTrailingIcon):
 	pass
@@ -31,7 +32,7 @@ class ReadOnlyTextField(MDBoxLayout):
 		)
 		self.password = password
 
-		self.field = MDTextField(
+		self.field = FocusableTextField(
 			MDTextFieldLeadingIcon(
 				icon=leading_icon
 			),

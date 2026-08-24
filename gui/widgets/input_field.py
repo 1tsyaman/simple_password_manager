@@ -5,6 +5,8 @@ from kivymd.uix.textfield import (
 	MDTextFieldLeadingIcon
 )
 
+from gui.widgets.focusable_text_field import FocusableTextField
+
 """
 	To communicate incorrect input:
 		input = InputField(...)
@@ -12,7 +14,7 @@ from kivymd.uix.textfield import (
 		input.error_widget.text = "Some error meesage"
 		input.error = True
 """
-class InputField(MDTextField):
+class InputField(FocusableTextField):
 	def __init__(
 		self,
 		*args,
