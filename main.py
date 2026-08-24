@@ -1,22 +1,17 @@
-from kivy.utils import platform
-
 import sys
 
-from gui.main import SimplePasswordManagerApp
-
 if __name__ == "__main__":
-    if platform == "android":
-        SimplePasswordManagerApp().run()
-    else:
-        from cli.main import main
-
         argv = sys.argv
 
         """
-            If no args were provided, we run the gui
+            If no args were provided (which is always the case on Android), we run the gui
             Otherwise, we pass the args to the cli
         """
         if len(argv) < 2:
+            from gui.main import SimplePasswordManagerApp
+
             SimplePasswordManagerApp().run()
         else:
+            from cli.main import main
+
             main(argv)

@@ -1,7 +1,6 @@
 import os
 import sys
 import importlib
-from kivy.utils import platform
 from pathlib import Path
 
 from core.pwd_manager import PwdManager
@@ -19,6 +18,8 @@ DEBUG = False
 		- OSError: resolving the executable/source path fails
 """
 def get_app_data_path() -> Path:
+	from kivy.utils import platform
+
 	# TODO: remove before bundling app
 	if DEBUG:
 		return Path('C://Users//y-fao//Desktop//Aktuell//Others//password_manager//')
