@@ -1,9 +1,10 @@
 import os
-
+from threading import Thread
 from collections.abc import Callable
 from shutil import copy2, SameFileError
 
 from kivy.utils import platform
+from kivy.clock import Clock
 
 from kivymd.uix.filemanager import MDFileManager
 
@@ -120,6 +121,12 @@ class ImportFilePicker:
 
 				dest = os.path.join(self.app_data_path, file_name)
 
+				if os.path.exists(dest):
+					self._emit_error(
+						message=f"Vault '{file_name}' already exists"
+					)
+					return
+
 				with open(dest, "wb") as output:
 					buffer = bytearray(BUFFER_SIZE)	# 8 KiB
 
@@ -148,11 +155,18 @@ class ImportFilePicker:
 						# The import result is already known. A close failure should not crash the app.
 						pass
 
-		self.refresh_callback()
+		"""
+			on android, this is called from a different thread,
+				hence, we need to schedule it on kivy's main thread
+		"""
+		Clock.schedule_once(
+			lambda _: self.refresh_callback()
+		)
 
 	def _open_android_picker(self):
 		activity.bind(
-			on_activity_result=self._on_activity_result	# Callback for when the request is fulfilled
+			# Callback for when the request is fulfilled
+			on_activity_result=self._start_on_activity_result_thread
 		)
 
 		try:
@@ -167,11 +181,22 @@ class ImportFilePicker:
 			PythonActivity.mActivity.startActivityForResult(intent, IMPORT_REQUEST)
 		except JavaException as error:
 			activity.unbind(
-				on_activity_result=self._on_activity_result
+				on_activity_result=self._start_on_activity_result_thread
 			)
 			self._emit_error(
 				message=f"Could not open Android file picker: {error}"
 			)
+
+	"""
+		To avoid the app not resuming because of background copying
+			we start the copying on a worker thread and return immediately
+	"""
+	def _start_on_activity_result_thread(self, *args):
+		Thread(
+			target=self._on_activity_result,
+			args=args,
+			daemon=True
+		).start()
 
 	def _on_activity_result(
 		self,
@@ -183,7 +208,7 @@ class ImportFilePicker:
 			return
 
 		activity.unbind(
-			on_activity_result=self._on_activity_result
+			on_activity_result=self._start_on_activity_result_thread
 		)
 
 		# RESULT_CANCELED is normal when the user closes the picker without selecting a file.
@@ -249,7 +274,13 @@ class ImportFilePicker:
 		raise ValueError("Could not determine selected file name")
 
 	def _emit_error(self, message: str):
-		ErrorDialog(
-			error_title="Import error:",
-			error_message=message
-		).open()
+		"""
+			on android, this is called from a different thread,
+				hence, we need to schedule it on kivy's main thread
+		"""
+		Clock.schedule_once(
+			lambda _: ErrorDialog(
+				error_title="Import error:",
+				error_message=message
+			).open()
+		)

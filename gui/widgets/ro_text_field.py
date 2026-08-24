@@ -37,7 +37,7 @@ class ReadOnlyTextField(MDBoxLayout):
 			),
 
 			text=text,
-			readonly=True,
+			readonly=True,	# sets 'is_focusable=False' implicitly
 			size_hint_x=1,
 			password=password,
 			password_mask="\u2022", # "●",
@@ -63,10 +63,10 @@ class ReadOnlyTextField(MDBoxLayout):
 
 	def set_read_only(self):
 		self.field.readonly = True
-
 		if self.password:
 			self.field.password = True
 
 	def allow_writing(self):
 		self.field.readonly = False
+		self.field.is_focusable = True	# Has to be set explicity
 		self.field.password = False

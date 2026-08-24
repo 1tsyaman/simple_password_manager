@@ -1,13 +1,15 @@
 from kivy.utils import platform
+
 import sys
 
 from gui.main import SimplePasswordManagerApp
-from cli.main import main
 
 if __name__ == "__main__":
     if platform == "android":
         SimplePasswordManagerApp().run()
     else:
+        from cli.main import main
+
         argv = sys.argv
 
         """
