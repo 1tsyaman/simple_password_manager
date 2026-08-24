@@ -6,35 +6,6 @@ The project can be run directly on desktop and can also be packaged as an Androi
 
 > **Note:** Android packaging currently requires a few workarounds for some native Python dependencies, especially `argon2-cffi` and `cryptography`. The steps below document the setup that produced a working `arm64-v8a` debug APK.
 
-## Requirements
-
-### Desktop
-
-- Python **3.13**
-- pip
-- A virtual environment
-
-Python 3.13.15 is known to work with this project.
-
-Create and activate a virtual environment:
-
-```bash
-python3.13 -m venv .venv
-source .venv/bin/activate
-```
-
-Install the desktop dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the application:
-
-```bash
-python main.py
-```
-
 ## Building for Android
 
 The Android build described here was tested on Ubuntu using:
@@ -147,8 +118,6 @@ android.archs = arm64-v8a
 
 NDK r28c is known to work with this setup.
 
-Make sure the requirements line contains **only one** `requirements =` assignment. A malformed line can accidentally create package names such as `pyotprequirements` or even `=`.
-
 ### 5. Start the build
 
 From the repository root:
@@ -156,10 +125,6 @@ From the repository root:
 ```bash
 buildozer -v android debug
 ```
-
-The first build is slow because Buildozer/python-for-Android must download and compile Python, Kivy, OpenSSL, Cairo, Rust components, and other native libraries.
-
-Do not run multiple Buildozer builds against the same `.buildozer` directory at the same time.
 
 After a successful build, the APK should be available under:
 
@@ -220,72 +185,6 @@ Rebuild without cleaning:
 
 ```bash
 buildozer -v android debug
-```
-
-### Pixman download times out
-
-Example:
-
-```text
-Downloading pixman source ...
-<urlopen error timed out>
-```
-
-This is normally a download/network problem, not a compilation problem.
-
-Test the source URL manually:
-
-```bash
-curl -I https://www.cairographics.org/releases/pixman-0.43.4.tar.gz
-```
-
-or:
-
-```bash
-wget https://www.cairographics.org/releases/pixman-0.43.4.tar.gz
-```
-
-If the URL is reachable, rerun Buildozer. Existing compiled components are normally reused.
-
-Avoid `buildozer android clean` unless necessary.
-
-### Buildozer tries to install `pyotprequirements`
-
-Example:
-
-```text
-ERROR: No matching distribution found for pyotprequirements
-ERROR: Invalid requirement: '='
-```
-
-The `requirements` line in `buildozer.spec` is malformed.
-
-Replace the complete line with:
-
-```ini
-requirements = python3==3.13.15,hostpython3==3.13.15,kivy==2.3.1,kivymd,cryptography,argon2-cffi,pyotp,materialyoucolor==3.0.4,materialshapes,pycairo,pillow,exceptiongroup,asyncgui,asynckivy,android
-```
-
-### `rustup` was not found
-
-Example:
-
-```text
-`rustup` was not found on host system
-```
-
-Install Rust through rustup:
-
-```bash
-curl https://sh.rustup.rs -sSf | sh
-source "$HOME/.cargo/env"
-```
-
-If a system Rust installation already exists:
-
-```bash
-RUSTUP_INIT_SKIP_PATH_CHECK=yes curl https://sh.rustup.rs -sSf | sh
-source "$HOME/.cargo/env"
 ```
 
 ### `argon2-cffi` fails because `pycparser` is missing
@@ -417,43 +316,6 @@ Shared library: [libpython3.13.so]
 ```
 
 This workaround modifies files under `.buildozer`, so deleting that directory or performing a full clean may remove it.
-
-### `libpython3.14.so not found` appears in logcat
-
-If the log immediately continues with:
-
-```text
-Loading library: python3.13
-...
-libpython3.13.so ... ok
-```
-
-then this is only python-for-android probing for another Python library. It is not the crash by itself.
-
-Look for the later Python traceback.
-
-### Suspicious `_cffi_backend...x86_64...so` warning
-
-During the Argon2 installation you may see something similar to:
-
-```text
-_cffi_backend.cpython-313-x86_64-linux-gnu.so already exists
-```
-
-inside an `arm64-v8a` installation directory.
-
-That is suspicious because native Android extensions should be built for ARM64.
-
-Inspect it with:
-
-```bash
-find .buildozer/android/platform/build-arm64-v8a/build/python-installs/simplepasswordmanager/arm64-v8a \
-    -maxdepth 1 -name '_cffi_backend*' -print -exec file {} \;
-```
-
-For the Android target, native shared objects should report an ARM/AArch64 architecture rather than x86-64.
-
-If the application runs and Argon2 works, do not delete working build artifacts unnecessarily. If CFFI/Argon2 imports fail at runtime, investigate this file first.
 
 ## Android crash debugging
 

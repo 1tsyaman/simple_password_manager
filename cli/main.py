@@ -2,6 +2,7 @@ import sys
 import os
 import signal
 import traceback
+import argparse
 
 from time import sleep
 from typing import Never
@@ -29,15 +30,26 @@ from core.errors import (
 GENERAL_ERROR	= "Something went wrong. Exiting..."
 
 def _init(argv: list[str]) -> PwdManager | int:
-	if len(argv) < 2 or len(argv) > 4:
-		print("Usage: python this_script.py path/to/file.vault (--create)")
-		return 1
+	parser = argparse.ArgumentParser(
+		description="Simple Password Manager CLI"
+	)
+	parser.add_argument(
+		"path",
+		help="Path to the vault file"
+	)
+	parser.add_argument(
+		"--create",
+		action="store_true",		# if argument is present -> parser stores 'True'
+		help="Create a new vault"
+	)
+
+	args = parser.parse_args(argv[1:])	# ignore the executable name
 
 	init_watchdog(exit_func=timeout_exit)
 
-	path = argv[1]
+	path = args.path
 
-	if len(argv) == 2:
+	if not args.create:
 		pwd = act.grab_master_password()
 
 		try:
