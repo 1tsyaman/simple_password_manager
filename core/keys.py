@@ -4,8 +4,8 @@ from argon2.exceptions import HashingError
 
 from core.errors import KeyDerivationError
 
-KEY_LEN			= 32		# 32 bytes = 256-bit AES key
-SALT_LEN		= 16		# 16 random bytes is a good salt size
+KEY_LEN				= 32		# 32 bytes = 256-bit AES key
+SALT_LEN			= 16		# 16 random bytes is a good salt size
 
 ARGON2_TIME_COST	= 3
 ARGON2_MEMORY_COST	= 64 * 1024	# 64 MiB, value is in KiB
@@ -16,7 +16,10 @@ ARGON2_PARALLELISM	= 1
 		- OSError
 		- KeyDerivationError
 """
-def derive_key(pwd: str, salt=bytes(0)) -> tuple[bytes,bytes]:
+def derive_key(
+	pwd: str,
+	salt: bytes = bytes(0)
+) -> tuple[bytes,bytes]:
 	if len(salt) == 0:
 		salt = os.urandom(SALT_LEN)
 

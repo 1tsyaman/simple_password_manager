@@ -5,16 +5,28 @@ from pathlib import Path
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
 
+from core.keys import (
+	derive_key,
+	KEY_LEN,
+	SALT_LEN
+)
+from core.errors import (
+	KeyLengthError,
+	VaultFormatError,
+	CorruptedVaultError
+)
 
-from core.keys import derive_key, KEY_LEN, SALT_LEN
-from core.errors import KeyLengthError, VaultFormatError, CorruptedVaultError
-
-NONCE		= "nonce"
-CIPHERTEXT	= "ciphertext"
+NONCE			= "nonce"
+CIPHERTEXT		= "ciphertext"
 ASSOCIATED_DATA	= "associated_data"
-SALT		= "salt"
+SALT			= "salt"
 
-RECORD_KEYS = [NONCE, CIPHERTEXT, ASSOCIATED_DATA, SALT]
+RECORD_KEYS = [
+	NONCE,
+	CIPHERTEXT,
+	ASSOCIATED_DATA,
+	SALT
+]
 
 """
 	@raises:
@@ -23,7 +35,13 @@ RECORD_KEYS = [NONCE, CIPHERTEXT, ASSOCIATED_DATA, SALT]
 		- OverflowError
 		- OSError
 """
-def encrypt_data(data: dict, key: bytes, salt: bytes, file_path: str, associated_data: str) -> None:
+def encrypt_data(
+	data: dict,
+	key: bytes,
+	salt: bytes,
+	file_path: str,
+	associated_data: str
+) -> None:
 	path = Path(file_path)
 
 	if (not path.exists()):
@@ -32,30 +50,51 @@ def encrypt_data(data: dict, key: bytes, salt: bytes, file_path: str, associated
 	if len(key) != KEY_LEN:
 		raise KeyLengthError
 
-	data_bytes = bytes(json.dumps(data), encoding="utf-8")
+	data_bytes = bytes(
+		json.dumps(data),
+		encoding="utf-8"
+	)
 
 	ad = bytes(0)
 
 	if associated_data != "":
-		ad = bytes(associated_data, encoding="utf-8")
+		ad = bytes(
+			associated_data,
+			encoding="utf-8"
+		)
 
-	encrypted, nonce = __encrypt_data(data=data_bytes, key=key, associated_data=ad)
+	encrypted, nonce = __encrypt_data(
+		data=data_bytes,
+		key=key,
+		associated_data=ad
+	)
 
 	record = {
-		SALT:			salt.hex(),
-		NONCE:			nonce.hex(),
-		CIPHERTEXT:		encrypted.hex(),
+		SALT:				salt.hex(),
+		NONCE:				nonce.hex(),
+		CIPHERTEXT:			encrypted.hex(),
 		ASSOCIATED_DATA:	ad.hex()
 	}
 
-	__atomic_write(record, path)
+	__atomic_write(
+		record,
+		path
+	)
 
 
-def __encrypt_data(data: bytes, key: bytes, associated_data: bytes | None) -> tuple[bytes, bytes]:
+def __encrypt_data(
+	data: bytes,
+	key: bytes,
+	associated_data: bytes | None
+) -> tuple[bytes, bytes]:
 	aesgcm = AESGCM(key)
 	nonce = os.urandom(12)
 
-	encrypted = aesgcm.encrypt(data=data, associated_data=associated_data, nonce=nonce)
+	encrypted = aesgcm.encrypt(
+		data=data,
+		associated_data=associated_data,
+		nonce=nonce
+	)
 
 	return encrypted, nonce
 
@@ -67,7 +106,10 @@ def __encrypt_data(data: bytes, key: bytes, associated_data: bytes | None) -> tu
 		- KeyDerivationError
 		- OSError
 """
-def get_key_from_pwd(pwd: str, file_path: str) -> tuple[bytes, bytes]:
+def get_key_from_pwd(
+	pwd: str,
+	file_path: str
+) -> tuple[bytes, bytes]:
 	path = Path(file_path)
 
 	if not path.exists():
@@ -76,20 +118,32 @@ def get_key_from_pwd(pwd: str, file_path: str) -> tuple[bytes, bytes]:
 	try:
 		with open(path, 'r', encoding="utf-8") as fd:
 			record = json.load(fd)
-	except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as e:
+
+	except (
+		json.JSONDecodeError,
+		UnicodeDecodeError,
+		RecursionError
+	) as e:
 		raise VaultFormatError from e
 
 	if not isinstance(record, dict):
 		raise VaultFormatError
 
-	if any(dict_key not in record for dict_key in RECORD_KEYS):
+	if any(
+		dict_key not in record
+			for dict_key in RECORD_KEYS
+		):
 		raise VaultFormatError
 
-	if any(not isinstance(record[dict_key], str) for dict_key in RECORD_KEYS):
+	if any(
+		not isinstance(record[dict_key], str)
+			for dict_key in RECORD_KEYS
+		):
 		raise VaultFormatError
 
 	try:
 		salt = bytes.fromhex(record[SALT])
+
 	except ValueError as e:
 		raise VaultFormatError from e
 
@@ -106,7 +160,10 @@ def get_key_from_pwd(pwd: str, file_path: str) -> tuple[bytes, bytes]:
 		- CorruptedVaultError
 		- OSError
 """
-def decrypt_data(key: bytes, file_path: str) -> dict:
+def decrypt_data(
+	key: bytes,
+	file_path: str
+) -> dict:
 	path = Path(file_path)
 
 	if (not path.exists()):
@@ -118,16 +175,27 @@ def decrypt_data(key: bytes, file_path: str) -> dict:
 	try:
 		with open(path, 'r', encoding="utf-8") as fd:
 			record = json.load(fd)
-	except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as e:
+
+	except (
+		json.JSONDecodeError,
+		UnicodeDecodeError,
+		RecursionError
+	) as e:
 		raise VaultFormatError from e
 
 	if not isinstance(record, dict):
 		raise VaultFormatError
 
-	if any(dict_key not in record for dict_key in RECORD_KEYS):
+	if any(
+		dict_key not in record 
+			for dict_key in RECORD_KEYS
+		):
 		raise VaultFormatError
 
-	if any(not isinstance(record[dict_key], str) for dict_key in RECORD_KEYS):
+	if any(
+		not isinstance(record[dict_key], str)
+			for dict_key in RECORD_KEYS
+		):
 		raise VaultFormatError
 
 	return __decrypt_data(key, record)
@@ -138,26 +206,41 @@ def decrypt_data(key: bytes, file_path: str) -> dict:
 		- CorruptedVaultError
 		- VaultFormatError
 """
-def __decrypt_data(key: bytes, record: dict) -> dict:
+def __decrypt_data(
+	key: bytes,
+	record: dict
+) -> dict:
 	aesgcm = AESGCM(key)
 
 	try:
 		nonce = bytes.fromhex(record[NONCE])
 		encrypted = bytes.fromhex(record[CIPHERTEXT])
 		associated_data = bytes.fromhex(record[ASSOCIATED_DATA])
+
 	except (TypeError, ValueError) as e:
 		raise VaultFormatError from e
 
 	try:
-		decrypted_data = aesgcm.decrypt(data=encrypted, associated_data=associated_data, nonce=nonce)
+		decrypted_data = aesgcm.decrypt(
+			data=encrypted,
+			associated_data=associated_data,
+			nonce=nonce
+		)
+
 	except InvalidTag as e:
 		raise CorruptedVaultError from e
+
 	except ValueError as e:
 		raise VaultFormatError from e
 
 	try:
 		data = json.loads(decrypted_data.decode("utf-8"))
-	except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as e:
+
+	except (
+		json.JSONDecodeError,
+		UnicodeDecodeError,
+		RecursionError
+	) as e:
 		raise VaultFormatError from e
 
 	return data
@@ -166,8 +249,12 @@ def __decrypt_data(key: bytes, record: dict) -> dict:
 	@raises:
 		- OSError
 """
-def __atomic_write(data: dict, path: Path):
+def __atomic_write(
+	data: dict,
+	path: Path
+):
 	tmp_path = path.with_name(path.name + ".tmp")
+
 	with open(tmp_path, 'w', encoding="utf-8") as fd:
 		json.dump(data, fd)
 
