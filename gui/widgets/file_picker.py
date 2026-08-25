@@ -54,6 +54,10 @@ class ImportFilePicker:
 			home_dir = os.path.expanduser("~")
 			self._md_file_manager.show(home_dir)
 
+	def close(self):
+		if platform != "android":
+			self._md_file_manager.close()
+
 	def import_file(
 		self,
 		src: object
@@ -67,11 +71,21 @@ class ImportFilePicker:
 				)
 				return
 
+			file_name = os.path.basename(path)
+			dst = os.path.join(self.app_data_path, file_name)
+
+			if os.path.isfile(dst):
+				self._emit_error(
+					message="A vault with this name already exists"
+				)
+				return
+
 			try:
 				copy2(
 					src=path,
-					dst=self.app_data_path
+					dst=dst
 				)
+				self.close()
 			except SameFileError:
 				self._emit_error(
 					message="The selected vault is already in the application directory"
