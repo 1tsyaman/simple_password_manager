@@ -126,7 +126,7 @@ def _main_loop(pwd_manager: PwdManager):
 		clear_screen()
 
 		n = pwd_manager.get_entry_list_len()
-		options = display_list(pwd_manager.get_website_and_username_string(), index)
+		options = display_list(pwd_manager.get_website_and_username_string_list(), index)
 		
 		print_footer()
 
@@ -195,7 +195,7 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
 
 def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
 	while True:
-		print(entry.to_string_with_desc())
+		print(entry.get_formatted_entry_string())
 		print_footer()
 
 		options = ['m', 'd', 'r', 'BACKSPACE']

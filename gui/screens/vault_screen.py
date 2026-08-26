@@ -139,7 +139,7 @@ class VaultScreen(MDScreen):
 	def load_accounts(self, dialog: LoginDialog):
 		self.account_list : AccountList = AccountList()
 
-		accounts = self.pwd_manager.get_website_username_list()
+		accounts = self.pwd_manager.get_website_username_pair_list()
 		self.number_accounts = len(accounts)	# store number of accounts
 		self.account_iterator = iter(accounts)	# create an iterator
 

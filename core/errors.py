@@ -16,7 +16,11 @@ class PasswordError(Exception):
 	pass
 
 class PasswordRequirementsError(PasswordError):
-	def __init__(self, *args: object, reason: str) -> None:
+	def __init__(
+		self,
+		*args: object,
+		reason: str
+	) -> None:
 		super().__init__(*args)
 
 		self.reason = reason
@@ -33,6 +37,9 @@ class EntryHasNoTotp(Exception):
 class TotpUriError(Exception):
 	pass
 
+class InvalidEntryJSON(Exception):
+	pass
+
 """
 	Raised whenever some impossible incosistency occures.
 	
@@ -42,7 +49,10 @@ class TotpUriError(Exception):
 class InconsistentVaultState(Exception):
 	pass
 
-def log(message: str, error: Exception | None = None):
+def log(
+	message: str,
+	error: Exception | None = None
+):
 	print(message)
 
 	if error is not None:

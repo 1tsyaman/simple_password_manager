@@ -28,7 +28,7 @@ class NewAccountDialog(MDDialog):
 		self.description_field			= InputField(title="Description")
 		self.add_account_callback		= add_account_callback
 
-		self.password_field.text = PwdManager.generate_pwd()	# Auto-fill with random password
+		self.password_field.text = PwdManager.generate_random_pwd()	# Auto-fill with random password
 
 		super().__init__(
 			MDDialogIcon(

@@ -1,6 +1,6 @@
 import sys
 from time import sleep
-from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, NO_SUCH_TOTP_MESSAGE, MIN_PWD_LENGTH
+from core.pwd_manager import PwdManager, MIN_PWD_LENGTH
 from core.entry import Entry
 from core.errors import (
 	KeyLengthError,
@@ -15,7 +15,8 @@ from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_back
 from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
 from cli.util import filter_list, list_diff, format_prev_next_str
 
-
+NO_SUCH_ENTRY_MESSAGE	= "No such entry."
+NO_SUCH_TOTP_MESSAGE	= "There is no TOTP config associated with this entry"
 
 def add_entry(pwd_manager: PwdManager) -> bool:
 	clear_screen()
@@ -28,7 +29,7 @@ def add_entry(pwd_manager: PwdManager) -> bool:
 	key = get_key()
 
 	if key == 'y':
-		password = PwdManager.generate_pwd()
+		password = PwdManager.generate_random_pwd()
 
 		if safe_copy(password):
 			print(f"password = {str_color(password, 'r')} was copied to clipboard")
@@ -138,7 +139,7 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 	while True:
 		clear_screen()
 
-		print(entry.to_string_with_desc())
+		print(entry.get_formatted_entry_string())
 		print_footer()
 		print("Modify [w]ebsite, [u]sername, [p]assword, [d]escription [t]otp/two factor authentication, or press [backspace] to go back")
 
@@ -248,7 +249,7 @@ def handle_query(pwd_manager: PwdManager) -> list[Entry]:
 	while not done:
 		clear_screen()
 
-		_, output = display_list_str([entry.to_string() for entry in ans])	# only shows the first 10 matches
+		_, output = display_list_str([entry.get_website_username_pair_string() for entry in ans])	# only shows the first 10 matches
 		print(output)
 		print_footer()
 		print(f"Query: {query}")
@@ -276,7 +277,7 @@ def search_entries(pwd_manager: PwdManager) -> Entry | None:
 		clear_screen()
 
 		n = len(candidates)
-		options = display_list([entry.to_string() for entry in candidates], index)
+		options = display_list([entry.get_website_username_pair_string() for entry in candidates], index)
 		print_footer()
 
 		main_str = format_prev_next_str(index, len=n)
@@ -291,7 +292,7 @@ def search_entries(pwd_manager: PwdManager) -> Entry | None:
 
 			entry = candidates[i]
 
-			print(entry.to_string_with_desc())
+			print(entry.get_formatted_entry_string())
 
 			return entry
 		
@@ -328,7 +329,7 @@ def grab_master_password(new=False) -> str:
 def _modify_website(entry: Entry) -> bool:
 	clear_screen()
 
-	print(entry.to_string_with_desc())
+	print(entry.get_formatted_entry_string())
 	print("Input new website for this entry or leave empty to go back.")
 
 	website = get_input("New website: ")
@@ -343,7 +344,7 @@ def _modify_website(entry: Entry) -> bool:
 def _modify_username(entry: Entry) -> bool:
 	clear_screen()
 
-	print(entry.to_string_with_desc())
+	print(entry.get_formatted_entry_string())
 	print("Input new username for this entry or leave empty to go back.")
 
 	username = get_input("New username: ")
@@ -358,7 +359,7 @@ def _modify_username(entry: Entry) -> bool:
 def _modify_description(entry: Entry) -> bool:
 	clear_screen()
 
-	print(entry.to_string_with_desc())
+	print(entry.get_formatted_entry_string())
 	print("Input new description for this entry or leave empty to go back.")
 
 	description = get_input("New description: ")
@@ -373,7 +374,7 @@ def _modify_description(entry: Entry) -> bool:
 def _modify_password(pwd_manager: PwdManager, entry: Entry) -> bool:
 	clear_screen()
 
-	print(entry.to_string_with_desc())
+	print(entry.get_formatted_entry_string())
 	print("Input new password for this entry or leave empty to go back.")
 
 	password = get_input("New password: ")
@@ -399,7 +400,7 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 	website = entry.get_website()
 	username = entry.get_username()
 
-	print(entry.to_string_with_desc())
+	print(entry.get_formatted_entry_string())
 	print("Input TOTP URI for this entry or leave empty to go back.")
 
 
@@ -423,7 +424,7 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 def gen_rand_password() -> None:
 	clear_screen()
 
-	pwd = PwdManager.generate_pwd()
+	pwd = PwdManager.generate_random_pwd()
 	if safe_copy(pwd):
 		print(f"Your random password {str_color(pwd, 'r')} was copied to clipboard!")
 	else:
