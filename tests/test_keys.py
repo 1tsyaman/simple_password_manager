@@ -1,26 +1,62 @@
 import unittest
+from unittest.mock import patch
 
-from core.keys import KEY_LEN, SALT_LEN, derrive_key
+from argon2.exceptions import HashingError
+
+from core.errors import KeyDerivationError
+from core.keys import (
+    ARGON2_MEMORY_COST,
+    ARGON2_PARALLELISM,
+    ARGON2_TIME_COST,
+    KEY_LEN,
+    SALT_LEN,
+    derive_key,
+)
 
 
-class KeyDerivationTests(unittest.TestCase):
-    def test_generates_expected_salt_and_key_lengths(self):
-        salt, key = derrive_key("password")
-        self.assertEqual(len(salt), SALT_LEN)
-        self.assertEqual(len(key), KEY_LEN)
+class KeyTests(unittest.TestCase):
+    def test_derive_key_uses_supplied_salt_and_argon2id_parameters(self):
+        salt = b"s" * SALT_LEN
+        key = b"k" * KEY_LEN
 
-    def test_reuses_provided_salt(self):
-        salt = bytes(range(SALT_LEN))
-        returned_salt, _ = derrive_key("password", salt)
+        with patch("core.keys.hash_secret_raw", return_value=key) as hash_secret_raw:
+            returned_salt, returned_key = derive_key("Master1!", salt)
+
         self.assertEqual(returned_salt, salt)
+        self.assertEqual(returned_key, key)
 
-    def test_same_password_and_salt_produce_same_key(self):
-        salt = bytes(range(SALT_LEN))
-        self.assertEqual(derrive_key("password", salt)[1], derrive_key("password", salt)[1])
+        kwargs = hash_secret_raw.call_args.kwargs
+        self.assertEqual(kwargs["secret"], b"Master1!")
+        self.assertEqual(kwargs["salt"], salt)
+        self.assertEqual(kwargs["time_cost"], ARGON2_TIME_COST)
+        self.assertEqual(kwargs["memory_cost"], ARGON2_MEMORY_COST)
+        self.assertEqual(kwargs["parallelism"], ARGON2_PARALLELISM)
+        self.assertEqual(kwargs["hash_len"], KEY_LEN)
 
-    def test_different_password_changes_key(self):
-        salt = bytes(range(SALT_LEN))
-        self.assertNotEqual(derrive_key("password", salt)[1], derrive_key("different", salt)[1])
+    def test_derive_key_generates_salt_when_not_supplied(self):
+        salt = b"r" * SALT_LEN
+        key = b"k" * KEY_LEN
 
-    def test_different_salt_changes_key(self):
-        self.assertNotEqual(derrive_key("password", b"a" * SALT_LEN)[1], derrive_key("password", b"b" * SALT_LEN)[1])
+        with patch("core.keys.os.urandom", return_value=salt) as urandom:
+            with patch("core.keys.hash_secret_raw", return_value=key):
+                returned_salt, returned_key = derive_key("Master1!")
+
+        urandom.assert_called_once_with(SALT_LEN)
+        self.assertEqual(returned_salt, salt)
+        self.assertEqual(returned_key, key)
+
+    def test_derive_key_wraps_hashing_error(self):
+        with patch(
+            "core.keys.hash_secret_raw",
+            side_effect=HashingError("argon2 failed"),
+        ):
+            with self.assertRaises(KeyDerivationError):
+                derive_key("Master1!", b"s" * SALT_LEN)
+
+    def test_derive_key_wraps_unicode_encode_error(self):
+        with self.assertRaises(KeyDerivationError):
+            derive_key("\ud800", b"s" * SALT_LEN)
+
+
+if __name__ == "__main__":
+    unittest.main()

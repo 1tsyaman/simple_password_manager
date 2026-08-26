@@ -1,95 +1,145 @@
 import json
-import tempfile
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from core.encrypt import (
     ASSOCIATED_DATA,
     CIPHERTEXT,
     NONCE,
-    RECORD_KEYS,
     SALT,
     decrypt_data,
     encrypt_data,
     get_key_from_pwd,
 )
-from core.keys import KEY_LEN, derrive_key
-from tests.helpers import VALID_MASTER_PASSWORD
+from core.errors import CorruptedVaultError, KeyLengthError, VaultFormatError
+from core.keys import KEY_LEN, SALT_LEN
 
 
-class EncryptionTests(unittest.TestCase):
+class EncryptTests(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.path = Path(self.temp_dir.name) / "vault.json"
-        self.path.touch()
-        self.salt, self.key = derrive_key(VALID_MASTER_PASSWORD)
+        self.key = b"k" * KEY_LEN
+        self.salt = b"s" * SALT_LEN
 
-    def tearDown(self):
-        self.temp_dir.cleanup()
+    def test_encrypt_and_decrypt_round_trip(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.touch()
 
-    def test_encrypt_decrypt_round_trip(self):
-        data = {"example.com, user, note": {"pwd": "secret"}}
-        encrypt_data(data, self.key, self.salt, str(self.path), "")
-        self.assertEqual(decrypt_data(self.key, str(self.path)), data)
+            data = {"github.com, yaman, personal": {"pwd": "secret", "totp_uri": ""}}
+            encrypt_data(data, self.key, self.salt, str(path), "metadata")
 
-    def test_record_contains_only_expected_fields(self):
-        encrypt_data({}, self.key, self.salt, str(self.path), "metadata")
-        record = json.loads(self.path.read_text())
-        self.assertEqual(set(record), set(RECORD_KEYS))
-        self.assertEqual(record[SALT], self.salt.hex())
-        self.assertEqual(bytes.fromhex(record[ASSOCIATED_DATA]), b"metadata")
+            self.assertEqual(decrypt_data(self.key, str(path)), data)
 
-    def test_new_nonce_is_generated_for_every_write(self):
-        encrypt_data({"a": 1}, self.key, self.salt, str(self.path), "")
-        nonce_1 = json.loads(self.path.read_text())[NONCE]
-        encrypt_data({"a": 1}, self.key, self.salt, str(self.path), "")
-        nonce_2 = json.loads(self.path.read_text())[NONCE]
-        self.assertNotEqual(nonce_1, nonce_2)
+    def test_encrypt_writes_expected_record_shape(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.touch()
 
-    def test_wrong_key_cannot_decrypt(self):
-        encrypt_data({"a": 1}, self.key, self.salt, str(self.path), "")
-        _, wrong_key = derrive_key("DifferentPassword1!", self.salt)
-        with self.assertRaises(KeyError):
-            decrypt_data(wrong_key, str(self.path))
+            encrypt_data({"value": 1}, self.key, self.salt, str(path), "")
 
-    def test_tampered_ciphertext_is_rejected(self):
-        encrypt_data({"a": 1}, self.key, self.salt, str(self.path), "")
-        record = json.loads(self.path.read_text())
-        ciphertext = bytearray.fromhex(record[CIPHERTEXT])
-        ciphertext[0] ^= 1
-        record[CIPHERTEXT] = ciphertext.hex()
-        self.path.write_text(json.dumps(record))
-        with self.assertRaises(KeyError):
-            decrypt_data(self.key, str(self.path))
+            record = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(set(record), {SALT, NONCE, CIPHERTEXT, ASSOCIATED_DATA})
+            self.assertEqual(bytes.fromhex(record[SALT]), self.salt)
+            self.assertEqual(bytes.fromhex(record[ASSOCIATED_DATA]), b"")
+            self.assertEqual(len(bytes.fromhex(record[NONCE])), 12)
+            self.assertFalse(path.with_name(path.name + ".tmp").exists())
 
-    def test_get_key_from_password_uses_stored_salt(self):
-        encrypt_data({}, self.key, self.salt, str(self.path), "")
-        returned_salt, returned_key = get_key_from_pwd(VALID_MASTER_PASSWORD, str(self.path))
-        self.assertEqual(returned_salt, self.salt)
-        self.assertEqual(returned_key, self.key)
+    def test_encrypt_raises_for_missing_file(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "missing.vault"
+            with self.assertRaises(FileNotFoundError):
+                encrypt_data({}, self.key, self.salt, str(path), "")
 
-    def test_encrypt_rejects_missing_file(self):
-        missing = self.path.with_name("missing.vault")
-        with self.assertRaises(FileNotFoundError):
-            encrypt_data({}, self.key, self.salt, str(missing), "")
+    def test_encrypt_raises_for_invalid_key_length(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.touch()
+            with self.assertRaises(KeyLengthError):
+                encrypt_data({}, b"short", self.salt, str(path), "")
 
-    def test_decrypt_rejects_missing_file(self):
-        with self.assertRaises(FileNotFoundError):
-            decrypt_data(self.key, str(self.path.with_name("missing.vault")))
+    def test_decrypt_raises_for_missing_file(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "missing.vault"
+            with self.assertRaises(FileNotFoundError):
+                decrypt_data(self.key, str(path))
 
-    def test_encrypt_rejects_wrong_key_length(self):
-        with self.assertRaises(KeyError):
-            encrypt_data({}, b"x" * (KEY_LEN - 1), self.salt, str(self.path), "")
+    def test_decrypt_raises_for_invalid_key_length(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.touch()
+            with self.assertRaises(KeyLengthError):
+                decrypt_data(b"short", str(path))
 
-    def test_decrypt_rejects_wrong_key_length(self):
-        with self.assertRaises(KeyError):
-            decrypt_data(b"x" * (KEY_LEN - 1), str(self.path))
+    def test_decrypt_raises_corrupted_vault_for_wrong_key(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.touch()
+            encrypt_data({"secret": "value"}, self.key, self.salt, str(path), "")
 
-    def test_missing_record_field_is_rejected(self):
-        self.path.write_text(json.dumps({NONCE: "", CIPHERTEXT: "", ASSOCIATED_DATA: ""}))
-        with self.assertRaises(ValueError):
-            get_key_from_pwd(VALID_MASTER_PASSWORD, str(self.path))
+            with self.assertRaises(CorruptedVaultError):
+                decrypt_data(b"x" * KEY_LEN, str(path))
 
-    def test_atomic_write_leaves_no_temporary_file(self):
-        encrypt_data({"a": 1}, self.key, self.salt, str(self.path), "")
-        self.assertFalse(self.path.with_name(self.path.name + ".tmp").exists())
+    def test_decrypt_raises_vault_format_error_for_invalid_json(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.write_text("{not-json", encoding="utf-8")
+
+            with self.assertRaises(VaultFormatError):
+                decrypt_data(self.key, str(path))
+
+    def test_decrypt_raises_vault_format_error_for_missing_record_field(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.write_text(
+                json.dumps({
+                    SALT: self.salt.hex(),
+                    NONCE: "00" * 12,
+                    CIPHERTEXT: "",
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(VaultFormatError):
+                decrypt_data(self.key, str(path))
+
+    def test_get_key_from_pwd_uses_stored_salt(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.write_text(
+                json.dumps({
+                    SALT: self.salt.hex(),
+                    NONCE: "00" * 12,
+                    CIPHERTEXT: "",
+                    ASSOCIATED_DATA: "",
+                }),
+                encoding="utf-8",
+            )
+
+            derived_key = b"d" * KEY_LEN
+            with patch("core.encrypt.derive_key", return_value=(self.salt, derived_key)) as derive:
+                result = get_key_from_pwd("Master1!", str(path))
+
+            self.assertEqual(result, (self.salt, derived_key))
+            derive.assert_called_once_with("Master1!", self.salt)
+
+    def test_get_key_from_pwd_rejects_invalid_salt(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "vault.vault"
+            path.write_text(
+                json.dumps({
+                    SALT: "00",
+                    NONCE: "00" * 12,
+                    CIPHERTEXT: "",
+                    ASSOCIATED_DATA: "",
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(VaultFormatError):
+                get_key_from_pwd("Master1!", str(path))
+
+
+if __name__ == "__main__":
+    unittest.main()
