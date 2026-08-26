@@ -1,7 +1,6 @@
 from threading import Thread, Lock
 from typing import TYPE_CHECKING
 
-from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.clock import Clock
 
 from kivymd.app import MDApp
@@ -24,6 +23,8 @@ from core.errors import (
 	EntryHasNoTotp,
 	log
 )
+
+BATCH_SIZE = 100
 
 # to avoid cicular import issues
 if TYPE_CHECKING:
@@ -73,15 +74,10 @@ class VaultScreen(MDScreen):
 		self.change_version = 0
 		self.synced_version = 0
 
-		self.box_container = MDBoxLayout(
-			orientation="vertical"
-		)
-
 		app = MDApp.get_running_app()
 		assert app is not None
 
 		super().__init__(
-			self.box_container,
 			name="vault",
 			md_bg_color=app.theme_cls.secondaryContainerColor,
 			*args,
@@ -133,8 +129,8 @@ class VaultScreen(MDScreen):
 		if hasattr(self, "account_load_event"):
 			self.account_load_event.cancel()
 
-		self.box_container.clear_widgets()
-		self.box_container.add_widget(NoAccountsLabel())
+		self.clear_widgets()
+		self.add_widget(NoAccountsLabel())
 
 	def load_accounts(self, dialog: LoginDialog):
 		self.account_list : AccountList = AccountList()
@@ -145,8 +141,8 @@ class VaultScreen(MDScreen):
 
 		# Case: No accounts to load
 		if self.number_accounts == 0:
-			self.box_container.clear_widgets()
-			self.box_container.add_widget(NoAccountsLabel())
+			self.clear_widgets()
+			self.add_widget(NoAccountsLabel())
 
 			dialog.dismiss()
 			return
@@ -163,7 +159,7 @@ class VaultScreen(MDScreen):
 			dialog: LoginDialog | None = None,	# is only needed for the first batch
 			first_batch: bool = False
 		) -> bool:
-		batch_size = min(10, self.number_accounts)
+		batch_size = min(BATCH_SIZE, self.number_accounts)
 		done = False
 
 		# Add accounts in batches of 10
@@ -176,18 +172,16 @@ class VaultScreen(MDScreen):
 				done = True
 				break
 
-			entry = AccountEntry(
+			self.account_list.add_account(
 				website=website,
 				username=username,
 				on_click_callback=self.show_account_details_dialog
 			)
-			self.account_list.add_account(entry)
 
 		# only switch the screen *once*, after one batch is added
 		if first_batch:
-			container : MDBoxLayout = self.box_container
-			container.clear_widgets()
-			container.add_widget(self.account_list)
+			self.clear_widgets()
+			self.add_widget(self.account_list)
 
 			if dialog is not None:
 				dialog.dismiss()
@@ -242,18 +236,15 @@ class VaultScreen(MDScreen):
 			username_field.error = True
 			return
 
-		# Add account to list (without refreshing the whole list)
-		entry = AccountEntry(
+		self.account_list.add_account(
 			website=website,
 			username=username,
 			on_click_callback=self.show_account_details_dialog
 		)
-		self.account_list.add_account(entry)
 
 		if self.number_accounts == 0:
-			container : MDBoxLayout = self.box_container
-			container.clear_widgets()
-			container.add_widget(self.account_list)
+			self.clear_widgets()
+			self.add_widget(self.account_list)
 
 		with self.change_lock:
 			self.change_version += 1
@@ -341,9 +332,11 @@ class VaultScreen(MDScreen):
 			)
 			return False
 
-		account_entry.update_labels(
-			website=new_website,
-			username=new_username
+		self.account_list.update_account(
+			old_website=website,
+			old_username=username,
+			new_website=new_website,
+			new_username=new_username
 		)
 
 		with self.change_lock:
@@ -372,7 +365,10 @@ class VaultScreen(MDScreen):
 				username=username
 			)
 
-		self.account_list.remove_account(account_entry)
+		self.account_list.remove_account(
+				website=website,
+				username=username
+		)
 
 		with self.change_lock:
 			self.change_version += 1

@@ -1,7 +1,5 @@
 from typing import TYPE_CHECKING
 
-from kivymd.uix.boxlayout import MDBoxLayout
-
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.appbar import MDActionTopAppBarButton
@@ -39,15 +37,10 @@ class SelectionScreen(MDScreen):
 		self.screen_manager = screen_manager
 		self.top_bar = top_bar
 
-		self.box_container = MDBoxLayout(
-			orientation="vertical"
-		)
-
 		app = MDApp.get_running_app()
 		assert app is not None
 
 		super().__init__(
-			self.box_container,
 			name="selection",
 			md_bg_color=app.theme_cls.secondaryContainerColor,
 			*args,
@@ -83,13 +76,12 @@ class SelectionScreen(MDScreen):
 	def load_vaults(self):
 		# refresh vault list
 		app_data_path = self.app_data_path
-		container : MDBoxLayout = self.box_container
 		self.vaults = io.get_vault_list(app_data_path)
 
 		if len(self.vaults) == 0:
 			# Add no_vaults_label
-			container.clear_widgets()
-			container.add_widget(NoVaultsLabel())
+			self.clear_widgets()
+			self.add_widget(NoVaultsLabel())
 			return
 
 		vault_list = VaultList()
@@ -100,8 +92,8 @@ class SelectionScreen(MDScreen):
 
 			vault_list.add_vault(entry)
 
-		container.clear_widgets()
-		container.add_widget(vault_list)
+		self.clear_widgets()
+		self.add_widget(vault_list)
 
 	def on_leave(self, *args):
 		self.clear()
@@ -110,8 +102,8 @@ class SelectionScreen(MDScreen):
 		is called when leaving the screen
 	"""
 	def clear(self):
-		self.box_container.clear_widgets()
-		self.box_container.add_widget(NoVaultsLabel())
+		self.clear_widgets()
+		self.add_widget(NoVaultsLabel())
 
 ##	New Vault Functions	##
 
