@@ -6,7 +6,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
 
 
-from core.keys import derrive_key, KEY_LEN
+from core.keys import derive_key, KEY_LEN, SALT_LEN
+from core.errors import KeyLengthError, VaultFormatError, CorruptedVaultError
 
 NONCE		= "nonce"
 CIPHERTEXT	= "ciphertext"
@@ -15,6 +16,13 @@ SALT		= "salt"
 
 RECORD_KEYS = [NONCE, CIPHERTEXT, ASSOCIATED_DATA, SALT]
 
+"""
+	@raises:
+		- FileNotFoundError(path) [OSError]
+		- KeyLengthError
+		- OverflowError
+		- OSError
+"""
 def encrypt_data(data: dict, key: bytes, salt: bytes, file_path: str, associated_data: str) -> None:
 	path = Path(file_path)
 
@@ -22,7 +30,7 @@ def encrypt_data(data: dict, key: bytes, salt: bytes, file_path: str, associated
 		raise FileNotFoundError(file_path)
 
 	if len(key) != KEY_LEN:
-		raise KeyError("Something went wrong: Key is not of the expected length.")
+		raise KeyLengthError
 
 	data_bytes = bytes(json.dumps(data), encoding="utf-8")
 
@@ -52,24 +60,52 @@ def __encrypt_data(data: bytes, key: bytes, associated_data: bytes | None) -> tu
 	return encrypted, nonce
 
 
+"""
+	@raises:
+		- FileNotFoundError(path) [OSError]
+		- VaultFormatError
+		- KeyDerivationError
+		- OSError
+"""
 def get_key_from_pwd(pwd: str, file_path: str) -> tuple[bytes, bytes]:
 	path = Path(file_path)
 
-	if (not path.exists()):
+	if not path.exists():
 		raise FileNotFoundError(file_path)
 
-	record = {}
+	try:
+		with open(path, 'r', encoding="utf-8") as fd:
+			record = json.load(fd)
+	except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as e:
+		raise VaultFormatError from e
 
-	with open(path, 'r') as fd:
-		record = json.load(fd)
+	if not isinstance(record, dict):
+		raise VaultFormatError
 
-	for dict_key in RECORD_KEYS:
-		if not dict_key in record.keys():
-			raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
+	if any(dict_key not in record for dict_key in RECORD_KEYS):
+		raise VaultFormatError
 
-	return derrive_key(pwd, bytes.fromhex(record[SALT]))
+	if any(not isinstance(record[dict_key], str) for dict_key in RECORD_KEYS):
+		raise VaultFormatError
 
+	try:
+		salt = bytes.fromhex(record[SALT])
+	except ValueError as e:
+		raise VaultFormatError from e
 
+	if len(salt) != SALT_LEN:
+		raise VaultFormatError
+
+	return derive_key(pwd, salt)
+
+"""
+	@raises:
+		- FileNotFoundError(path) [OSError]
+		- KeyLengthError
+		- VaultFormatError
+		- CorruptedVaultError
+		- OSError
+"""
 def decrypt_data(key: bytes, file_path: str) -> dict:
 	path = Path(file_path)
 
@@ -77,37 +113,59 @@ def decrypt_data(key: bytes, file_path: str) -> dict:
 		raise FileNotFoundError(file_path)
 	
 	if len(key) != KEY_LEN:
-		raise KeyError("Something went wrong: Key is not of the expected length.")
+		raise KeyLengthError
 
-	record = {}
+	try:
+		with open(path, 'r', encoding="utf-8") as fd:
+			record = json.load(fd)
+	except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as e:
+		raise VaultFormatError from e
 
-	with open(path, 'r') as fd:
-		record = json.load(fd)
+	if not isinstance(record, dict):
+		raise VaultFormatError
 
-	for dict_key in RECORD_KEYS:
-		if not dict_key in record.keys():
-			raise ValueError(f"Provided file_path {file_path} is not a valid vault file.")
+	if any(dict_key not in record for dict_key in RECORD_KEYS):
+		raise VaultFormatError
+
+	if any(not isinstance(record[dict_key], str) for dict_key in RECORD_KEYS):
+		raise VaultFormatError
 
 	return __decrypt_data(key, record)
 
 
+"""
+	@raises:
+		- CorruptedVaultError
+		- VaultFormatError
+"""
 def __decrypt_data(key: bytes, record: dict) -> dict:
 	aesgcm = AESGCM(key)
 
-	nonce = bytes.fromhex(record[NONCE])
-	encrypted = bytes.fromhex(record[CIPHERTEXT])
-	associated_data = bytes.fromhex(record[ASSOCIATED_DATA])
-	
+	try:
+		nonce = bytes.fromhex(record[NONCE])
+		encrypted = bytes.fromhex(record[CIPHERTEXT])
+		associated_data = bytes.fromhex(record[ASSOCIATED_DATA])
+	except (TypeError, ValueError) as e:
+		raise VaultFormatError from e
+
 	try:
 		decrypted_data = aesgcm.decrypt(data=encrypted, associated_data=associated_data, nonce=nonce)
-	except InvalidTag:
-		raise KeyError("Something went wrong: Ciphertext has been changed, or key/nonce/associated data are wrong.")
+	except InvalidTag as e:
+		raise CorruptedVaultError from e
+	except ValueError as e:
+		raise VaultFormatError from e
 
-	data = json.loads(decrypted_data.decode("utf-8"))
+	try:
+		data = json.loads(decrypted_data.decode("utf-8"))
+	except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as e:
+		raise VaultFormatError from e
 
 	return data
 
-
+"""
+	@raises:
+		- OSError
+"""
 def __atomic_write(data: dict, path: Path):
 	tmp_path = path.with_name(path.name + ".tmp")
 	with open(tmp_path, 'w', encoding="utf-8") as fd:

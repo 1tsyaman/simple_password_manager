@@ -2,9 +2,19 @@ import sys
 from time import sleep
 from core.pwd_manager import PwdManager, NO_SUCH_ENTRY_MESSAGE, NO_SUCH_TOTP_MESSAGE, MIN_PWD_LENGTH
 from core.entry import Entry
+from core.errors import (
+	KeyLengthError,
+	KeyDerivationError,
+	PasswordRequirementsError,
+	EntryExistsError,
+	NoSuchEntryError,
+	EntryHasNoTotp,
+	TotpUriError,
+)
 from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke, get_input, input_password
 from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
 from cli.util import filter_list, list_diff, format_prev_next_str
+
 
 
 def add_entry(pwd_manager: PwdManager) -> bool:
@@ -35,7 +45,13 @@ def add_entry(pwd_manager: PwdManager) -> bool:
 	ans = poll_y_n_backspace()
 
 	if ans == 'y':
-		pwd_manager.add_entry(website, username, password, description)
+		try:
+			pwd_manager.add_entry(website, username, password, description)
+		except EntryExistsError:
+			print("Entry already exists!")
+			sleep(2)
+			return False
+
 		return True
 	
 	return False
@@ -63,9 +79,10 @@ def get_password(pwd_manager: PwdManager, entry: Entry) -> None:
 	website = entry.get_website()
 	username = entry.get_username()
 
-	pwd = pwd_manager.get_password(website, username)
+	try:
+		pwd = pwd_manager.get_password(website, username)
 
-	if pwd == NO_SUCH_ENTRY_MESSAGE:
+	except NoSuchEntryError:
 		return print(NO_SUCH_ENTRY_MESSAGE)
 
 	print(f"Website: {website}\nUsername: {username}\nPassword: {pwd}")
@@ -89,18 +106,22 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 	website = entry.get_website()
 	username = entry.get_username()
 
-	totp = pwd_manager.get_totp(website=website, username=username)
+	try:
+		totp_code, time_remaining = pwd_manager.get_totp(website=website, username=username)
+		totp_message = f"Code: {totp_code}. Valid for {time_remaining} seconds"
+	except EntryHasNoTotp:
+		return print(NO_SUCH_TOTP_MESSAGE)
+	except NoSuchEntryError:
+		return print(NO_SUCH_ENTRY_MESSAGE)
 
-	if totp in [NO_SUCH_TOTP_MESSAGE, NO_SUCH_ENTRY_MESSAGE]:
-		return print(totp)
-	
-	print(f"Website: {website}\nUsername: {username}\nTOTP Code: {totp}")
+	print(f"Website: {website}\nUsername: {username}\nTOTP Code: {totp_message}")
 
 	print("Press [c] to copy to clipboard or [any key] to return to go back.")
 
 	match get_key():
 		case 'c':
-			if safe_copy(totp):
+			code = totp_message.removeprefix("Code: ").split(".", maxsplit=1)[0]	# assuming the format is "Code: 123456. Valid for XY seconds."
+			if safe_copy(code):
 				print("Code is copied to clipboard!")
 			else:
 				print("Could not copy Code.")
@@ -112,10 +133,10 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 
 
 def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
+	modified = False
+	
 	while True:
 		clear_screen()
-
-		modified = False
 
 		print(entry.to_string_with_desc())
 		print_footer()
@@ -158,9 +179,34 @@ def modify_master_password(pwd_manager: PwdManager) -> bool:
 		key = poll_y_n_backspace()
 
 		if key == "y":
-			pwd_manager.modify_master_password(pwd)
-			
-			print("Master password updated successfully,")
+			try:
+				pwd_manager.modify_master_password(pwd)
+
+			except FileNotFoundError as e:
+				print(f"Master password update failed: Vault file path is incorrect: {e}")
+				return False
+
+			except PasswordRequirementsError as e:
+				print(f"Master password update failed: Password does not satisfy the minimum requirements: Reason: {e.reason}")
+				return False
+
+			except KeyLengthError:
+				print("Master password update failed: Key length is not as expected.")
+				return False
+
+			except KeyDerivationError:
+				print("Master password update failed: Could not derive encryption key.")
+				return False
+
+			except OverflowError:
+				print("Master password update failed: Vault is too large to encrypt.")
+				return False
+
+			except OSError as e:
+				print(f"Master password update failed: {e}")
+				return False
+
+			print("Master password updated successfully.")
 
 			sleep(1)
 			return True
@@ -168,9 +214,26 @@ def modify_master_password(pwd_manager: PwdManager) -> bool:
 		return False
 
 def save_changes(pwd_manager: PwdManager) -> bool:
+	try:
+		pwd_manager.encrypt()
+	except FileNotFoundError as e:
+		print(f"Saving failed: Vault file path is incorrect: {e}")
+		return False
+
+	except KeyLengthError:
+		print(f"Saving failed: Key length is not as expected.")
+		return False
+
+	except OverflowError:
+		print("Saving failed: Vault is too large to encrypt.")
+		return False
+
+	except OSError as e:
+		print(f"Saving failed: {e}")
+		return False
+
 	print("Changes saved.")
 	sleep(1)
-	pwd_manager.encrypt()
 	return True
 
 def handle_query(pwd_manager: PwdManager) -> list[Entry]:
@@ -250,7 +313,7 @@ def grab_master_password(new=False) -> str:
 		pwd = input_password("Enter master password: ")
 		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
 
-		while (not satisfies):
+		while (new and not satisfies):
 			display_password_rejection_reason(reason=reason, min_len=MIN_PWD_LENGTH)
 			pwd = input_password("Enter master password: ")
 			satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
@@ -321,7 +384,12 @@ def _modify_password(pwd_manager: PwdManager, entry: Entry) -> bool:
 	website = entry.get_website()
 	username = entry.get_username()
 
-	pwd_manager.set_password(website, username, password)
+	try:
+		pwd_manager.set_password(website, username, password)
+	except NoSuchEntryError:
+		print("Could not set password, entry does not exist!")
+		sleep(2)
+		return False
 
 	return True
 
@@ -340,12 +408,14 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 	if len(uri) == 0:
 		return False
 
-	err = pwd_manager.set_totp_config(website=website, username=username, uri=uri)
-
-	if err in [NO_SUCH_TOTP_MESSAGE, NO_SUCH_ENTRY_MESSAGE]:
-		print(err)
+	try:
+		pwd_manager.set_totp_config(website=website, username=username, uri=uri)
+	except (NoSuchEntryError, TotpUriError) as e:
+		if isinstance(e, NoSuchEntryError):
+			print("Could not set TOTP, entry does not exist!")
+		else:
+			print("Could not set TOTP, URI is invalid!")
 		sleep(2)
-
 		return False
 	
 	return True

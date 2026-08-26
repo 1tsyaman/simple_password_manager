@@ -1,169 +1,216 @@
 # Simple Password Manager
 
-A small command-line password manager written in Python.
+A local password manager written in Python with two frontends: a **Kivy/KivyMD graphical interface** for desktop and Android, and a **terminal interface** for command-line use.
 
-This project is mainly a learning project for working with password storage, encryption, key derivation, file handling, and basic terminal interfaces. It stores entries in a local encrypted vault file protected by a master password.
+## App Preview
+
+<p align="center">
+  <img src="docs/screenshots/vaults.jpeg" width="30%" alt="Vault selection">
+  <img src="docs/screenshots/create-vault.jpeg" width="30%" alt="Create vault">
+  <img src="docs/screenshots/unlock-vault.jpeg" width="30%" alt="Unlock vault">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/add-account.jpeg" width="30%" alt="Add account">
+  <img src="docs/screenshots/accounts.jpeg" width="30%" alt="Account list">
+  <img src="docs/screenshots/account-details.jpeg" width="30%" alt="Account details">
+</p>
 
 ## Features
 
-* Create and open encrypted local vault files
-* Add entries with website, username, password, and description
-* List saved entries by website and username
-* Search entries by website, username, or description
-* Retrieve saved passwords
-* Copy passwords to the clipboard
-* Modify existing entries
-* Delete entries
-* Generate random passwords
-* Change the master password
-* Save changes manually
-* Save modified vaults on normal exit
-* Automatically exit after 60 seconds of inactivity
-* Reset the inactivity timer whenever user input is received
+* Local encrypted `.vault` files protected by a master password
+* Create, import and manage multiple vaults
+* Add, modify and delete account entries
+* Copy account information directly from the GUI
+* Password generation
+* Account entry search **(currently CLI-only)**
+* Inactivity watchdog **(currently CLI-only)**
+* TOTP / two-factor authentication support  **(currently CLI-only)**
+* **Argon2id** key derivation
+* **AES-GCM** authenticated encryption
+* Atomic vault writes
+* Graphical interface using **Kivy / KivyMD**
+* Full command-line interface
+* Android support
 
-## Project structure
+## Two Interfaces, One Core
+
+Both interfaces use the same underlying password-management, cryptography and storage code.
+
+### Graphical Interface
+
+Launching the application without arguments starts the GUI:
+
+```bash
+python main.py
+```
+
+The GUI supports:
+
+* Vault selection
+* Vault creation and import
+* Master-password authentication
+* Account creation, modification and deletion
+* Account detail views
+* Clipboard actions
+
+The GUI also includes some responsiveness-oriented implementation details: account entries are loaded in batches rather than all at once, and vault changes are encrypted and synchronized outside the main UI thread.
+
+### Command-Line Interface
+
+Passing a vault path starts the original terminal interface:
+
+```bash
+python main.py my.vault
+```
+
+A new vault can be created with:
+
+```bash
+python main.py my.vault --create
+```
+
+The CLI provides entry management, searching, password generation, TOTP retrieval, clipboard support, manual saving and an inactivity watchdog.
+
+## Project Structure
 
 ```text
 simple_password_manager/
-├── main.py              # Program entry point and main loop
-├── cli/
-│   ├── actions.py       # User-facing actions
-│   ├── display.py       # Terminal display helpers
-│   ├── input.py         # Keyboard and clipboard input helpers
-│   ├── util.py          # CLI utility functions
-│   └── watchdog.py      # Inactivity watchdog
-├── core/
-│   ├── encrypt.py       # Encryption/decryption logic
-│   ├── entry.py         # Entry class
-│   ├── keys.py          # Key derivation logic
-│   └── pwd_manager.py   # Password manager logic
-└── storage/
-    └── io.py            # Vault loading, creation, and deletion helpers
+├── main.py                  # Selects GUI or CLI
+│
+├── core/                    # Interface-independent application logic
+│   ├── encrypt.py           # AES-GCM encryption/decryption
+│   ├── entry.py             # Password-entry model
+│   ├── errors.py            # Application-specific exceptions/logging
+│   ├── keys.py              # Argon2id key derivation
+│   ├── pwd_manager.py       # Vault and entry management
+│   └── totp.py              # TOTP parsing and generation
+│
+├── storage/
+│   └── io.py                # Vault filesystem operations
+│
+├── cli/                     # Terminal frontend
+│   ├── main.py
+│   ├── actions.py
+│   ├── display.py
+│   ├── input.py
+│   ├── util.py
+│   └── watchdog.py
+│
+├── gui/                     # Kivy/KivyMD frontend
+│   ├── main.py
+│   ├── screens/             # Application screens and navigation
+│   ├── dialogs/             # Vault/account dialogs
+│   ├── widgets/             # Reusable UI components
+│   ├── utils/               # GUI-specific helpers
+│   └── design/              # UI design resources
+│
+├── requirements.txt
+└── APK_Build_README.md
 ```
 
-## Security design
+The main architectural goal is to keep **presentation separate from application logic**.
 
-The vault is encrypted locally.
+The `gui/` and `cli/` packages are two independent frontends built around the same `core/` password manager and encrypted vault format. Filesystem-related operations are kept in the `storage/` layer.
 
-The master password is used to derive a 256-bit encryption key with Argon2id. Vault data is encrypted using AES-GCM.
+## Security Design
 
-The encrypted vault file stores:
+The master password itself is never stored.
 
-* Salt
-* Nonce
-* Ciphertext
-* Associated data field
+Instead, it is used with **Argon2id** to derive a 256-bit encryption key. Vault contents are encrypted and authenticated using **AES-GCM**.
 
-Vault writes are done through a temporary file and then replaced atomically. This helps avoid corrupting the previous vault if a write fails.
+An encrypted vault contains the salt, nonce, ciphertext and associated data required for decryption.
 
-## Important warning
+Each encryption operation generates a fresh nonce.
 
-This project is not audited and should not be used as a production password manager.
+Vault updates use a temporary file followed by an atomic replacement of the previous vault. This reduces the chance of destroying an existing vault if a write fails partway through.
 
-It is a personal learning project. Passwords may still exist in memory while the vault is open, and copied passwords may remain in the system clipboard or clipboard history.
+Passwords and TOTP secrets still exist in process memory while an unlocked vault is being used, and copied values may remain in the system clipboard or clipboard history.
 
-## Installation
+## Technology
 
-Clone the repository:
+* Python 3
+* Kivy 2.3.1
+* KivyMD 2.0.0
+* cryptography
+* Argon2
+* PyOTP
+* Buildozer / python-for-android
 
-```bash
-git clone https://github.com/1tsyaman/simple_password_manager.git
-cd simple_password_manager
-```
+The Android build process has been tested with Python 3.13.15.
 
-Create a virtual environment:
+## Running from Source
+
+Python **3.13** is required.
+
+Create and activate a virtual environment:
 
 ```bash
 python -m venv .venv
-```
 
-Activate it:
-
-```bash
-# Linux/macOS
+# Linux
 source .venv/bin/activate
 
 # Windows PowerShell
 .venv\Scripts\Activate.ps1
 ```
 
-Install dependencies:
+Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Clipboard support on Linux
-
-Clipboard support uses `pyperclip`.
-
-On Linux, install `xclip` so copying passwords works:
+Start the GUI:
 
 ```bash
-sudo apt install xclip
+python main.py
 ```
 
-On Termux, clipboard support expects `termux-clipboard-set` to be available.
-
-## Usage
-
-Create a new vault:
-
-```bash
-python main.py my.vault --create
-```
-
-Open an existing vault:
+Or start the CLI with a vault file:
 
 ```bash
 python main.py my.vault
 ```
 
-Inside the program, use the displayed keyboard commands.
+### Linux Clipboard Support
 
-Main actions include:
+Clipboard operations use `pyperclip`. On Linux, `xclip` may additionally be required:
 
-* `[a]` add an entry
-* `[g]` generate a random password
-* `[m]` modify the master password
-* `[f]` search entries
-* `[s]` save current changes
-* `[q]` quit
+```bash
+sudo apt install xclip
+```
 
-When selecting a specific entry, you can modify it, delete it, or retrieve its password.
+## Android Build
 
-### Inactivity watchdog
+The application can be packaged for Android using Buildozer and python-for-android.
 
-The program includes an inactivity watchdog.
+Because some native dependencies require additional Android build configuration, the complete setup, known issues and workarounds are documented separately in:
 
-If no user input is received for 60 seconds, the process exits automatically. The timer is reset whenever the user interacts with the program, including while entering passwords or using menu commands.
+`APK_Build_README.md`
 
-A watchdog timeout exits immediately and does not save unsaved vault changes. Use `[s]` to save important changes manually.
+## Security Notice
 
-Normal quitting with `[q]` still saves modified vaults automatically.
+This is a personal software and security project and has **not undergone a professional security audit**.
 
-## Notes
+It should therefore not be relied upon as a production password manager or as the only storage location for important credentials.
 
-* The master password cannot be recovered if forgotten.
-* Keep backups of your vault file.
-* Do not store the vault file together with your master password.
-* Clipboard support depends on the platform.
-* Unsaved changes are saved automatically on normal quit.
-* Unsaved changes are discarded when the inactivity watchdog triggers.
-* The watchdog exits the application rather than locking and reopening the active vault.
+## Current Limitations
 
-## Current limitations
-
-* No graphical interface
-* No browser integration
+* No browser integration or autofill
 * No automatic clipboard clearing
+* No cross-device synchronization
 * No formal security audit
-* No packaged installer
 
-## Planned improvements
+## About the Project
 
-* Improve command-line argument handling
-* Add safer clipboard handling
-* Add optional vault locking and unlocking
-* Improve error messages
-* Package the project for easier installation
+This project was developed to gain practical experience with:
+
+* Object-oriented programming
+* Structured programming
+* Application architecture and separation of concerns
+* Multithreading and concurrent tasks
+* UI responsiveness
+* Cross-platform Python development
+
+The application code in this repository was written by the author. The automated test suite available on a separate testing branch was initially generated with assistance from an AI agent and subsequently reviewed and adapted to the project's implementation.
