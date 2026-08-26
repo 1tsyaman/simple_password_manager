@@ -11,6 +11,7 @@ from gui.widgets.vault_list import VaultEntry, VaultList
 from gui.widgets.file_picker import ImportFilePicker
 from gui.dialogs.login_dialog import LoginDialog
 from gui.dialogs.new_vault_dialog import NewVaultDialog
+from gui.dialogs.vault_context_menu import VaultContextMenu
 
 import storage.io as io
 from core.errors import (
@@ -88,7 +89,7 @@ class SelectionScreen(MDScreen):
 
 		for vault in self.vaults:
 			entry = VaultEntry(name=vault)
-			entry.bind(on_release=self.show_open_vault_dialog)
+			entry.bind(on_release=self.show_vault_context_menu)
 
 			vault_list.add_vault(entry)
 
@@ -175,14 +176,33 @@ class SelectionScreen(MDScreen):
 				error=e
 			)
 
+##	Vault Context Menu Funtion ##
+
+	def show_vault_context_menu(
+		self,
+		instance: VaultEntry
+	):
+		VaultContextMenu(
+			vault_name=instance.vault_name,
+			open_callback=self.show_open_vault_dialog,
+			export_callback=self.show_export_vault_dialog
+		).open()
 
 ##	Open Vault Function	##
 
-	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
-		login_dialog = LoginDialog(
-			vault=instance.vault_name,
+	def show_open_vault_dialog(self, vault_name: str) -> None:
+		LoginDialog(
+			vault=vault_name,
 			login_callback=self.screen_manager.open_vault
 		).open()
+
+##	Modify Vault Function	##
+
+	def show_export_vault_dialog(
+		self,
+		vault_name: str
+	):
+		pass
 
 ##	Import Vault Function	##
 
