@@ -10,9 +10,6 @@ from kivymd.uix.textfield import (
 
 from gui.widgets.focusable_text_field import FocusableTextField
 
-class ClickableTrailingIcon(ButtonBehavior, MDTextFieldTrailingIcon):
-	pass
-
 class ReadOnlyTextField(MDBoxLayout):
 	def __init__(
 		self,

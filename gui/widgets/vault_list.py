@@ -1,3 +1,6 @@
+from collections.abc import Callable
+
+from kivymd.uix.button import MDIconButton
 from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.list import (
@@ -9,14 +12,27 @@ from kivymd.uix.list import (
 class VaultEntry(MDListItem):
 	def __init__(self,
 		name: str,
+		context_callback: Callable,
 		*args,
 		**kwargs
 	):
 		self.vault_name = name
+		self.context_button = MDIconButton(
+			icon="dots-vertical",
+			pos_hint={
+				"center_x": 0.5,
+				"center_y": 0.5,
+			},
+			on_release=lambda _: context_callback(
+				instance=self,
+				button=self.context_button
+			)
+		)
 
 		super().__init__(
 			MDListItemLeadingIcon(icon="safe"),
 			MDListItemHeadlineText(text=name),
+			self.context_button,
 			pos_hint={
 				"center_x": 0.5,
 				"center_y": 0.5

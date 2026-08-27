@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from kivy.uix.widget import Widget
+
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.appbar import MDActionTopAppBarButton
@@ -12,7 +14,7 @@ from gui.widgets.import_picker import ImportFilePicker
 from gui.widgets.export_picker import ExportFilePicker
 from gui.dialogs.login_dialog import LoginDialog
 from gui.dialogs.new_vault_dialog import NewVaultDialog
-from gui.dialogs.vault_context_menu import VaultContextMenu
+from gui.widgets.vault_context_menu import VaultContextMenu
 
 import storage.io as io
 from core.errors import (
@@ -89,8 +91,11 @@ class SelectionScreen(MDScreen):
 		vault_list = VaultList()
 
 		for vault in self.vaults:
-			entry = VaultEntry(name=vault)
-			entry.bind(on_release=self.show_vault_context_menu)
+			entry = VaultEntry(
+				name=vault,
+				context_callback=self.show_vault_context_menu
+			)
+			entry.bind(on_release=self.show_open_vault_dialog)
 
 			vault_list.add_vault(entry)
 
@@ -181,19 +186,21 @@ class SelectionScreen(MDScreen):
 
 	def show_vault_context_menu(
 		self,
-		instance: VaultEntry
+		instance: VaultEntry,
+		button: Widget
 	):
+		name = instance.vault_name
 		VaultContextMenu(
-			vault_name=instance.vault_name,
-			open_callback=self.show_open_vault_dialog,
-			export_callback=self.show_export_vault_dialog
+			export_callback=lambda: self.show_export_vault_dialog(name),
+			rename_callback=lambda: print("NO :3"),
+			caller=button
 		).open()
 
 ##	Open Vault Function	##
 
-	def show_open_vault_dialog(self, vault_name: str) -> None:
+	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
 		LoginDialog(
-			vault=vault_name,
+			vault=instance.vault_name,
 			login_callback=self.screen_manager.open_vault
 		).open()
 
