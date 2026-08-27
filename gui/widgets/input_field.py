@@ -1,8 +1,10 @@
+from collections.abc import Callable
+
 from kivymd.uix.textfield import (
-	MDTextField,
 	MDTextFieldHelperText,
 	MDTextFieldHintText,
-	MDTextFieldLeadingIcon
+	MDTextFieldLeadingIcon,
+	MDTextFieldTrailingIcon,
 )
 
 from gui.widgets.focusable_text_field import FocusableTextField
@@ -21,6 +23,8 @@ class InputField(FocusableTextField):
 		title: str,
 		icon: str = "",
 		password: bool = False,	# defines if text is masked or not
+		trailing_icon: str = "",
+		trailing_callback: Callable | None = None,
 		**kwargs
 	):
 		self.error_widget = MDTextFieldHelperText(
@@ -43,6 +47,9 @@ class InputField(FocusableTextField):
 				text_color_normal="mediumaquamarine",
 				text_color_focus="tan",
 			),
+
+			trailing_icon=trailing_icon,
+			trailing_callback=trailing_callback,
 
 			mode="outlined",
 			fill_color_normal="lightcyan",

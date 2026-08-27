@@ -2,10 +2,8 @@ from collections.abc import Callable
 
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDIconButton
-from kivy.uix.behaviors import ButtonBehavior
 from kivymd.uix.textfield import (
 	MDTextFieldLeadingIcon,
-	MDTextFieldTrailingIcon,
 )
 
 from gui.widgets.focusable_text_field import FocusableTextField
@@ -17,6 +15,8 @@ class ReadOnlyTextField(MDBoxLayout):
 		text: str,
 		copy_callback: Callable,
 		password: bool = False,
+		trailing_icon: str = "",
+		trailing_callback: Callable | None = None,
 		*args,
 		**kwargs
 	):
@@ -31,8 +31,10 @@ class ReadOnlyTextField(MDBoxLayout):
 
 		self.field = FocusableTextField(
 			MDTextFieldLeadingIcon(
-				icon=leading_icon
+				icon=leading_icon,
 			),
+			trailing_icon=trailing_icon,
+			trailing_callback=trailing_callback,
 
 			text=text,
 			readonly=True,	# sets 'is_focusable=False' implicitly
@@ -68,3 +70,12 @@ class ReadOnlyTextField(MDBoxLayout):
 		self.field.readonly = False
 		self.field.is_focusable = True	# Has to be set explicity
 		self.field.password = False
+
+	def toggle_password_mask(self):
+		self.field.toggle_password_mask()
+
+	def password_mask_is_set(self):
+		return self.field.password_mask_is_set()
+
+	def set_trailing_icon(self, icon: str):
+		self.field.trailing_icon = icon

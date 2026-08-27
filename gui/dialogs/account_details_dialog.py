@@ -62,7 +62,9 @@ class AccountDetailsDialog(MDDialog):
 			leading_icon="key",
 			text=password,
 			copy_callback=copy_callback,
-			password=True
+			password=True,
+			trailing_icon="eye",
+			trailing_callback=self.toggle_password_mask
 		)
 		self.description_field = ReadOnlyTextField(
 			leading_icon="text",
@@ -257,3 +259,11 @@ class AccountDetailsDialog(MDDialog):
 
 		dialog.dismiss()
 		self.dismiss()
+
+	def toggle_password_mask(self):
+		self.password_field.toggle_password_mask()
+		# Toggle the icon
+		if self.password_field.password_mask_is_set():
+			self.password_field.set_trailing_icon("eye")
+		else:
+			self.password_field.set_trailing_icon("eye-off")
