@@ -14,6 +14,7 @@ from gui.widgets.import_picker import ImportFilePicker
 from gui.widgets.export_picker import ExportFilePicker
 from gui.dialogs.login_dialog import LoginDialog
 from gui.dialogs.new_vault_dialog import NewVaultDialog
+from gui.dialogs.rename_vault_dialog import RenameVaultDialog
 from gui.widgets.vault_context_menu import VaultContextMenu
 
 import storage.io as io
@@ -112,11 +113,6 @@ class SelectionScreen(MDScreen):
 		self.clear_widgets()
 		self.add_widget(NoVaultsLabel())
 
-##	New Vault Functions	##
-
-	def show_new_vault_dialog(self):
-		NewVaultDialog(create_vault_callback=self.create_vault).open()
-
 	def create_vault(
 		self,
 		dialog: NewVaultDialog,
@@ -182,7 +178,41 @@ class SelectionScreen(MDScreen):
 				error=e
 			)
 
-##	Vault Context Menu Funtion ##
+	def rename_vault(
+		self,
+		old_name: str,
+		new_name: str
+	):
+		try:
+			io.rename_vault(
+				path=self.app_data_path,
+				vault_name=old_name,
+				new_vault_name=new_name
+			)
+
+			self.refresh()
+
+		except (
+			FileNotFoundError,
+			FileExistsError,
+			OSError,
+		) as e:
+			log(
+				message=f"Something went wrong while renaming vault {old_name}.",
+				error=e
+			)
+
+			self.screen_manager.show_error_dialog(
+				error_title="Rename Error:",
+				error_message="Failed to rename vault, check log"
+			)
+
+####	Open Dialog/Menu Methods	####
+
+	def show_new_vault_dialog(self):
+		NewVaultDialog(
+			create_vault_callback=self.create_vault
+		).open()
 
 	def show_vault_context_menu(
 		self,
@@ -192,11 +222,9 @@ class SelectionScreen(MDScreen):
 		name = instance.vault_name
 		VaultContextMenu(
 			export_callback=lambda: self.show_export_vault_dialog(name),
-			rename_callback=lambda: print("NO :3"),
+			rename_callback=lambda: self.show_rename_vault_dialog(name),
 			caller=button
 		).open()
-
-##	Open Vault Function	##
 
 	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
 		LoginDialog(
@@ -204,7 +232,14 @@ class SelectionScreen(MDScreen):
 			login_callback=self.screen_manager.open_vault
 		).open()
 
-##	Modify Vault Function	##
+	def show_rename_vault_dialog(
+		self,
+		vault_name: str
+	):
+		RenameVaultDialog(
+			vault_name=vault_name,
+			rename_callback=self.rename_vault
+		).open()
 
 	def show_export_vault_dialog(
 		self,
@@ -214,8 +249,6 @@ class SelectionScreen(MDScreen):
 			app_data_path=self.app_data_path,
 			vault_name=vault_name
 		).open()
-
-##	Import Vault Function	##
 
 	def show_import_vault_file_picker(self):
 		ImportFilePicker(

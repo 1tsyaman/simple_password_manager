@@ -11,13 +11,16 @@ class VaultContextMenu(MDDropdownMenu):
 		caller: Widget,
 		**kwargs
 	):
-		rename = {
-			"text":			"Rename",
-			"on_release":	lambda *args: rename_callback(),
-		}
+		self.export_callback = export_callback
+		self.rename_callback = rename_callback
+
 		export = {
 			"text":			"Export",
-			"on_release":	lambda *args: export_callback(),
+			"on_release":	lambda *args: self._export_callback(),
+		}
+		rename = {
+			"text":			"Rename",
+			"on_release":	lambda *args: self._rename_callback(),
 		}
 
 		super().__init__(
@@ -34,3 +37,11 @@ class VaultContextMenu(MDDropdownMenu):
 	def on_open(self, *args):
 		self.scale_value_center = self._start_coords
 		super().on_open(*args)
+
+	def _export_callback(self):
+		self.dismiss()
+		self.export_callback()
+
+	def _rename_callback(self):
+		self.dismiss()
+		self.rename_callback()
