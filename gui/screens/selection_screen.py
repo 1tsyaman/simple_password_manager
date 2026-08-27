@@ -103,6 +103,9 @@ class SelectionScreen(MDScreen):
 		self.clear_widgets()
 		self.add_widget(vault_list)
 
+	def on_back(self):
+		self.screen_manager.exit_app()
+
 	def on_leave(self, *args):
 		self.clear()
 

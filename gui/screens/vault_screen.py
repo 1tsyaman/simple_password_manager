@@ -118,6 +118,9 @@ class VaultScreen(MDScreen):
 
 		self.load_accounts(dialog=dialog)
 
+	def on_back(self):
+		self.screen_manager.back_to_selection()
+
 	def on_leave(self, *args):
 		self.clear()
 

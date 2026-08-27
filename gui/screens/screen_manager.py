@@ -1,3 +1,4 @@
+from kivymd.app import MDApp
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.transition import MDSharedAxisTransition
 
@@ -23,6 +24,7 @@ import storage.io as io
 class AppScreenManager(MDScreenManager):
 	def __init__(
 		self,
+		app: MDApp,
 		top_bar: TopBar,
 		pwd_manager: PwdManager,
 		*args,
@@ -30,6 +32,7 @@ class AppScreenManager(MDScreenManager):
 	):
 		self.app_data_path = str(io.get_app_data_path())
 
+		self.app = app
 		self.top_bar = top_bar
 		self.selection_screen = SelectionScreen(
 			app_data_path=self.app_data_path,
@@ -146,6 +149,9 @@ class AppScreenManager(MDScreenManager):
 
 	def back_to_selection(self):
 		self.switch_screen("selection", on_exit=True)
+
+	def exit_app(self):
+		self.app.stop()
 
 	def show_error_dialog(self, **kwargs):
 		self.error_dialog = ErrorDialog(**kwargs)

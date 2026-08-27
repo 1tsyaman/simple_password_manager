@@ -28,6 +28,7 @@ class SimplePasswordManagerApp(MDApp):
 			title=APP_NAME
 		)
 		self.screen_manager = AppScreenManager(
+			app=self,
 			top_bar=self.top_bar,
 			pwd_manager=PwdManager()	# dummy pwd manager to initialize vault screen
 		)

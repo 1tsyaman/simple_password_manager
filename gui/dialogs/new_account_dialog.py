@@ -22,10 +22,22 @@ class NewAccountDialog(MDDialog):
 		*args,
 		**kwargs
 	):
-		self.website_field				= InputField(title="Website")
-		self.username_field				= InputField(title="Username")
-		self.password_field				= InputField(title="Password")
-		self.description_field			= InputField(title="Description")
+		self.website_field				= InputField(
+			title="Website",
+			icon="web"
+		)
+		self.username_field				= InputField(
+			title="Username",
+			icon="account"
+		)
+		self.password_field				= InputField(
+			title="Password",
+			icon="key"
+		)
+		self.description_field			= InputField(
+			title="Description",
+			icon="text"
+		)
 		self.add_account_callback		= add_account_callback
 
 		self.password_field.text = PwdManager.generate_random_pwd()	# Auto-fill with random password
