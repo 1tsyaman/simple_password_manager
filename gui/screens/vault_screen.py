@@ -1,10 +1,9 @@
 from threading import Thread, Lock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from kivy.clock import Clock
 
 from kivymd.app import MDApp
-from kivymd.uix.appbar import MDActionTopAppBarButton
 from kivymd.uix.screen import MDScreen
 
 from gui.dialogs.login_dialog import LoginDialog
@@ -12,7 +11,7 @@ from gui.dialogs.new_account_dialog import NewAccountDialog
 from gui.dialogs.account_details_dialog import AccountDetailsDialog
 from gui.widgets.account_list import AccountEntry, AccountList
 from gui.widgets.labels import NoAccountsLabel
-from gui.widgets.top_bar import TopBar
+from gui.widgets.search_bar import SearchBar
 from gui.utils.clipboard import copy_text
 
 from core.pwd_manager import PwdManager
@@ -34,16 +33,16 @@ class VaultScreen(MDScreen):
 	def __init__(
 		self,
 		app_data_path: str,
+		phone_screen: MDScreen,
 		screen_manager: "AppScreenManager",	# forward reference for type checking
 		pwd_manager: PwdManager,
-		top_bar: TopBar,
 		*args,
 		**kwargs
 	):
 		self.app_data_path = app_data_path
+		self.phone_screen = phone_screen
 		self.screen_manager = screen_manager
 		self.pwd_manager = pwd_manager
-		self.top_bar = top_bar
 		self.vault_name = ""
 
 		"""
@@ -91,24 +90,35 @@ class VaultScreen(MDScreen):
 		Called on pre_enter
 	"""
 	def refresh(self):
-		top_bar = self.top_bar
-		back_button : MDActionTopAppBarButton = top_bar.back_button
-		import_button: MDActionTopAppBarButton = top_bar.import_vault_button
-
 		dialog = self.login_dialog
 
-		top_bar.add_back_button(
-			callback=self.screen_manager.back_to_selection
+		search_bar = SearchBar(
+			view_root=self.phone_screen,
+			search_function=self.search_accounts,
+			search_text="Search accounts...",
+			leading_button_icon="arrow-left",
+			leading_button_callback=self.screen_manager.back_to_selection,
+			trailing_button_icon="dots-vertical",
+			trailing_button_callback=None,		# TODO: Add drop down menu for this
 		)
-		top_bar.set_title(self.vault_name)
 
-		# Disable import button
-		top_bar.import_callback = None
-		import_button.disabled = True
-		import_button.opacity = 0
+		self.screen_manager.switch_top_bar(
+			search_bar,
+			padding="2dp"
+		)
 
-		# New account button
-		top_bar.plus_callback = self.show_add_account_dialog
+#		top_bar.add_back_button(
+#			callback=self.screen_manager.back_to_selection
+#		)
+#		top_bar.set_title(self.vault_name)
+#
+#		# Disable import button
+#		top_bar.import_callback = None
+#		import_button.disabled = True
+#		import_button.opacity = 0
+#
+#		# New account button
+#		top_bar.plus_callback = self.show_add_account_dialog
 
 		with self.change_lock:
 			self.change_version = 0
@@ -381,6 +391,12 @@ class VaultScreen(MDScreen):
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
 		).start()
+
+	def search_accounts(
+		self,
+		query: str
+	) -> list[dict[str, Any]]:
+		return []
 
 	"""
 		Creates a snapshot of the current state of self.pwd_manager and encrypts it.

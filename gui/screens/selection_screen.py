@@ -33,14 +33,14 @@ class SelectionScreen(MDScreen):
 	def __init__(
 		self,
 		app_data_path: str,
+		app_name: str,
 		screen_manager: "AppScreenManager",	# forward reference for type checking
-		top_bar: TopBar,
 		*args,
 		**kwargs
 	):
 		self.app_data_path = app_data_path
+		self.app_name = app_name
 		self.screen_manager = screen_manager
-		self.top_bar = top_bar
 
 		app = MDApp.get_running_app()
 		assert app is not None
@@ -59,11 +59,12 @@ class SelectionScreen(MDScreen):
 		is called before entering the screen
 	"""
 	def refresh(self):
-		top_bar: TopBar = self.top_bar
+		top_bar = TopBar(
+			title=self.app_name
+		)
 		import_button: MDActionTopAppBarButton = top_bar.import_vault_button
 
 		top_bar.remove_back_button()
-		top_bar.reset_title()
 
 		# Enable import button
 		top_bar.import_callback = self.show_import_vault_file_picker
@@ -75,6 +76,8 @@ class SelectionScreen(MDScreen):
 
 		# Import vault button
 		top_bar.import_callback = self.show_import_vault_file_picker
+
+		self.screen_manager.switch_top_bar(top_bar)
 
 		self.load_vaults()
 

@@ -1,13 +1,16 @@
 from kivymd.app import MDApp
+from kivymd.uix.widget import Widget
+from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.transition import MDSharedAxisTransition
+from kivymd.uix.boxlayout import MDBoxLayout
 
 from gui.screens.selection_screen import SelectionScreen
 from gui.screens.vault_screen import VaultScreen
 from gui.dialogs.login_dialog import LoginDialog
 from gui.dialogs.error_dialog import ErrorDialog
 from gui.widgets.input_field import InputField
-from gui.widgets.top_bar import TopBar
+from gui.widgets.search_bar import SearchBar
 
 from core.pwd_manager import PwdManager
 from core.errors import (
@@ -25,25 +28,28 @@ class AppScreenManager(MDScreenManager):
 	def __init__(
 		self,
 		app: MDApp,
-		top_bar: TopBar,
+		app_name: str,
+		phone_screen: MDScreen,
+		top_container: MDBoxLayout,
 		pwd_manager: PwdManager,
 		*args,
 		**kwargs
 	):
-		self.app_data_path = str(io.get_app_data_path())
-
+		self.app_name = app_name
 		self.app = app
-		self.top_bar = top_bar
+		self.app_data_path = str(io.get_app_data_path())
+		self.top_container = top_container
+
 		self.selection_screen = SelectionScreen(
 			app_data_path=self.app_data_path,
-			screen_manager=self,
-			top_bar=top_bar
+			app_name=self.app_name,
+			screen_manager=self
 		)
 		self.vault_screen = VaultScreen(
 			app_data_path=self.app_data_path,
+			phone_screen=phone_screen,
 			screen_manager=self,
 			pwd_manager=pwd_manager,
-			top_bar=top_bar
 		)
 
 		super().__init__(
@@ -133,7 +139,7 @@ class AppScreenManager(MDScreenManager):
 			if screen == "vault":
 				screen_object.vault_name = vault_name
 
-			screen_object.top_bar = self.top_bar
+			screen_object.top_bar = self.top_container
 			self.current = screen
 
 	def vault_screen_can_switch(self):
@@ -156,3 +162,19 @@ class AppScreenManager(MDScreenManager):
 	def show_error_dialog(self, **kwargs):
 		self.error_dialog = ErrorDialog(**kwargs)
 		self.error_dialog.open()
+
+	def switch_top_bar(
+		self,
+		widget: Widget,
+		padding: str = "0dp"
+	):
+		widget.size_hint = (1,1)
+
+		# Detach search bar, if attached
+		for child in self.top_container.children:
+			if isinstance(child, SearchBar):
+				child.detach()
+
+		self.top_container.clear_widgets()
+		self.top_container.add_widget(widget)
+		self.top_container.padding = padding

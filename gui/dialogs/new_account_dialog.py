@@ -99,5 +99,4 @@ class NewAccountDialog(MDDialog):
 		)
 
 	def _generate_pwd(self):
-		print("Clicked!")
 		self.password_field.text = PwdManager.generate_random_pwd()
