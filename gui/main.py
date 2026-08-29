@@ -1,4 +1,5 @@
 from threading import Lock
+from time import time
 
 from kivy.clock import Clock
 from kivy.core.window import Window
@@ -19,6 +20,8 @@ class SimplePasswordManagerApp(MDApp):
 	def __init__(self, **kwargs):
 		self.modified_lock = Lock()
 		self.modified = False	# Shared state which is checked by the watchdog thread
+		self.watchdog_thread = None
+		self.watchdog_deadline = 0
 
 		super().__init__(**kwargs)
 
@@ -27,11 +30,32 @@ class SimplePasswordManagerApp(MDApp):
 		# Reset watchdog on activity
 		Window.bind(
 			on_touch_down=	lambda *_: self.reset_watchdog(),
-			on_key_down=	lambda *_: self.reset_watchdog()
+			on_key_down=	lambda *_: self.reset_watchdog(),
+			on_keyboard=	lambda 	window,
+									key,
+									scancode,
+									codepoint,
+									modifiers: self._on_keyboard(key)
 		)
 
 		# Start the watchdog timer.
-		Clock.schedule_interval(
+		self.schedule_watchdog()
+
+	# TODO: Add on_pause behaviour, such as locking the vault
+	def on_pause(self):
+		return super().on_pause()
+
+	def on_resume(self):
+		if time() >= self.watchdog_deadline:
+			# Call the watchdog function
+			self.kill_if_inactive()
+
+		return super().on_resume()
+
+	def schedule_watchdog(self):
+		# Add absolute deadline that can be used if app is paused
+		self.watchdog_deadline = time() + INACTIVITY_TIMEOUT_DURATION
+		self.watchdog_thread = Clock.schedule_once(
 			lambda *_: self.kill_if_inactive(),
 			INACTIVITY_TIMEOUT_DURATION,
 		)
@@ -47,6 +71,18 @@ class SimplePasswordManagerApp(MDApp):
 				self.stop()
 			else:
 				self.modified = False
+
+		self.schedule_watchdog()
+
+	def _on_keyboard(
+		self,
+		key: int
+	) -> bool:
+		if key == 27:	# Anroid back button / Esc
+			self.screen_manager.current_screen.on_back()
+			return True	# Consume this event (interception)
+
+		return False	# Event gets handled by default handler
 
 	def build(self):
 		self.app_screen = MDScreen(
