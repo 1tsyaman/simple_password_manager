@@ -248,6 +248,43 @@ class PwdManager:
 	def get_entry_list_len(self: PwdManager) -> int:
 		return len(self.entries)
 
+	"""
+		Returns a list of dictionaries
+			{
+				"website":		'website',
+				"username":		'username',
+				"description":	'description',
+				"totp_config":	{
+									"issuer":		'issuer',
+									"account":		'account',
+									"algorithm":	'algorithm',
+									"digits":		digits,
+									"period":		period"
+								}
+			}
+		
+		"totp_config" can be {} if there is no config set up
+	"""
+	def get_entries_as_json(self: PwdManager) -> list[dict]:
+		return [entry.get_json()
+					for entry in self.entries]
+
+	def get_entry_as_json(
+		self,
+		website: str,
+		username: str
+	) -> dict:
+		entry = self.__get_entry_with_username_or_None(
+			website=website,
+			username=username
+		)
+
+		if entry is None:
+			raise NoSuchEntryError
+
+		return entry.get_json()
+
+
 ####	Entry attribute getters		####
 
 	"""

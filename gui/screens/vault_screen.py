@@ -146,11 +146,13 @@ class VaultScreen(MDScreen):
 		self.add_widget(NoAccountsLabel())
 
 	def load_accounts(self, dialog: LoginDialog):
-		self.account_list : AccountList = AccountList()
+		self.account_list_widget : AccountList = AccountList()
 
 		accounts = self.pwd_manager.get_website_username_pair_list()
 		self.number_accounts = len(accounts)	# store number of accounts
 		self.account_iterator = iter(accounts)	# create an iterator
+
+		self.account_list = self.pwd_manager.get_entries_as_json()	# used for search
 
 		# Case: No accounts to load
 		if self.number_accounts == 0:
@@ -185,7 +187,7 @@ class VaultScreen(MDScreen):
 				done = True
 				break
 
-			self.account_list.add_account(
+			self.account_list_widget.add_account(
 				website=website,
 				username=username,
 				on_click_callback=self.show_account_details_dialog
@@ -194,7 +196,7 @@ class VaultScreen(MDScreen):
 		# only switch the screen *once*, after one batch is added
 		if first_batch:
 			self.clear_widgets()
-			self.add_widget(self.account_list)
+			self.add_widget(self.account_list_widget)
 
 			if dialog is not None:
 				dialog.dismiss()
@@ -249,15 +251,23 @@ class VaultScreen(MDScreen):
 			username_field.error = True
 			return
 
-		self.account_list.add_account(
+		self.account_list_widget.add_account(
 			website=website,
 			username=username,
 			on_click_callback=self.show_account_details_dialog
 		)
 
+		# Update the internal account list
+		self.account_list.append(
+			self.pwd_manager.get_entry_as_json(
+				website=website,
+				username=username
+			)
+		)
+
 		if self.number_accounts == 0:
 			self.clear_widgets()
-			self.add_widget(self.account_list)
+			self.add_widget(self.account_list_widget)
 
 		with self.change_lock:
 			self.change_version += 1
@@ -280,7 +290,7 @@ class VaultScreen(MDScreen):
 				username=username
 			)
 		except NoSuchEntryError:
-			# Emit error!
+			# TODO: Emit error!
 			return
 
 		password = password_desc["password"]
@@ -345,12 +355,19 @@ class VaultScreen(MDScreen):
 			)
 			return False
 
-		self.account_list.update_account(
+		self.account_list_widget.update_account(
 			old_website=website,
 			old_username=username,
 			new_website=new_website,
 			new_username=new_username
 		)
+
+		# Update the internal account list
+		for entry in self.account_list:
+			if 	entry["website"] == website and	entry["username"] == username:
+				entry["website"]		= new_website
+				entry["username"]		= new_username
+				entry["description"]	= new_description
 
 		with self.change_lock:
 			self.change_version += 1
@@ -378,10 +395,15 @@ class VaultScreen(MDScreen):
 				username=username
 			)
 
-		self.account_list.remove_account(
+		self.account_list_widget.remove_account(
 				website=website,
 				username=username
 		)
+
+		# Update the internal account list
+		for index, entry in enumerate(self.account_list):
+			if 	entry["website"] == website and	entry["username"] == username:
+				self.account_list.pop(index)
 
 		with self.change_lock:
 			self.change_version += 1
@@ -396,7 +418,26 @@ class VaultScreen(MDScreen):
 		self,
 		query: str
 	) -> list[dict[str, Any]]:
-		return []
+		candidates = []
+		keywords = query.split(" ")
+
+		for entry in self.account_list:
+			for key in entry:	# O(1), because we only have 3 keys d:
+				if all(keyword in entry[key]
+						for keyword in keywords):
+					candidates.append(entry)
+
+		return [
+			{
+				"viewclass":			"AccountEntry",
+				"website":				entry["website"],
+				"username":				entry["username"],
+				"on_click_callback":	self.show_account_details_dialog,
+				"callback":				None 
+			}
+				for entry in candidates
+		]
+
 
 	"""
 		Creates a snapshot of the current state of self.pwd_manager and encrypts it.

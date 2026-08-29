@@ -16,6 +16,8 @@ from kivymd.uix.search import (
 	MDSearchTrailingIcon
 )
 
+from gui.widgets.account_list import AccountEntry
+
 class SearchBar(MDSearchBar):
 	"""
 		search_function returns a list of dicts of the following shape:
@@ -41,21 +43,21 @@ class SearchBar(MDSearchBar):
 		self.leading_button_callback = leading_button_callback
 		self.trailing_button_callback = trailing_button_callback
 
+		self.recycle_layout = MDRecycleBoxLayout(
+			orientation="vertical",
+			default_size=(None, dp(72)),
+			default_size_hint=(1, None),
+			adaptive_height=True,
+			spacing="8dp",
+			padding="4dp",
+		)
+
 		self.recycle_view = MDRecycleView(
-			key_viewclass="viewclass",	# tells kivy to search for the view class in the data dicts under key viewclass
+			self.recycle_layout
 		)
 
-		self.recycle_view.add_widget(
-			MDRecycleBoxLayout(
-				orientation="vertical",
-				default_size=(None, dp(72)),
-				default_size_hint=(1, None),
-				adaptive_height=True,
-				spacing="8dp",
-				padding="4dp",
-			)
-		)
-
+		self.recycle_view.key_viewclass = "viewclass"
+		self.recycle_view.key_size = "height"
 
 		super().__init__(
 			# Main view
@@ -109,6 +111,10 @@ class SearchBar(MDSearchBar):
 
 		if widget:
 			widget.parent.remove_widget(widget)
+
+	def close_view(self) -> None:
+		self.text = ""
+		return super().close_view()
 
 	def _leading_button_callback(self):
 		if self.leading_button_callback is not None:
