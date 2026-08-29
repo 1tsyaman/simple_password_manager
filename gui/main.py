@@ -1,3 +1,8 @@
+from threading import Lock
+
+from kivy.clock import Clock
+from kivy.core.window import Window
+
 from kivymd.uix.boxlayout import MDBoxLayout
 
 from kivymd.app import MDApp
@@ -8,8 +13,41 @@ from gui.screens.screen_manager import AppScreenManager
 from core.pwd_manager import PwdManager
 
 APP_NAME = "Simple Password Manager"
+INACTIVITY_TIMEOUT_DURATION = 60	# seconds
 
 class SimplePasswordManagerApp(MDApp):
+	def __init__(self, **kwargs):
+		self.modified_lock = Lock()
+		self.modified = False	# Shared state which is checked by the watchdog thread
+
+		super().__init__(**kwargs)
+
+
+	def on_start(self):
+		# Reset watchdog on activity
+		Window.bind(
+			on_touch_down=	lambda *_: self.reset_watchdog(),
+			on_key_down=	lambda *_: self.reset_watchdog()
+		)
+
+		# Start the watchdog timer.
+		Clock.schedule_interval(
+			lambda *_: self.kill_if_inactive(),
+			INACTIVITY_TIMEOUT_DURATION,
+		)
+
+	def reset_watchdog(self):
+		with self.modified_lock:
+			self.modified = True
+
+	# TODO: Change this to 'Lock Vault' instead of 'Kill app'
+	def kill_if_inactive(self):
+		with self.modified_lock:
+			if not self.modified:
+				self.stop()
+			else:
+				self.modified = False
+
 	def build(self):
 		self.app_screen = MDScreen(
 			md_bg_color=self.theme_cls.backgroundColor
