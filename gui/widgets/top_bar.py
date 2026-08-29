@@ -27,10 +27,6 @@ class TopBar(MDTopAppBar):
 			icon="file-import",
 			on_release=self.on_import
 		)
-		self.plus_button			= MDActionTopAppBarButton(
-			icon="plus",
-			on_release=self.on_plus
-		)
 		self.settings_button		= MDActionTopAppBarButton(
 			icon="cog"
 		)
@@ -48,7 +44,6 @@ class TopBar(MDTopAppBar):
 
 		# indirect callback for the buttons (to avoid binding and unbinding buttons)
 		self.back_callback		: Callable | None = None
-		self.plus_callback		: Callable | None = None
 		self.import_callback	: Callable | None = None
 
 		super().__init__(
@@ -58,7 +53,6 @@ class TopBar(MDTopAppBar):
 
 			MDTopAppBarTrailingButtonContainer(
 				self.import_vault_button,
-				self.plus_button,
 				self.settings_button
 			),
 
@@ -70,10 +64,6 @@ class TopBar(MDTopAppBar):
 	def on_back(self, instance=None):
 		if self.back_callback is not None:
 			self.back_callback()
-
-	def on_plus(self, instance=None):
-		if self.plus_callback is not None:
-			self.plus_callback()
 
 	def on_import(self, instance=None):
 		if self.import_callback is not None:

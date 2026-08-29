@@ -5,6 +5,7 @@ from kivy.clock import Clock
 
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
+from kivymd.uix.boxlayout import MDBoxLayout
 
 from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.vault_screen.new_account_dialog import NewAccountDialog
@@ -12,6 +13,7 @@ from gui.dialogs.vault_screen.account_details_dialog import AccountDetailsDialog
 from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
 from gui.widgets.labels import NoAccountsLabel
 from gui.widgets.vault_screen.search_bar import SearchBar
+from gui.widgets.plus_button import PlusButton
 from gui.utils.clipboard import copy_text
 
 from core.pwd_manager import PwdManager
@@ -44,6 +46,8 @@ class VaultScreen(MDScreen):
 		self.screen_manager = screen_manager
 		self.pwd_manager = pwd_manager
 		self.vault_name = ""
+
+		self.main_container = MDBoxLayout()		# contains the account_list widget
 
 		"""
 			Guards self.pwd_manager from being modified concurrently
@@ -82,6 +86,18 @@ class VaultScreen(MDScreen):
 			*args,
 			**kwargs
 		)
+
+		self.add_widget(
+			self.main_container
+		)
+
+		# Add floating action button '+'
+		self.add_widget(
+			PlusButton(
+				callback=self.show_add_account_dialog
+			)
+		)
+
 
 	def on_pre_enter(self, *args):
 		self.refresh()
@@ -142,8 +158,8 @@ class VaultScreen(MDScreen):
 		if hasattr(self, "account_load_event"):
 			self.account_load_event.cancel()
 
-		self.clear_widgets()
-		self.add_widget(NoAccountsLabel())
+		self.main_container.clear_widgets()
+		self.main_container.add_widget(NoAccountsLabel())
 
 	def load_accounts(self, dialog: LoginDialog):
 		self.account_list_widget : AccountList = AccountList()
@@ -156,8 +172,8 @@ class VaultScreen(MDScreen):
 
 		# Case: No accounts to load
 		if self.number_accounts == 0:
-			self.clear_widgets()
-			self.add_widget(NoAccountsLabel())
+			self.main_container.clear_widgets()
+			self.main_container.add_widget(NoAccountsLabel())
 
 			dialog.dismiss()
 			return
@@ -195,8 +211,8 @@ class VaultScreen(MDScreen):
 
 		# only switch the screen *once*, after one batch is added
 		if first_batch:
-			self.clear_widgets()
-			self.add_widget(self.account_list_widget)
+			self.main_container.clear_widgets()
+			self.main_container.add_widget(self.account_list_widget)
 
 			if dialog is not None:
 				dialog.dismiss()
@@ -266,8 +282,8 @@ class VaultScreen(MDScreen):
 		)
 
 		if self.number_accounts == 0:
-			self.clear_widgets()
-			self.add_widget(self.account_list_widget)
+			self.main_container.clear_widgets()
+			self.main_container.add_widget(self.account_list_widget)
 
 		with self.change_lock:
 			self.change_version += 1

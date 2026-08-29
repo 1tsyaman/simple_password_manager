@@ -5,6 +5,7 @@ from kivy.uix.widget import Widget
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.appbar import MDActionTopAppBarButton
+from kivymd.uix.boxlayout import MDBoxLayout
 
 from gui.widgets.top_bar import TopBar
 from gui.widgets.labels import NoVaultsLabel
@@ -16,6 +17,7 @@ from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.selection_screen.new_vault_dialog import NewVaultDialog
 from gui.dialogs.selection_screen.rename_vault_dialog import RenameVaultDialog
 from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
+from gui.widgets.plus_button import PlusButton
 
 import storage.io as io
 from core.errors import (
@@ -42,6 +44,8 @@ class SelectionScreen(MDScreen):
 		self.app_name = app_name
 		self.screen_manager = screen_manager
 
+		self.main_container = MDBoxLayout()
+
 		app = MDApp.get_running_app()
 		assert app is not None
 
@@ -50,6 +54,15 @@ class SelectionScreen(MDScreen):
 			md_bg_color=app.theme_cls.secondaryContainerColor,
 			*args,
 			**kwargs
+		)
+
+		self.add_widget(
+			self.main_container
+		)
+		self.add_widget(
+			PlusButton(
+				callback=self.show_new_vault_dialog
+			)
 		)
 
 	def on_pre_enter(self, *args):
@@ -71,9 +84,6 @@ class SelectionScreen(MDScreen):
 		import_button.disabled = False
 		import_button.opacity = 1
 
-		# New vault button
-		top_bar.plus_callback = self.show_new_vault_dialog
-
 		# Import vault button
 		top_bar.import_callback = self.show_import_vault_file_picker
 
@@ -88,8 +98,8 @@ class SelectionScreen(MDScreen):
 
 		if len(self.vaults) == 0:
 			# Add no_vaults_label
-			self.clear_widgets()
-			self.add_widget(NoVaultsLabel())
+			self.main_container.clear_widgets()
+			self.main_container.add_widget(NoVaultsLabel())
 			return
 
 		vault_list = VaultList()
@@ -103,8 +113,8 @@ class SelectionScreen(MDScreen):
 
 			vault_list.add_vault(entry)
 
-		self.clear_widgets()
-		self.add_widget(vault_list)
+		self.main_container.clear_widgets()
+		self.main_container.add_widget(vault_list)
 
 	def on_back(self):
 		self.screen_manager.exit_app()
@@ -116,8 +126,8 @@ class SelectionScreen(MDScreen):
 		is called when leaving the screen
 	"""
 	def clear(self):
-		self.clear_widgets()
-		self.add_widget(NoVaultsLabel())
+		self.main_container.clear_widgets()
+		self.main_container.add_widget(NoVaultsLabel())
 
 	def create_vault(
 		self,
