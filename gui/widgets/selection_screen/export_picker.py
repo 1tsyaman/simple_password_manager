@@ -5,7 +5,7 @@ from kivy.utils import platform
 
 from kivymd.uix.filemanager import MDFileManager
 
-from gui.widgets.file_picker import FilePicker, BUFFER_SIZE
+from gui.widgets.selection_screen.file_picker import FilePicker, BUFFER_SIZE
 
 if platform == "android":
 	# We require jnius to use Java classes

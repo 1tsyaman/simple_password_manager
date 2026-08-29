@@ -7,10 +7,10 @@ from kivymd.uix.boxlayout import MDBoxLayout
 
 from gui.screens.selection_screen import SelectionScreen
 from gui.screens.vault_screen import VaultScreen
-from gui.dialogs.login_dialog import LoginDialog
+from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.error_dialog import ErrorDialog
 from gui.widgets.input_field import InputField
-from gui.widgets.search_bar import SearchBar
+from gui.widgets.vault_screen.search_bar import SearchBar
 
 from core.pwd_manager import PwdManager
 from core.errors import (

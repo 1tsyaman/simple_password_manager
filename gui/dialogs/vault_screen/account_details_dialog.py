@@ -13,7 +13,7 @@ from kivymd.uix.dialog import (
 )
 
 from gui.widgets.ro_text_field import ReadOnlyTextField
-from gui.widgets.account_list import AccountEntry
+from gui.widgets.vault_screen.account_list import AccountEntry
 from gui.dialogs.yes_no_dialog import YesNoDialog
 
 class AccountDetailsDialog(MDDialog):

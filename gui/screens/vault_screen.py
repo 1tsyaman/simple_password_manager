@@ -6,12 +6,12 @@ from kivy.clock import Clock
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 
-from gui.dialogs.login_dialog import LoginDialog
-from gui.dialogs.new_account_dialog import NewAccountDialog
-from gui.dialogs.account_details_dialog import AccountDetailsDialog
-from gui.widgets.account_list import AccountEntry, AccountList
+from gui.dialogs.selection_screen.login_dialog import LoginDialog
+from gui.dialogs.vault_screen.new_account_dialog import NewAccountDialog
+from gui.dialogs.vault_screen.account_details_dialog import AccountDetailsDialog
+from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
 from gui.widgets.labels import NoAccountsLabel
-from gui.widgets.search_bar import SearchBar
+from gui.widgets.vault_screen.search_bar import SearchBar
 from gui.utils.clipboard import copy_text
 
 from core.pwd_manager import PwdManager

@@ -9,13 +9,13 @@ from kivymd.uix.appbar import MDActionTopAppBarButton
 from gui.widgets.top_bar import TopBar
 from gui.widgets.labels import NoVaultsLabel
 from gui.widgets.input_field import InputField
-from gui.widgets.vault_list import VaultEntry, VaultList
-from gui.widgets.import_picker import ImportFilePicker
-from gui.widgets.export_picker import ExportFilePicker
-from gui.dialogs.login_dialog import LoginDialog
-from gui.dialogs.new_vault_dialog import NewVaultDialog
-from gui.dialogs.rename_vault_dialog import RenameVaultDialog
-from gui.widgets.vault_context_menu import VaultContextMenu
+from gui.widgets.selection_screen.vault_list import VaultEntry, VaultList
+from gui.widgets.selection_screen.import_picker import ImportFilePicker
+from gui.widgets.selection_screen.export_picker import ExportFilePicker
+from gui.dialogs.selection_screen.login_dialog import LoginDialog
+from gui.dialogs.selection_screen.new_vault_dialog import NewVaultDialog
+from gui.dialogs.selection_screen.rename_vault_dialog import RenameVaultDialog
+from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
 
 import storage.io as io
 from core.errors import (

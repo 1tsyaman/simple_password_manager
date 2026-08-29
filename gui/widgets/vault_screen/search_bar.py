@@ -16,7 +16,7 @@ from kivymd.uix.search import (
 	MDSearchTrailingIcon
 )
 
-from gui.widgets.account_list import AccountEntry
+from gui.widgets.vault_screen.account_list import AccountEntry
 
 class SearchBar(MDSearchBar):
 	"""
