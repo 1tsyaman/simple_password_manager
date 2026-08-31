@@ -18,8 +18,6 @@ INACTIVITY_TIMEOUT_DURATION = 60	# seconds
 
 class SimplePasswordManagerApp(MDApp):
 	def __init__(self, **kwargs):
-		self.modified_lock = Lock()
-		self.modified = False	# Shared state which is checked by the watchdog thread
 		self.watchdog_thread = None
 		self.watchdog_deadline = 0
 
@@ -48,7 +46,8 @@ class SimplePasswordManagerApp(MDApp):
 	def on_resume(self):
 		if time() >= self.watchdog_deadline:
 			# Call the watchdog function
-			self.kill_if_inactive()
+			self.cancel_watchdog_if_scheduled()
+			self.lock_vault()
 
 		return super().on_resume()
 
@@ -56,22 +55,20 @@ class SimplePasswordManagerApp(MDApp):
 		# Add absolute deadline that can be used if app is paused
 		self.watchdog_deadline = time() + INACTIVITY_TIMEOUT_DURATION
 		self.watchdog_thread = Clock.schedule_once(
-			lambda *_: self.kill_if_inactive(),
+			lambda *_: self.lock_vault(),
 			INACTIVITY_TIMEOUT_DURATION,
 		)
 
+	def cancel_watchdog_if_scheduled(self):
+		if self.watchdog_thread is not None:
+			self.watchdog_thread.cancel()
+
 	def reset_watchdog(self):
-		with self.modified_lock:
-			self.modified = True
+		self.cancel_watchdog_if_scheduled()
+		self.schedule_watchdog()
 
-	# TODO: Change this to 'Lock Vault' instead of 'Kill app'
-	def kill_if_inactive(self):
-		with self.modified_lock:
-			if not self.modified:
-				self.stop()
-			else:
-				self.modified = False
-
+	def lock_vault(self):
+		self.screen_manager.lock_vault()
 		self.schedule_watchdog()
 
 	def _on_keyboard(

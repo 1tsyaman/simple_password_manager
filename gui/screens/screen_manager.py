@@ -116,7 +116,6 @@ class AppScreenManager(MDScreenManager):
 		self,
 		screen: str,
 		vault_name: str ="",
-		on_exit: bool = False
 	):
 		if (screen in ["selection", "vault"] \
 			and (
@@ -124,26 +123,7 @@ class AppScreenManager(MDScreenManager):
 					or self.vault_screen_can_switch()	# current = vault? -> check if we can exit
 			)
 		):
-			attribute = f"{screen}_screen"
-
-			try:
-				screen_object = getattr(self, attribute)	# example: vault_screen
-			except AttributeError:
-				ErrorDialog(
-					error_title="Error",
-					error_message="Could not switch screens, check log."
-				).open()
-				log(
-					message=f"Attribute {attribute} is not associated with the screen manager option: Screen: {screen}."
-				)
-
-				return
-
-			if screen == "vault":
-				screen_object.vault_name = vault_name
-
-			screen_object.top_bar = self.top_container
-			self.current = screen
+			return self._switch_screen(screen, vault_name)
 
 	def vault_screen_can_switch(self):
 		vault_screen = self.vault_screen
@@ -154,10 +134,13 @@ class AppScreenManager(MDScreenManager):
 	def force_exist_vault_screen(self, dialog: ErrorDialog):
 		dialog.dismiss()
 		self.vault_screen.force_exit_vault = True
-		self.switch_screen("selection", on_exit=True)
+		self.switch_screen("selection")
 
 	def back_to_selection(self):
-		self.switch_screen("selection", on_exit=True)
+		self.switch_screen("selection")
+
+	def lock_vault(self):
+		self._switch_screen("selection")
 
 	def exit_app(self):
 		self.app.stop()
@@ -181,3 +164,32 @@ class AppScreenManager(MDScreenManager):
 		self.top_container.clear_widgets()
 		self.top_container.add_widget(widget)
 		self.top_container.padding = padding
+
+	def _switch_screen(
+		self,
+		screen: str,
+		vault_name: str = "",
+		lock_vault: bool = False,
+	):
+		attribute = f"{screen}_screen"
+
+		try:
+			screen_object = getattr(self, attribute)	# example: vault_screen
+		except AttributeError:
+			ErrorDialog(
+				error_title="Error",
+				error_message="Could not switch screens, check log.",
+				first_button_callback=lambda *_: self.exit_app()		# if lock_vault flag is set
+							if lock_vault else None						# 'Dismiss' closes the app
+			).open()
+			log(
+				message=f"Attribute {attribute} is not associated with the screen manager option: Screen: {screen}."
+			)
+
+			return
+
+		if screen == "vault":
+			screen_object.vault_name = vault_name
+
+		screen_object.top_bar = self.top_container
+		self.current = screen
