@@ -17,12 +17,15 @@ class YesNoDialog(MDDialog):
 		self,
 		headline: str,
 		message: str,
-		no_callback: Callable,
 		yes_callback: Callable,
+		no_callback: Callable | None = None,	# if None, this is simply 'dismiss'
 		icon: str = "",
 		*args,
 		**kwargs
 	):
+		self.yes_callback	= yes_callback
+		self.no_callback	= no_callback
+
 		icon_widget = []
 
 		if icon != "":
@@ -56,7 +59,7 @@ class YesNoDialog(MDDialog):
 		    			text_color=app.theme_cls.errorColor,
 					),
 					style="text",
-					on_release=lambda _: yes_callback(self)
+					on_release=lambda _: self._yes_callback()
 				),
 
 				MDButton(
@@ -64,7 +67,7 @@ class YesNoDialog(MDDialog):
 						text="No",
 					),
 					style="text",
-					on_release=lambda _: no_callback(self)
+					on_release=lambda _: self._no_callback()
 				),
 
 				Widget(),
@@ -75,3 +78,13 @@ class YesNoDialog(MDDialog):
 			*args,
 			**kwargs,
 		)
+
+	def _yes_callback(self):
+		self.dismiss()
+		self.yes_callback()
+
+	def _no_callback(self):
+		self.dismiss()
+
+		if self.no_callback is not None:
+			self.no_callback

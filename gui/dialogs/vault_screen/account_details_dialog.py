@@ -245,19 +245,17 @@ class AccountDetailsDialog(MDDialog):
 		YesNoDialog(
 			headline="Are you sure?",
 			message="Deleted accounts cannot be restored",
-			no_callback=lambda dialog: dialog.dismiss(),
-			yes_callback=self._delete,
+			yes_callback=lambda _:self._delete(),
 			icon="alert-circle" 
 		).open()
 
-	def _delete(self, dialog):
+	def _delete(self):
 		self.delete_callback(
 			website=self.website,
 			username=self.username,
 			account_entry=self.account_entry
 		)
 
-		dialog.dismiss()
 		self.dismiss()
 
 	def toggle_password_mask(self):

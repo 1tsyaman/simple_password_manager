@@ -136,6 +136,17 @@ def vault_exists_for_gui(app_data_path: str, vault_name: str):
 def delete_vault(path: str) -> None:
 	os.remove(Path(path))
 
+"""
+	@raises: 
+		- OSError
+"""
+def delete_vault_for_gui(
+	app_data_path: str,
+	vault_name: str
+):
+	path = os.path.join(app_data_path, vault_name + VAULT_ENDING)
+	delete_vault(path)
+
 def rename_vault(
 		path: str,
 		vault_name: str,

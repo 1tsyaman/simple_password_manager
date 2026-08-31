@@ -8,24 +8,30 @@ class VaultContextMenu(MDDropdownMenu):
 		self,
 		export_callback: Callable,
 		rename_callback: Callable,
+		delete_callback: Callable,
 		caller: Widget,
 		**kwargs
 	):
 		self.export_callback = export_callback
 		self.rename_callback = rename_callback
+		self.delete_callback = delete_callback
 
 		export = {
 			"text":			"Export",
-			"on_release":	lambda *args: self._export_callback(),
+			"on_release":	lambda *_: self._export_callback(),
 		}
 		rename = {
 			"text":			"Rename",
-			"on_release":	lambda *args: self._rename_callback(),
+			"on_release":	lambda *_: self._rename_callback(),
+		}
+		delete = {
+			"text":			"Delete",
+			"on_release":	lambda *_: self._delete_callback(),
 		}
 
 		super().__init__(
 			caller=caller,
-			items=[rename, export],
+			items=[rename, export, delete],
 			hor_growth="left",		# horizontal growth in relation to the caller
 			ver_growth="down",		# vertical grwoth in relation to the caller
 			**kwargs
@@ -45,3 +51,7 @@ class VaultContextMenu(MDDropdownMenu):
 	def _rename_callback(self):
 		self.dismiss()
 		self.rename_callback()
+
+	def _delete_callback(self):
+		self.dismiss()
+		self.delete_callback()

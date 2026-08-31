@@ -8,12 +8,12 @@ from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.boxlayout import MDBoxLayout
 
+from gui.dialogs.yes_no_dialog import YesNoDialog
 from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.vault_screen.new_account_dialog import NewAccountDialog
 from gui.dialogs.vault_screen.account_details_dialog import AccountDetailsDialog
 from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
 from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
-from gui.widgets.selection_screen.vault_list import VaultEntry
 from gui.widgets.selection_screen.export_picker import ExportFilePicker
 from gui.dialogs.selection_screen.rename_vault_dialog import RenameVaultDialog
 from gui.widgets.labels import NoAccountsLabel
@@ -478,6 +478,24 @@ class VaultScreen(MDScreen):
 				error_message="Failed to rename vault, check log"
 			)
 
+	def delete_vault(self):
+		try:
+			io.delete_vault_for_gui(
+				app_data_path=self.app_data_path,
+				vault_name=self.vault_name
+			)
+			self.on_back()
+		except OSError as e:
+			self.screen_manager.show_error_dialog(
+				error_title="Deletion Error:",
+				error_message=f"Could not delete the vault {self.vault_name}, check log"
+			)
+
+			log(
+				message=f"Something went wrong while deleting vault {self.vault_name}.",
+				error=e
+			)
+
 
 	"""
 		Creates a snapshot of the current state of self.pwd_manager and encrypts it.
@@ -553,6 +571,7 @@ class VaultScreen(MDScreen):
 		VaultContextMenu(
 			export_callback=lambda: self.show_export_vault_dialog(),
 			rename_callback=lambda: self.show_rename_vault_dialog(),
+			delete_callback=lambda: self.show_delete_vault_dialog(),
 			caller=button
 		).open()
 
@@ -570,4 +589,12 @@ class VaultScreen(MDScreen):
 		ExportFilePicker(
 			app_data_path=self.app_data_path,
 			vault_name=vault_name
+		).open()
+
+	def show_delete_vault_dialog(self):
+		vault_name = self.vault_name
+		YesNoDialog(
+			headline=f"Delete {vault_name}?",
+			message="This action cannot be undone.",
+			yes_callback=self.delete_vault,
 		).open()
