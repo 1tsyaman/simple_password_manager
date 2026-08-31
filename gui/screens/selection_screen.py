@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from kivy.uix.widget import Widget
+from kivy.clock import Clock
 
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
@@ -32,6 +33,12 @@ if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
 
 class SelectionScreen(MDScreen):
+	"""
+		Is set *once* on start by the screen manager to trigger direct switch to vault
+			window (with corresponding login dialog)
+	"""
+	on_start: bool
+
 	def __init__(
 		self,
 		app_data_path: str,
@@ -100,11 +107,14 @@ class SelectionScreen(MDScreen):
 			# Add no_vaults_label
 			self.main_container.clear_widgets()
 			self.main_container.add_widget(NoVaultsLabel())
+
+			self.on_start = False	# never true again while running
 			return
 
+		first_vault = None	# TODO: Later set to 'favorite/default' vault, configurable setting
 		vault_list = VaultList()
 
-		for vault in self.vaults:
+		for index, vault in enumerate(self.vaults):
 			entry = VaultEntry(
 				name=vault,
 				context_callback=self.show_vault_context_menu
@@ -113,8 +123,20 @@ class SelectionScreen(MDScreen):
 
 			vault_list.add_vault(entry)
 
+			if index == 0:
+				first_vault = entry
+
 		self.main_container.clear_widgets()
 		self.main_container.add_widget(vault_list)
+
+		assert first_vault is not None	# should not be the case, because we have >= 1 vault
+
+		if self.on_start:
+			self.on_start = False	# never true again while running
+			Clock.schedule_once(
+				lambda *_: self.show_open_vault_dialog(first_vault),
+				0
+			)
 
 	def on_back(self):
 		self.screen_manager.exit_app()

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from core.pwd_manager import PwdManager
 
+VAULT_ENDING = ".vault"
 INVALID_PATH_ERROR	= "Given vault path does not exist"
 DEBUG = False
 
@@ -37,11 +38,13 @@ def get_app_data_path() -> Path:
 	raise RuntimeError(f"Unsupported platform: {platform}")
 
 """
+	@returns:
+		List of vault names in the dir (without the ending .vault)
 	@raises:
 		- OSError
 """
 def get_vault_list(dir: str) -> list[str]:
-	return [file for file in os.listdir(dir) if file.endswith(".vault")]
+	return [file[:-6] for file in os.listdir(dir) if file.endswith(VAULT_ENDING)]
 
 """
 	@raises:
@@ -55,7 +58,7 @@ def get_vault_list(dir: str) -> list[str]:
 			- OSError
 """
 def load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdManager:
-	path = os.path.join(app_data_path, vault_name)
+	path = os.path.join(app_data_path, vault_name + VAULT_ENDING)
 
 	return load_vault(path=path, pwd=pwd)
 
@@ -87,7 +90,7 @@ def load_vault(path: str, pwd: str) -> PwdManager:
 		- OSError
 """
 def create_and_load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdManager:
-	path = os.path.join(app_data_path, vault_name + ".vault")
+	path = os.path.join(app_data_path, vault_name + VAULT_ENDING)
 
 	try:
 		return create_and_load_vault(path=path, pwd=pwd)
@@ -123,7 +126,7 @@ def vault_exists(path: str) -> bool:
 		- OSError
 """
 def vault_exists_for_gui(app_data_path: str, vault_name: str):
-	path = os.path.join(app_data_path, vault_name + ".vault")
+	path = os.path.join(app_data_path, vault_name + VAULT_ENDING)
 	return Path(path).exists()
 
 """
@@ -138,7 +141,7 @@ def rename_vault(
 		vault_name: str,
 		new_vault_name: str
 ):
-	old_path = os.path.join(path, vault_name)
-	new_path = os.path.join(path, new_vault_name)
+	old_path = os.path.join(path, vault_name + VAULT_ENDING)
+	new_path = os.path.join(path, new_vault_name + VAULT_ENDING)
 
 	os.rename(old_path, new_path)

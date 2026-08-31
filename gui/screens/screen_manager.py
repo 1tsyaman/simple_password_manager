@@ -52,6 +52,9 @@ class AppScreenManager(MDScreenManager):
 			pwd_manager=pwd_manager,
 		)
 
+		# Signal that this is the first time we queue the selection screen
+		self.selection_screen.on_start = True
+
 		super().__init__(
 			self.selection_screen,
 			self.vault_screen,
