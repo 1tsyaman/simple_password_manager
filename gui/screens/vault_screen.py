@@ -2,6 +2,7 @@ from threading import Thread, Lock
 from typing import TYPE_CHECKING, Any
 
 from kivy.clock import Clock
+from kivy.uix.widget import Widget
 
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
@@ -11,6 +12,10 @@ from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.vault_screen.new_account_dialog import NewAccountDialog
 from gui.dialogs.vault_screen.account_details_dialog import AccountDetailsDialog
 from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
+from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
+from gui.widgets.selection_screen.vault_list import VaultEntry
+from gui.widgets.selection_screen.export_picker import ExportFilePicker
+from gui.dialogs.selection_screen.rename_vault_dialog import RenameVaultDialog
 from gui.widgets.labels import NoAccountsLabel
 from gui.widgets.vault_screen.search_bar import SearchBar
 from gui.widgets.plus_button import PlusButton
@@ -25,6 +30,9 @@ from core.errors import (
 	log
 )
 
+import storage.io as io
+
+
 BATCH_SIZE = 100
 
 # to avoid cicular import issues
@@ -34,18 +42,18 @@ if TYPE_CHECKING:
 class VaultScreen(MDScreen):
 	def __init__(
 		self,
-		app_data_path: str,
-		phone_screen: MDScreen,
-		screen_manager: "AppScreenManager",	# forward reference for type checking
-		pwd_manager: PwdManager,
+		app_data_path	: str,
+		phone_screen	: MDScreen,
+		screen_manager	: "AppScreenManager",	# forward reference for type checking
+		pwd_manager		: PwdManager,
 		*args,
 		**kwargs
 	):
-		self.app_data_path = app_data_path
-		self.phone_screen = phone_screen
-		self.screen_manager = screen_manager
-		self.pwd_manager = pwd_manager
-		self.vault_name = ""
+		self.app_data_path	= app_data_path
+		self.phone_screen	= phone_screen
+		self.screen_manager	= screen_manager
+		self.pwd_manager	= pwd_manager
+		self.vault_name		= ""
 
 		self.main_container = MDBoxLayout()		# contains the account_list widget
 
@@ -115,26 +123,13 @@ class VaultScreen(MDScreen):
 			leading_button_icon="arrow-left",
 			leading_button_callback=self.screen_manager.back_to_selection,
 			trailing_button_icon="dots-vertical",
-			trailing_button_callback=None,		# TODO: Add drop down menu for this
+			trailing_button_callback=self.show_vault_context_menu,
 		)
 
 		self.screen_manager.switch_top_bar(
 			search_bar,
 			padding="2dp"
 		)
-
-#		top_bar.add_back_button(
-#			callback=self.screen_manager.back_to_selection
-#		)
-#		top_bar.set_title(self.vault_name)
-#
-#		# Disable import button
-#		top_bar.import_callback = None
-#		import_button.disabled = True
-#		import_button.opacity = 0
-#
-#		# New account button
-#		top_bar.plus_callback = self.show_add_account_dialog
 
 		with self.change_lock:
 			self.change_version = 0
@@ -454,6 +449,35 @@ class VaultScreen(MDScreen):
 				for entry in candidates
 		]
 
+	def rename_vault(
+		self,
+		old_name: str,
+		new_name: str
+	):
+		try:
+			io.rename_vault(
+				path=self.app_data_path,
+				vault_name=old_name,
+				new_vault_name=new_name
+			)
+
+			self.refresh()
+
+		except (
+			FileNotFoundError,
+			FileExistsError,
+			OSError,
+		) as e:
+			log(
+				message=f"Something went wrong while renaming vault {old_name}.",
+				error=e
+			)
+
+			self.screen_manager.show_error_dialog(
+				error_title="Rename Error:",
+				error_message="Failed to rename vault, check log"
+			)
+
 
 	"""
 		Creates a snapshot of the current state of self.pwd_manager and encrypts it.
@@ -520,3 +544,30 @@ class VaultScreen(MDScreen):
 			0
 		)
 		return False
+
+	def show_vault_context_menu(
+		self,
+		button: Widget,
+		*args
+	):
+		VaultContextMenu(
+			export_callback=lambda: self.show_export_vault_dialog(),
+			rename_callback=lambda: self.show_rename_vault_dialog(),
+			caller=button
+		).open()
+
+	def show_rename_vault_dialog(self):
+		vault_name = self.vault_name
+
+		RenameVaultDialog(
+			vault_name=vault_name,
+			rename_callback=self.rename_vault
+		).open()
+
+	def show_export_vault_dialog(self):
+		vault_name = self.vault_name
+
+		ExportFilePicker(
+			app_data_path=self.app_data_path,
+			vault_name=vault_name
+		).open()

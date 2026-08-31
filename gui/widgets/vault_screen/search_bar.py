@@ -71,7 +71,7 @@ class SearchBar(MDSearchBar):
 			MDSearchBarTrailingContainer(
 				MDSearchTrailingIcon(
 					icon=trailing_button_icon,
-					on_release=lambda *_: self._trailing_button_callback()
+					on_release=lambda *args: self._trailing_button_callback(*args)
 				)
 			),
 
@@ -120,9 +120,9 @@ class SearchBar(MDSearchBar):
 		if self.leading_button_callback is not None:
 			self.leading_button_callback()
 
-	def _trailing_button_callback(self):
+	def _trailing_button_callback(self, *args):
 		if self.trailing_button_callback is not None:
-			self.trailing_button_callback()
+			self.trailing_button_callback(*args)
 
 	def _handle_search(self, text: str):
 		self.recycle_view.data = self.search_function(text)

@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from kivy.uix.widget import Widget
 from kivy.clock import Clock
 
 from kivymd.app import MDApp
@@ -13,11 +12,8 @@ from gui.widgets.labels import NoVaultsLabel
 from gui.widgets.input_field import InputField
 from gui.widgets.selection_screen.vault_list import VaultEntry, VaultList
 from gui.widgets.selection_screen.import_picker import ImportFilePicker
-from gui.widgets.selection_screen.export_picker import ExportFilePicker
 from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.selection_screen.new_vault_dialog import NewVaultDialog
-from gui.dialogs.selection_screen.rename_vault_dialog import RenameVaultDialog
-from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
 from gui.widgets.plus_button import PlusButton
 
 import storage.io as io
@@ -117,7 +113,7 @@ class SelectionScreen(MDScreen):
 		for index, vault in enumerate(self.vaults):
 			entry = VaultEntry(
 				name=vault,
-				context_callback=self.show_vault_context_menu
+#				context_callback=self.show_vault_context_menu
 			)
 			entry.bind(on_release=self.show_open_vault_dialog)
 
@@ -216,35 +212,6 @@ class SelectionScreen(MDScreen):
 				error=e
 			)
 
-	def rename_vault(
-		self,
-		old_name: str,
-		new_name: str
-	):
-		try:
-			io.rename_vault(
-				path=self.app_data_path,
-				vault_name=old_name,
-				new_vault_name=new_name
-			)
-
-			self.refresh()
-
-		except (
-			FileNotFoundError,
-			FileExistsError,
-			OSError,
-		) as e:
-			log(
-				message=f"Something went wrong while renaming vault {old_name}.",
-				error=e
-			)
-
-			self.screen_manager.show_error_dialog(
-				error_title="Rename Error:",
-				error_message="Failed to rename vault, check log"
-			)
-
 ####	Open Dialog/Menu Methods	####
 
 	def show_new_vault_dialog(self):
@@ -252,40 +219,10 @@ class SelectionScreen(MDScreen):
 			create_vault_callback=self.create_vault
 		).open()
 
-	def show_vault_context_menu(
-		self,
-		instance: VaultEntry,
-		button: Widget
-	):
-		name = instance.vault_name
-		VaultContextMenu(
-			export_callback=lambda: self.show_export_vault_dialog(name),
-			rename_callback=lambda: self.show_rename_vault_dialog(name),
-			caller=button
-		).open()
-
 	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
 		LoginDialog(
 			vault=instance.vault_name,
 			login_callback=self.screen_manager.open_vault
-		).open()
-
-	def show_rename_vault_dialog(
-		self,
-		vault_name: str
-	):
-		RenameVaultDialog(
-			vault_name=vault_name,
-			rename_callback=self.rename_vault
-		).open()
-
-	def show_export_vault_dialog(
-		self,
-		vault_name: str
-	):
-		ExportFilePicker(
-			app_data_path=self.app_data_path,
-			vault_name=vault_name
 		).open()
 
 	def show_import_vault_file_picker(self):

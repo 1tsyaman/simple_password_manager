@@ -7,6 +7,8 @@ from kivymd.uix.filemanager import MDFileManager
 
 from gui.widgets.selection_screen.file_picker import FilePicker, BUFFER_SIZE
 
+from storage.io import VAULT_ENDING
+
 if platform == "android":
 	# We require jnius to use Java classes
 	from jnius import autoclass, JavaException
@@ -53,14 +55,7 @@ class ExportFilePicker(FilePicker):
 		vault_name: str,
 		dst: object
 	):
-		vault_name = os.path.basename(vault_name)
-
-		# Shared checks
-		if not vault_name.endswith(".vault"):
-			self._emit_error(
-				message="Vault files have the extension '.vault'"
-			)
-			return
+		vault_name = os.path.basename(vault_name + VAULT_ENDING)
 
 		src = os.path.join(
 			self.app_data_path,
