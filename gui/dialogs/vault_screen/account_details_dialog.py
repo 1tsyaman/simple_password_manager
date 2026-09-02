@@ -13,7 +13,11 @@ from kivymd.uix.dialog import (
 	MDDialogButtonContainer
 )
 
-from gui.widgets.ro_text_field import ReadOnlyTextField, TotpReadOnlyTextField
+from gui.widgets.ro_text_field import (
+	ReadOnlyTextField,
+	TotpReadOnlyTextField,
+	PasswordReadOnlyText
+)
 from gui.widgets.vault_screen.account_list import AccountEntry
 from gui.dialogs.yes_no_dialog import YesNoDialog
 
@@ -64,13 +68,10 @@ class AccountDetailsDialog(MDDialog):
 			text=username,
 			copy_callback=copy_callback
 		)
-		self.password_field = ReadOnlyTextField(
+		self.password_field = PasswordReadOnlyText(
 			leading_icon="key",
 			text=password,
 			copy_callback=copy_callback,
-			password=True,
-			trailing_icon="eye",
-			trailing_callback=self.toggle_password_mask
 		)
 		self.description_field = ReadOnlyTextField(
 			leading_icon="text",
@@ -263,14 +264,6 @@ class AccountDetailsDialog(MDDialog):
 	):
 		self.totp_uri = uri
 		self.totp_field.set_text(preview_code)
-
-	def toggle_password_mask(self):
-		self.password_field.toggle_password_mask()
-		# Toggle the icon
-		if self.password_field.password_mask_is_set():
-			self.password_field.set_trailing_icon("eye")
-		else:
-			self.password_field.set_trailing_icon("eye-off")
 
 	def _toggle_modification_mode(self):
 		if self.modification_in_process:
