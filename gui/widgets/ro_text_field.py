@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import Any
 
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDIconButton
@@ -17,8 +18,6 @@ class ReadOnlyTextField(MDBoxLayout):
 		password					: bool = False,
 		trailing_icon				: str = "",
 		trailing_callback			: Callable | None = None,
-		secondary_icon				: str = "",
-		secondary_callback			: Callable | None = None,
 		*args,
 		**kwargs
 	):
@@ -29,12 +28,8 @@ class ReadOnlyTextField(MDBoxLayout):
 			*args,
 			**kwargs
 		)
-		# True -> primary callback: copy, False -> secondary callback
-		self.primary_callback	= True
-		self.copy_callback		= copy_callback
-		self.secondary_callback = secondary_callback
-		self.secondary_icon		= secondary_icon
 
+		self.copy_callback		= copy_callback
 		self.password = password
 
 		self.field = FocusableTextField(
@@ -77,7 +72,7 @@ class ReadOnlyTextField(MDBoxLayout):
 		if self.password:
 			self.field.password = True
 
-	def allow_writing(self):
+	def set_read_write(self):
 		self.field.readonly = False
 		self.field.is_focusable = True	# Has to be set explicity
 		self.field.password = False
@@ -92,9 +87,42 @@ class ReadOnlyTextField(MDBoxLayout):
 		self.field.trailing_icon = icon
 
 	def button_callback(self):
+		if self.copy_callback is not None:
+			self.copy_callback(self.field.text)
+
+	def _disable_button(
+		self,
+		button: MDIconButton
+	):
+		button.opacity = 0.5
+		button.disabled = True
+
+	def _enable_button(
+		self,
+		button: MDIconButton
+	):
+		button.opacity = 1
+		button.disabled = False
+
+class TotpReadOnlyTextField(ReadOnlyTextField):
+	def __init__(
+		self,
+		secondary_icon		: str = "",
+		secondary_callback	: Callable | None = None,
+		*args,
+		**kwargs
+	):
+		# True -> primary callback: copy, False -> secondary callback
+		self.primary_callback	= True
+		self.secondary_callback = secondary_callback
+		self.secondary_icon		= secondary_icon
+
+		super().__init__(*args, **kwargs)
+
+
+	def button_callback(self):
 		if self.primary_callback:
-			if self.copy_callback is not None:
-				self.copy_callback(self.field.text)
+			super().button_callback()
 		else:
 			if self.secondary_callback is not None:
 				self.secondary_callback()
@@ -116,17 +144,3 @@ class ReadOnlyTextField(MDBoxLayout):
 			self._enable_button(self.copy_button)
 		else:
 			self._disable_button(self.copy_button)
-
-	def _disable_button(
-		self,
-		button: MDIconButton
-	):
-		button.opacity = 0.5
-		button.disabled = True
-
-	def _enable_button(
-		self,
-		button: MDIconButton
-	):
-		button.opacity = 1
-		button.disabled = False

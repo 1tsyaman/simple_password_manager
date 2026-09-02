@@ -306,7 +306,10 @@ class VaultScreen(MDScreen):
 				username=username
 			)
 		except NoSuchEntryError:
-			# TODO: Emit error!
+			self.screen_manager.show_error_dialog(
+				error_title="Error",
+				error_message="Something went wrong, the selected entry does not exist"
+			)
 			return
 
 		password = password_desc["password"]

@@ -39,7 +39,6 @@ class SimplePasswordManagerApp(MDApp):
 		# Start the watchdog timer.
 		self.schedule_watchdog()
 
-	# TODO: Add on_pause behaviour, such as locking the vault
 	def on_pause(self):
 		return super().on_pause()
 

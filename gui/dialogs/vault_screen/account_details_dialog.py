@@ -12,7 +12,7 @@ from kivymd.uix.dialog import (
 	MDDialogButtonContainer
 )
 
-from gui.widgets.ro_text_field import ReadOnlyTextField
+from gui.widgets.ro_text_field import ReadOnlyTextField, TotpReadOnlyTextField
 from gui.widgets.vault_screen.account_list import AccountEntry
 from gui.dialogs.yes_no_dialog import YesNoDialog
 
@@ -79,7 +79,7 @@ class AccountDetailsDialog(MDDialog):
 		# 	use Clock.schedule_intervall(..., 1) in combination with MDLabel to realize counter
 		
 		if totp_code != "":
-			self.totp_field = ReadOnlyTextField(
+			self.totp_field = TotpReadOnlyTextField(
 				leading_icon="timer-lock",
 				text=totp_code,
 				copy_callback=copy_callback,
@@ -87,7 +87,7 @@ class AccountDetailsDialog(MDDialog):
 				secondary_callback=lambda *_: totp_qr_callback(details_dialog=self)
 			)
 		else:
-			self.totp_field = ReadOnlyTextField(
+			self.totp_field = TotpReadOnlyTextField(
 				leading_icon="timer-lock",
 				text="TOTP not configured",
 				secondary_icon="qrcode",
@@ -261,11 +261,11 @@ class AccountDetailsDialog(MDDialog):
 	def _toggle_modification_mode(self):
 		if self.modification_in_process:
 			# Allow modifying
-			self.website_field.allow_writing()
-			self.username_field.allow_writing()
-			self.password_field.allow_writing()
+			self.website_field.set_read_write()
+			self.username_field.set_read_write()
+			self.password_field.set_read_write()
 			self.totp_field.toggle_secondary_callback()
-			self.description_field.allow_writing()
+			self.description_field.set_read_write()
 
 			# Change the button labels
 			self.dismiss_button_label.text	= "Cancel"
