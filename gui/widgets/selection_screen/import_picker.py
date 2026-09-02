@@ -20,6 +20,7 @@ if platform == "android":
 
 
 IMPORT_REQUEST = 1001
+PICTURE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".bmp", ".webp"]
 
 class ImportFilePicker(FilePicker):
 	ERROR_TITLE = "Import error:"
@@ -27,7 +28,9 @@ class ImportFilePicker(FilePicker):
 	def __init__(
 		self,
 		app_data_path: str,
-		refresh_callback: Callable,
+		on_finish_callback: Callable,
+		type: str,
+		image_prefix: str = "",
 		*args,
 		**kwargs
 	):
@@ -35,14 +38,19 @@ class ImportFilePicker(FilePicker):
 			app_data_path=app_data_path
 		)
 
-		self.refresh_callback = refresh_callback
+		if type not in (".vault", "picture"):
+			raise ValueError("type must be either '.vault' or 'picture'")
+
+		self.refresh_callback = on_finish_callback
+		self.type = type
+		self.image_prefix = image_prefix
 
 		# Only create the MDFileManager instance if we're not on Android
 		if platform != "android":
 			self._md_file_manager = MDFileManager(
 				select_path=self.import_file,
 				exit_manager=lambda *args: self.close(),
-				ext=[".vault"],
+				ext=[".vault"] if self.type == ".vault" else PICTURE_EXTENSIONS,
 				search="all",
 				selector="file",
 				preview=False,
@@ -76,17 +84,28 @@ class ImportFilePicker(FilePicker):
 			file_name = os.path.basename(file_name)
 
 		# Shared checks
-		if not file_name.endswith(".vault"):
+		if self.type == ".vault" and not file_name.lower().endswith(".vault"):
 			self._emit_error(
 				message="Vault files have the extension '.vault'"
 			)
 			return
 
-		dst = os.path.join(self.app_data_path, file_name)
+		if self.type == "picture" and not file_name.lower().endswith(tuple(PICTURE_EXTENSIONS)):
+			self._emit_error(
+				message="Selected file is not a supported picture"
+			)
+			return
+
+		if self.type == ".vault":
+			dst = os.path.join(self.app_data_path, file_name)
+		else:
+			# Attach the provided prefix to the image name
+			file_name = self.image_prefix + file_name
+			dst = os.path.join(self.app_data_path, file_name)
 
 		if os.path.exists(dst):
 			self._emit_error(
-				message=f"Vault '{file_name}' already exists"
+				message=f"'{file_name}' already exists"
 			)
 			return
 
@@ -125,12 +144,12 @@ class ImportFilePicker(FilePicker):
 			self.close()
 		except SameFileError:
 			self._emit_error(
-				message="The selected vault is already in the application directory"
+				message="The selected file is already in the application directory"
 			)
 			return False
 		except OSError as error:
 			self._emit_error(
-				message=f"Could not import vault: {error}"
+				message=f"Could not import file: {error}"
 			)
 			return False
 
@@ -166,12 +185,12 @@ class ImportFilePicker(FilePicker):
 					output.write(buffer[:count])
 		except JavaException as error:
 			self._emit_error(
-				message=f"Android could not read the selected vault: {error}"
+				message=f"Android could not read the selected file: {error}"
 			)
 			return False
 		except OSError as error:
 			self._emit_error(
-				message=f"Could not write imported vault: {error}"
+				message=f"Could not write imported file: {error}"
 			)
 			return False
 		finally:
@@ -191,7 +210,10 @@ class ImportFilePicker(FilePicker):
 		"""
 			Common MIME types: https://stackoverflow.com/questions/13065838/what-are-the-possible-intent-types-for-intent-settypetype
 		"""
-		intent.setType("*/*")	# .vault files do not have a standard MIME type, so "*/*" means 'any'
+		if self.type == ".vault":
+			intent.setType("*/*")	# .vault files do not have a standard MIME type
+		else:
+			intent.setType("image/*")
 
 		self._launch_android_picker(
 			intent=intent,

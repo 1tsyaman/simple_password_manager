@@ -11,12 +11,14 @@ from gui.widgets.focusable_text_field import FocusableTextField
 class ReadOnlyTextField(MDBoxLayout):
 	def __init__(
 		self,
-		leading_icon: str,
-		text: str,
-		copy_callback: Callable,
-		password: bool = False,
-		trailing_icon: str = "",
-		trailing_callback: Callable | None = None,
+		leading_icon				: str,
+		text						: str,
+		copy_callback				: Callable | None = None,	# if no callback is passed, the button is disabled (but visible)
+		password					: bool = False,
+		trailing_icon				: str = "",
+		trailing_callback			: Callable | None = None,
+		secondary_icon				: str = "",
+		secondary_callback			: Callable | None = None,
 		*args,
 		**kwargs
 	):
@@ -27,6 +29,12 @@ class ReadOnlyTextField(MDBoxLayout):
 			*args,
 			**kwargs
 		)
+		# True -> primary callback: copy, False -> secondary callback
+		self.primary_callback	= True
+		self.copy_callback		= copy_callback
+		self.secondary_callback = secondary_callback
+		self.secondary_icon		= secondary_icon
+
 		self.password = password
 
 		self.field = FocusableTextField(
@@ -49,8 +57,11 @@ class ReadOnlyTextField(MDBoxLayout):
 				"center_x": 0.5,
 				"center_y": 0.5,
 			},
-			on_release=lambda _: copy_callback(self.field.text)
+			on_release=lambda _: self.button_callback()
 		)
+
+		if copy_callback is None:
+			self._disable_button(self.copy_button)	
 
 		self.add_widget(self.field)
 		self.add_widget(self.copy_button)
@@ -79,3 +90,43 @@ class ReadOnlyTextField(MDBoxLayout):
 
 	def set_trailing_icon(self, icon: str):
 		self.field.trailing_icon = icon
+
+	def button_callback(self):
+		if self.primary_callback:
+			if self.copy_callback is not None:
+				self.copy_callback(self.field.text)
+		else:
+			if self.secondary_callback is not None:
+				self.secondary_callback()
+
+	"""
+		Switches copy button between copy and 'secondary' callback and icon
+	"""
+	def toggle_secondary_callback(self):
+		self.primary_callback = not self.primary_callback
+
+		if self.primary_callback:
+			self.copy_button.icon = "content-copy"
+			enable_condition = self.copy_callback is not None
+		else:
+			self.copy_button.icon = self.secondary_icon
+			enable_condition = self.secondary_callback is not None
+
+		if enable_condition:
+			self._enable_button(self.copy_button)
+		else:
+			self._disable_button(self.copy_button)
+
+	def _disable_button(
+		self,
+		button: MDIconButton
+	):
+		button.opacity = 0.5
+		button.disabled = True
+
+	def _enable_button(
+		self,
+		button: MDIconButton
+	):
+		button.opacity = 1
+		button.disabled = False

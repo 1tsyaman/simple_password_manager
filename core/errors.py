@@ -37,7 +37,16 @@ class EntryHasNoTotp(Exception):
 class TotpUriError(Exception):
 	pass
 
+class TotpQRCodeError(Exception):
+	pass
+
 class InvalidEntryJSON(Exception):
+	pass
+
+class ImageOpenError(Exception):
+	pass
+
+class QRDecodeError(Exception):
 	pass
 
 """

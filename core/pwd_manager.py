@@ -19,10 +19,15 @@ from core.errors import (
 	EntryExistsError,
 	NoSuchEntryError,
 	TotpUriError,
+	TotpQRCodeError,
 	InconsistentVaultState,
 	VaultFormatError,
+	ImageOpenError,
+	QRDecodeError,
 	log
 )
+
+from storage.qr_reader import read_qr_code
 
 # Config
 LETTERS_LOWER	= [l for l in "abcdefghijklmnopqrstuvwxyz"]
@@ -391,12 +396,33 @@ class PwdManager:
 
 		self.entries[entry][PWD] = password
 
+
+	"""
+		@raises:
+			- NoSuchEntryError
+			- TotpQRCodeError
+			- TotpUriError
+	"""
+	def set_totp_config_qr_code(
+		self	: PwdManager,
+		website	: str,
+		username: str,
+		qr_path	: str,
+	):
+		uri = self.get_uri_from_qr_code(qr_path)
+
+		return self.set_totp_config_uri(
+			website=website,
+			username=username,
+			uri=uri
+		)
+
 	"""
 		@raises:
 			- NoSuchEntryError
 			- TotpUriError
 	"""
-	def set_totp_config(
+	def set_totp_config_uri(
 		self	: PwdManager,
 		website	: str,
 		username: str,
@@ -490,6 +516,48 @@ class PwdManager:
 		}
 
 ####	Statics		####
+
+	"""
+		@raises:
+			- TotpQRCodeError
+	"""
+	@staticmethod
+	def get_uri_from_qr_code(image_path: str) -> str:
+		try:
+			return read_qr_code(image_path)
+		except (ImageOpenError, QRDecodeError):
+			raise TotpQRCodeError
+
+	"""
+		@raises:
+			- TotpQRCodeError
+			- TotpUriError
+	"""
+	@staticmethod
+	def get_totp_uri_and_preview_from_qr_code(image_path: str) -> tuple[str, str]:
+		uri = PwdManager.get_uri_from_qr_code(image_path)
+		preview = PwdManager.get_totp_preview_from_uri(uri)
+
+		return uri, preview
+
+	"""
+		@raises:
+			- TotpUriError
+	"""
+	@staticmethod
+	def get_totp_preview_from_uri(uri: str) -> str:
+		config = TOTP_Config.from_uri(uri)
+
+		totp_config, secret = config
+
+		totp_code = TOTP(
+			s=secret,
+			digits=totp_config.digits,
+			digest=sha1,
+			interval=totp_config.period
+		).now()
+
+		return totp_code
 
 	@staticmethod
 	def generate_random_pwd():
@@ -601,7 +669,7 @@ class PwdManager:
 
 			if len(uri) > 0:
 				try:
-					pwd_manager.set_totp_config(
+					pwd_manager.set_totp_config_uri(
 						website=website,
 						username=username,
 						uri=uri

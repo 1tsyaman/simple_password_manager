@@ -228,5 +228,6 @@ class SelectionScreen(MDScreen):
 	def show_import_vault_file_picker(self):
 		ImportFilePicker(
 			app_data_path=self.app_data_path,
-			refresh_callback=self.refresh
+			on_finish_callback=self.refresh,
+			type=".vault"
 		).open()

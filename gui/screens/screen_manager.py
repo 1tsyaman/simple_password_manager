@@ -145,7 +145,19 @@ class AppScreenManager(MDScreenManager):
 	def exit_app(self):
 		self.app.stop()
 
-	def show_error_dialog(self, **kwargs):
+	"""
+		kwargs:
+			error_title: str,
+			error_message: str,
+			first_button_label: str = "dismiss",
+			second_button_label: str = "",
+			first_button_callback: Callable | None = None,
+			second_button_callback: Callable | None = None,
+	"""
+	def show_error_dialog(
+		self,
+		**kwargs
+	):
 		self.error_dialog = ErrorDialog(**kwargs)
 		self.error_dialog.open()
 

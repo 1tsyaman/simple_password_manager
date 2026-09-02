@@ -1,3 +1,5 @@
+import random as rand
+
 from threading import Thread, Lock
 from typing import TYPE_CHECKING, Any
 
@@ -16,8 +18,9 @@ from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
 from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
 from gui.widgets.selection_screen.export_picker import ExportFilePicker
 from gui.dialogs.selection_screen.rename_vault_dialog import RenameVaultDialog
-from gui.widgets.labels import NoAccountsLabel
 from gui.widgets.vault_screen.search_bar import SearchBar
+from gui.widgets.selection_screen.import_picker import ImportFilePicker
+from gui.widgets.labels import NoAccountsLabel
 from gui.widgets.plus_button import PlusButton
 from gui.utils.clipboard import copy_text
 
@@ -27,6 +30,8 @@ from core.errors import (
 	KeyLengthError,
 	NoSuchEntryError,
 	EntryHasNoTotp,
+	TotpQRCodeError,
+	TotpUriError,
 	log
 )
 
@@ -308,13 +313,14 @@ class VaultScreen(MDScreen):
 		description = password_desc["description"]
 
 		kwargs = {
-			"website":			website,
-			"username":			username,
-			"password":			password,
-			"description":		description,
+			"website":				website,
+			"username":				username,
+			"password":				password,
+			"description":			description,
 			"copy_callback":		copy_text,
-			"modify_callback":	self.modify_account_details,
-			"delete_callback":	self.delete_account,
+			"totp_qr_callback":		self.show_qr_code_dialog,
+			"modify_callback":		self.modify_account_details,
+			"delete_callback":		self.delete_account,
 			"account_entry":		instance,
 		}
 
@@ -341,13 +347,13 @@ class VaultScreen(MDScreen):
 	"""
 	def modify_account_details(
 		self,
-		website: str,
-		username: str,
-		new_website: str,
-		new_username: str,
-		new_password: str,
-		new_description: str,
-		account_entry: AccountEntry,
+		website			: str,
+		username		: str,
+		new_website		: str,
+		new_username	: str,
+		new_password	: str,
+		new_description	: str,
+		new_totp_uri	: str | None,
 	) -> bool:
 		try:
 			with self.pwd_manager_lock:
@@ -359,10 +365,23 @@ class VaultScreen(MDScreen):
 					new_password=new_password,
 					new_description=new_description
 				)
-		except NoSuchEntryError:
+
+				if new_totp_uri is not None:
+					self.pwd_manager.set_totp_config_uri(
+						website=website,
+						username=username,
+						uri=new_totp_uri
+					)
+
+		except (NoSuchEntryError, TotpUriError) as e:
+			if isinstance(e, NoSuchEntryError):
+				message = "Vault state is inconsistent: Modified entry does not exist!"
+			else:
+				message = "Failed to set up TOTP"
+
 			self.screen_manager.show_error_dialog(
 				error_title="Error: Changes not saved",
-				error_message="Vault state is inconsistent: Modified entry does not exist!"
+				error_message=message
 			)
 			return False
 
@@ -375,7 +394,7 @@ class VaultScreen(MDScreen):
 
 		# Update the internal account list
 		for entry in self.account_list:
-			if 	entry["website"] == website and	entry["username"] == username:
+			if entry["website"] == website and	entry["username"] == username:
 				entry["website"]		= new_website
 				entry["username"]		= new_username
 				entry["description"]	= new_description
@@ -598,3 +617,82 @@ class VaultScreen(MDScreen):
 			message="This action cannot be undone.",
 			yes_callback=self.delete_vault,
 		).open()
+
+	def show_qr_code_dialog(
+		self,
+		details_dialog	: AccountDetailsDialog,
+	):
+		YesNoDialog(
+			headline="Setup TOTP:",
+			message="Select a picture of the setup QR Code.",
+			yes_callback=lambda *_:self.open_qr_code_importer(details_dialog),
+			yes_text="Select",
+			no_text="Dismiss",
+			red_option="",
+			icon="qrcode" 
+		).open()
+
+	def open_qr_code_importer(
+		self,
+		details_dialog	: AccountDetailsDialog,
+	):
+		random = rand.randint(1, 1000)
+		prefix = f"QR_CODE_{random}"
+
+		ImportFilePicker(
+			app_data_path=self.app_data_path,
+			on_finish_callback=lambda *_: 	self._process_qr_code_picture(
+												prefix=prefix,
+												details_dialog=details_dialog
+											),
+			type="picture",
+			image_prefix=prefix
+		).open()
+
+	"""
+		Assumes that there is a single picture
+			in our private app data
+	"""
+	def _process_qr_code_picture(
+		self,
+		prefix: str,
+		details_dialog: AccountDetailsDialog,
+	):
+		try:
+			path = io.get_unique_image_path_with_prefix(
+				dir=self.app_data_path,
+				image_prefix=prefix
+			)
+		except FileNotFoundError:
+			self.screen_manager.show_error_dialog(
+				error_title="Import Error",
+				error_message="Could not find the selected image"
+			)
+
+			return
+
+		try:
+			uri, preview = self.pwd_manager.get_totp_uri_and_preview_from_qr_code(path)
+		except (TotpQRCodeError ,TotpUriError) as e:
+			if isinstance(e, TotpQRCodeError):
+				message = "Failed to find (or decode) the QR code in the selected image"
+			else:
+				message = "QR code does not encode a valid TOTP config URI"
+
+			self.screen_manager.show_error_dialog(
+				error_title="TOTP Error",
+				error_message=message
+			)
+
+			return
+		finally:
+			# Delete the imported image (clean up)
+			try:
+				io.delete_file(path)
+			except OSError:
+				self.screen_manager.show_error_dialog(
+					error_title="Clean Up Error",
+					error_message="Could not delete copied QR code image"
+				)
+
+		details_dialog.set_totp_preview_uri(uri, preview)

@@ -14,7 +14,7 @@ from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
 from cli.display import display_list, clear_screen, print_footer
 from cli.util import format_prev_next_str, is_valid_index
-from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
+from storage.io import load_vault, create_and_load_vault, vault_exists, delete_file
 from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
 
 from core.errors import (
@@ -91,7 +91,7 @@ def _init(argv: list[str]) -> PwdManager | int:
 						message2="Permanently delete the given vault? Y/n")
 			if ans:
 				try:
-					delete_vault(path)
+					delete_file(path)
 				except OSError as e:
 					print(f"Deleting vault failed: {e}")
 					return -1

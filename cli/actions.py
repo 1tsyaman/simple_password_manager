@@ -410,7 +410,7 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 		return False
 
 	try:
-		pwd_manager.set_totp_config(website=website, username=username, uri=uri)
+		pwd_manager.set_totp_config_uri(website=website, username=username, uri=uri)
 	except (NoSuchEntryError, TotpUriError) as e:
 		if isinstance(e, NoSuchEntryError):
 			print("Could not set TOTP, entry does not exist!")

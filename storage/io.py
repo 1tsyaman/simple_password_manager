@@ -133,7 +133,7 @@ def vault_exists_for_gui(app_data_path: str, vault_name: str):
 	@raises: 
 		- OSError
 """
-def delete_vault(path: str) -> None:
+def delete_file(path: str) -> None:
 	os.remove(Path(path))
 
 """
@@ -145,7 +145,7 @@ def delete_vault_for_gui(
 	vault_name: str
 ):
 	path = os.path.join(app_data_path, vault_name + VAULT_ENDING)
-	delete_vault(path)
+	delete_file(path)
 
 def rename_vault(
 		path: str,
@@ -156,3 +156,14 @@ def rename_vault(
 	new_path = os.path.join(path, new_vault_name + VAULT_ENDING)
 
 	os.rename(old_path, new_path)
+
+
+def get_unique_image_path_with_prefix(
+	dir: str,
+	image_prefix: str
+) -> str:
+	for file in os.listdir(dir):
+		if file.startswith(image_prefix):
+			return os.path.join(dir, file)
+
+	raise FileNotFoundError

@@ -19,34 +19,38 @@ from gui.dialogs.yes_no_dialog import YesNoDialog
 class AccountDetailsDialog(MDDialog):
 	def __init__(
 		self,
-		website: str,
-		username: str,
-		password: str,
-		description: str,
-		copy_callback: Callable,
-		modify_callback: Callable,
-		delete_callback: Callable,
-		account_entry: AccountEntry,
-		totp_code: str = "",
-		totp_time_remaining: int = 0,
-		totp_callback: Callable | None = None,
+		website					: str,
+		username				: str,
+		password				: str,
+		description				: str,
+		copy_callback			: Callable,
+		totp_qr_callback		: Callable[..., str],
+		modify_callback			: Callable,				# accepts an optional uri: str option
+		delete_callback			: Callable,
+		account_entry			: AccountEntry,
+		totp_code				: str = "",
+		totp_time_remaining		: int = 0,
+		totp_callback			: Callable | None = None,
 		*args,
 		**kwargs
 	):
 		# Save original details
-		self.website = website
-		self.username = username
-		self.password = password
-		self.description = description
+		self.website		= website
+		self.username		= username
+		self.password		= password
+		self.description	= description
+		self.totp_code		= totp_code
 
 		# For updating the labels on the vault screen
-		self.account_entry = account_entry
+		self.account_entry	= account_entry
+		self.totp_uri		= None			# attribute to store new uri
 
 		# Save callbacks
-		self.copy_callback = copy_callback
-		self.modify_callback = modify_callback
-		self.delete_callback = delete_callback
-		self.totp_callback = totp_callback
+		self.copy_callback			= copy_callback
+		self.totp_qr_callback		= totp_qr_callback
+		self.modify_callback		= modify_callback
+		self.delete_callback		= delete_callback
+		self.totp_callback			= totp_callback
 
 		self.website_field = ReadOnlyTextField(
 			leading_icon="web",
@@ -71,24 +75,32 @@ class AccountDetailsDialog(MDDialog):
 			text=description,
 			copy_callback=copy_callback
 		)
+		# TODO: change this to a special text field with countdown
+		# 	use Clock.schedule_intervall(..., 1) in combination with MDLabel to realize counter
+		
+		if totp_code != "":
+			self.totp_field = ReadOnlyTextField(
+				leading_icon="timer-lock",
+				text=totp_code,
+				copy_callback=copy_callback,
+				secondary_icon="qrcode",
+				secondary_callback=lambda *_: totp_qr_callback(details_dialog=self)
+			)
+		else:
+			self.totp_field = ReadOnlyTextField(
+				leading_icon="timer-lock",
+				text="TOTP not configured",
+				secondary_icon="qrcode",
+				secondary_callback=lambda *_: totp_qr_callback(details_dialog=self)
+			)
 
 		fields = [
 			self.website_field,
 			self.username_field,
 			self.password_field,
 			self.description_field,
+			self.totp_field,
 		]
-
-		# TODO: change this to a special text field with countdown
-		# 	use Clock.schedule_intervall(..., 1) in combination with MDLabel to realize counter
-		if totp_code != "" and totp_callback is not None:
-			self.totp_field = ReadOnlyTextField(
-				leading_icon="timer-lock",
-				text=totp_code,
-				copy_callback=copy_callback
-			)
-
-			fields.append(self.totp_field)
 
 		# Store a reference for the button labels for modification
 		self.dismiss_button_label = MDButtonText(text="Cancel")		
@@ -153,25 +165,13 @@ class AccountDetailsDialog(MDDialog):
 
 	def _modify(self):
 		self.modification_in_process = True
-	
-		# Allow modifying
-		self.website_field.allow_writing()
-		self.username_field.allow_writing()
-		self.password_field.allow_writing()
-		self.description_field.allow_writing()
-
-		# Change the button labels
-		self.dismiss_button_label.text	= "Cancel"
-		self.modify_button_label.text	= "Save"
-
-		# Disable the delete button
-		self.delete_button.disabled = True
-		self.delete_button.opacity = 0.5
+		self._toggle_modification_mode()
 
 	def _save(self):
 		new_website = self.website_field.get_text()
 		new_username = self.username_field.get_text()
 		new_password = self.password_field.get_text()
+		new_totp_code = self.totp_field.get_text()
 		new_description = self.description_field.get_text()
 
 		if not self.modify_callback(
@@ -181,53 +181,37 @@ class AccountDetailsDialog(MDDialog):
 			new_username=new_username,
 			new_password=new_password,
 			new_description=new_description,
-			account_entry=self.account_entry,
+			new_totp_uri=self.totp_uri,
 		):
 			return
 
-		self.modification_in_process = False
 		# Update stored values
-		self.website = new_website
-		self.username = new_username
-		self.password = new_password
-		self.description = new_description
+		self.website		= new_website
+		self.username		= new_username
+		self.password		= new_password
+		self.totp_code		= new_totp_code
+		self.description	= new_description
 
-		# Disable modification
-		self.website_field.set_read_only()
-		self.username_field.set_read_only()
-		self.password_field.set_read_only()
-		self.description_field.set_read_only()
+		if self.totp_uri is not None:
+			# Enable the copy button
+			self.totp_field.copy_callback = self.copy_callback
 
-		# Change the button labels back
-		self.dismiss_button_label.text	= "Dismiss"
-		self.modify_button_label.text	= "Modify"
 
-		# Enable the delete button
-		self.delete_button.disabled = False
-		self.delete_button.opacity = 1
+		self.modification_in_process = False
+		self._toggle_modification_mode()
 
 	def _cancel(self):
-		self.modification_in_process = False
-
 		# Restore original values
 		self.website_field.set_text(self.website)
 		self.username_field.set_text(self.username)
 		self.password_field.set_text(self.password)
+		self.totp_field.set_text(self.totp_code)
 		self.description_field.set_text(self.description)
 
-		# Disable modification
-		self.website_field.set_read_only()
-		self.username_field.set_read_only()
-		self.password_field.set_read_only()
-		self.description_field.set_read_only()
+		self.totp_uri = None
 
-		# Change the button labels back
-		self.dismiss_button_label.text	= "Dismiss"
-		self.modify_button_label.text	= "Modify"
-
-		# Enable the delete button
-		self.delete_button.disabled = False
-		self.delete_button.opacity = 1
+		self.modification_in_process = False
+		self._toggle_modification_mode()
 
 	def _modify_or_save(self, instance):
 		if not self.modification_in_process:
@@ -258,6 +242,14 @@ class AccountDetailsDialog(MDDialog):
 
 		self.dismiss()
 
+	def set_totp_preview_uri(
+		self,
+		uri: str,
+		preview_code: str
+	):
+		self.totp_uri = uri
+		self.totp_field.set_text(preview_code)
+
 	def toggle_password_mask(self):
 		self.password_field.toggle_password_mask()
 		# Toggle the icon
@@ -265,3 +257,35 @@ class AccountDetailsDialog(MDDialog):
 			self.password_field.set_trailing_icon("eye")
 		else:
 			self.password_field.set_trailing_icon("eye-off")
+
+	def _toggle_modification_mode(self):
+		if self.modification_in_process:
+			# Allow modifying
+			self.website_field.allow_writing()
+			self.username_field.allow_writing()
+			self.password_field.allow_writing()
+			self.totp_field.toggle_secondary_callback()
+			self.description_field.allow_writing()
+
+			# Change the button labels
+			self.dismiss_button_label.text	= "Cancel"
+			self.modify_button_label.text	= " Save "
+
+			# Disable the delete button
+			self.delete_button.disabled = True
+			self.delete_button.opacity = 0.5
+		else:
+			# Disable modification
+			self.website_field.set_read_only()
+			self.username_field.set_read_only()
+			self.password_field.set_read_only()
+			self.totp_field.toggle_secondary_callback()
+			self.description_field.set_read_only()
+
+			# Change the button labels back
+			self.dismiss_button_label.text	= "Dismiss"
+			self.modify_button_label.text	= "Modify "
+
+			# Enable the delete button
+			self.delete_button.disabled = False
+			self.delete_button.opacity = 1
