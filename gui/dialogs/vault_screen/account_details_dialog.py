@@ -95,9 +95,10 @@ class AccountDetailsDialog(MDDialog):
 			)
 
 		else:
+			self.totp_code	= "TOTP not configured"
 			self.totp_field = TotpReadOnlyTextField(
 				leading_icon="timer-lock",
-				text="TOTP not configured",
+				text=self.totp_code,
 				secondary_icon="qrcode",
 				secondary_callback=lambda *_: totp_qr_callback(details_dialog=self)
 			)
