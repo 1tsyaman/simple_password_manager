@@ -328,10 +328,12 @@ class VaultScreen(MDScreen):
 		}
 
 		try:
-			totp_code, time_remaining = self.pwd_manager.get_totp(website=website, username=username)
-			kwargs["totp_code"] = totp_code
-			kwargs["totp_time_remaining"] = time_remaining
-			kwargs["totp_callback"] = self.pwd_manager.get_totp
+			totp_code, time_remaining = self.pwd_manager.get_totp(website, username)
+
+			kwargs["totp_code"]				= totp_code
+			kwargs["totp_time_remaining"]	= time_remaining
+			kwargs["totp_callback"]			= lambda *_: self.pwd_manager.get_totp(website, username)
+
 		except NoSuchEntryError:
 			self.screen_manager.show_error_dialog(
 				error_title="Error: Inconsistent internal state",

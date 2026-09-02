@@ -1,5 +1,6 @@
 from collections.abc import Callable
 
+from kivy.clock import Clock
 from kivy.uix.widget import Widget
 
 from kivymd.app import MDApp
@@ -40,6 +41,7 @@ class AccountDetailsDialog(MDDialog):
 		self.password		= password
 		self.description	= description
 		self.totp_code		= totp_code
+		self.time_remaining = totp_time_remaining
 
 		# For updating the labels on the vault screen
 		self.account_entry	= account_entry
@@ -75,17 +77,22 @@ class AccountDetailsDialog(MDDialog):
 			text=description,
 			copy_callback=copy_callback
 		)
-		# TODO: change this to a special text field with countdown
-		# 	use Clock.schedule_intervall(..., 1) in combination with MDLabel to realize counter
-		
+
 		if totp_code != "":
 			self.totp_field = TotpReadOnlyTextField(
 				leading_icon="timer-lock",
-				text=totp_code,
+				text=self._format_totp_string(),
 				copy_callback=copy_callback,
 				secondary_icon="qrcode",
 				secondary_callback=lambda *_: totp_qr_callback(details_dialog=self)
 			)
+
+			# Set up a thread to update the code/timer
+			Clock.schedule_interval(
+				lambda *_: self.update_totp_field(),
+				1,	# once a second
+			)
+
 		else:
 			self.totp_field = TotpReadOnlyTextField(
 				leading_icon="timer-lock",
@@ -162,6 +169,13 @@ class AccountDetailsDialog(MDDialog):
 			**kwargs,
 		)
 
+	def update_totp_field(self):
+		if self.time_remaining == 0 and self.totp_callback is not None:
+			self.totp_code, self.time_remaining = self.totp_callback()
+		else:
+			self.time_remaining -= 1
+
+		self.totp_field.set_text(self._format_totp_string())
 
 	def _modify(self):
 		self.modification_in_process = True
@@ -289,3 +303,6 @@ class AccountDetailsDialog(MDDialog):
 			# Enable the delete button
 			self.delete_button.disabled = False
 			self.delete_button.opacity = 1
+
+	def _format_totp_string(self) -> str:
+		return f"{self.totp_code[:3]} {self.totp_code[3:]}   •   {self.time_remaining:02d}s"	# pad with 0s to 2 digits

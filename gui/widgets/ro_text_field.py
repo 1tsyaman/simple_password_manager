@@ -122,7 +122,8 @@ class TotpReadOnlyTextField(ReadOnlyTextField):
 
 	def button_callback(self):
 		if self.primary_callback:
-			super().button_callback()
+			if self.copy_callback is not None:
+				self.copy_callback(self.field.text[:6])	# only copy the TOTP code
 		else:
 			if self.secondary_callback is not None:
 				self.secondary_callback()
