@@ -449,23 +449,24 @@ class VaultScreen(MDScreen):
 		query: str
 	) -> list[dict[str, Any]]:
 		candidates = []
-		keywords = query.split(" ")
+		keywords = query.lower().split()
 
 		for entry in self.account_list:
-			for key in entry:	# O(1), because we only have 3 keys d:
-				if all(keyword in entry[key]
-						for keyword in keywords):
-					candidates.append(entry)
+			if all(
+				any(keyword in str(value).lower() for value in entry.values())
+				for keyword in keywords
+			):
+				candidates.append(entry)
 
 		return [
 			{
-				"viewclass":			"AccountEntry",
-				"website":				entry["website"],
-				"username":				entry["username"],
-				"on_click_callback":	self.show_account_details_dialog,
-				"callback":				None 
+				"viewclass": "AccountEntry",
+				"website": entry["website"],
+				"username": entry["username"],
+				"on_click_callback": self.show_account_details_dialog,
+				"callback": None
 			}
-				for entry in candidates
+			for entry in candidates
 		]
 
 	def rename_vault(
