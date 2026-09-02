@@ -1,10 +1,10 @@
-from threading import Lock
 from time import time
 
 from kivy.clock import Clock
 from kivy.core.window import Window
 
 from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.dialog import MDDialog
 
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
@@ -67,8 +67,21 @@ class SimplePasswordManagerApp(MDApp):
 		self.schedule_watchdog()
 
 	def lock_vault(self):
+		self._close_all_dialogs()
 		self.screen_manager.lock_vault()
 		self.schedule_watchdog()
+
+	def _close_all_dialogs(self):
+		stack = list(Window.children)
+
+		while stack:
+			widget = stack.pop()
+
+			if isinstance(widget, MDDialog):
+				widget.dismiss()
+
+			stack.extend(widget.children)
+
 
 	def _on_keyboard(
 		self,
