@@ -1,5 +1,6 @@
 from kivymd.app import MDApp
 from kivymd.uix.widget import Widget
+from kivymd.uix.dialog import MDDialog
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.transition import MDSharedAxisTransition
@@ -7,6 +8,7 @@ from kivymd.uix.boxlayout import MDBoxLayout
 
 from gui.screens.welcome_screen import WelcomeScreen
 from gui.screens.vault_screen import VaultScreen
+from gui.screens.settings_screen import SettingsScreen
 from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.selection_screen.new_vault_dialog import NewVaultDialog
 from gui.dialogs.error_dialog import ErrorDialog
@@ -52,6 +54,11 @@ class AppScreenManager(MDScreenManager):
 			screen_manager=self,
 			pwd_manager=pwd_manager,
 		)
+		self.settings_screen = SettingsScreen(
+			app_data_path=self.app_data_path,
+			screen_manager=self,
+			pwd_manager=pwd_manager
+		)
 
 		# Signal that this is the first time we queue the selection screen
 		self.welcome_screen.prompt_login = True
@@ -59,6 +66,7 @@ class AppScreenManager(MDScreenManager):
 		super().__init__(
 			self.welcome_screen,
 			self.vault_screen,
+			self.settings_screen,
 			transition=MDSharedAxisTransition(
 				transition_axis="x",
 			),
@@ -141,16 +149,17 @@ class AppScreenManager(MDScreenManager):
 
 	def switch_screen(
 		self,
-		screen: str,
-		vault_name: str ="",
+		screen		: str,
+		vault_name	: str ="",
+		pwd_manager	: PwdManager | None = None,
 	):
-		if (screen in ["welcome", "vault"] \
+		if (screen in ["welcome", "vault", "settings"] \
 			and (
 					self.current != "vault"
 					or self.vault_screen_can_switch()	# current = vault? -> check if we can exit
 			)
 		):
-			return self._switch_screen(screen, vault_name)
+			return self._switch_screen(screen, vault_name, pwd_manager)
 
 	def vault_screen_can_switch(self):
 		vault_screen = self.vault_screen
@@ -165,6 +174,19 @@ class AppScreenManager(MDScreenManager):
 
 	def back_to_welcome_screen(self):
 		self.switch_screen("welcome")
+
+	def back_to_vault(
+		self,
+		pwd_manager: PwdManager,
+		vault_name	: str
+	):
+		self.vault_screen.pwd_manager = pwd_manager
+		self.vault_screen.login_dialog = MDDialog()	# bogus dialog
+		self.switch_screen(
+			"vault",
+			vault_name=vault_name
+		)
+		return
 
 	def lock_vault(self):
 		self._switch_screen("welcome")
@@ -206,9 +228,10 @@ class AppScreenManager(MDScreenManager):
 
 	def _switch_screen(
 		self,
-		screen: str,
-		vault_name: str = "",
-		lock_vault: bool = False,
+		screen		: str,
+		vault_name	: str = "",
+		pwd_manager	: PwdManager | None = None,
+		lock_vault	: bool = False,
 	):
 		attribute = f"{screen}_screen"
 
@@ -227,8 +250,11 @@ class AppScreenManager(MDScreenManager):
 
 			return
 
-		if screen == "vault":
+		if screen in ["vault", "settings"]:
 			screen_object.vault_name = vault_name
+
+		if screen == "settings":
+			screen_object.pwd_manager = pwd_manager
 
 		screen_object.top_bar = self.top_container
 		self.current = screen

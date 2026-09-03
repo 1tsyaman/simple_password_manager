@@ -597,6 +597,11 @@ class VaultScreen(MDScreen):
 		*args
 	):
 		VaultContextMenu(
+			settings_callback=lambda: self.screen_manager.switch_screen(
+											"settings",
+											vault_name=self.vault_name,
+											pwd_manager=self.pwd_manager
+									),
 			export_callback=lambda: self.show_export_vault_dialog(),
 			rename_callback=lambda: self.show_rename_vault_dialog(),
 			delete_callback=lambda: self.show_delete_vault_dialog(),
