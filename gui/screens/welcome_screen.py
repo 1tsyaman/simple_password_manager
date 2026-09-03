@@ -88,7 +88,7 @@ class WelcomeScreen(MDScreen):
 				)
 			)
 
-			self.on_start = False	# never true again while running
+			self.prompt_login = False
 			return
 
 		# Open first vault in the list
@@ -101,8 +101,8 @@ class WelcomeScreen(MDScreen):
 			)
 		)
 
-		if self.on_start:
-			self.on_start = False	# never true again while running
+		if self.prompt_login:
+			self.prompt_login = False	# never true again while running
 			Clock.schedule_once(
 				lambda *_: self.show_open_vault_dialog(vault),
 				0
@@ -158,8 +158,12 @@ class WelcomeScreen(MDScreen):
 		try:
 			app_data_path = self.app_data_path
 			io.create_and_load_vault_for_gui(app_data_path, name, password)
-			self.load_vaults()
-			dialog.dismiss()
+
+			self.screen_manager.open_new_vault(
+				dialog=dialog,
+				vault_name=name,
+				password=password
+			)
 
 		except FileNotFoundError:
 			name_field.error_widget.text = "Could not create vault file"
@@ -192,15 +196,17 @@ class WelcomeScreen(MDScreen):
 			create_vault_callback=self.create_vault
 		).open()
 
-	def show_open_vault_dialog(self, vault_name: str) -> None:
-		LoginDialog(
-			vault=vault_name,
-			login_callback=self.screen_manager.open_vault
-		).open()
-
 	def show_import_vault_file_picker(self):
+		self.prompt_login = True
+
 		ImportFilePicker(
 			app_data_path=self.app_data_path,
 			on_finish_callback=self.refresh,
 			type=".vault"
+		).open()
+
+	def show_open_vault_dialog(self, vault_name: str) -> None:
+		LoginDialog(
+			vault=vault_name,
+			login_callback=self.screen_manager.open_vault
 		).open()

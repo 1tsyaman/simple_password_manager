@@ -9,9 +9,9 @@ from kivy.uix.widget import Widget
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.dialog import MDDialog
 
 from gui.dialogs.yes_no_dialog import YesNoDialog
-from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.vault_screen.new_account_dialog import NewAccountDialog
 from gui.dialogs.vault_screen.account_details_dialog import AccountDetailsDialog
 from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
@@ -119,7 +119,7 @@ class VaultScreen(MDScreen):
 		Called on pre_enter
 	"""
 	def refresh(self):
-		dialog = self.login_dialog
+		dialog: MDDialog = self.login_dialog
 
 		search_bar = SearchBar(
 			view_root=self.phone_screen,
@@ -161,7 +161,10 @@ class VaultScreen(MDScreen):
 		self.main_container.clear_widgets()
 		self.main_container.add_widget(NoAccountsLabel())
 
-	def load_accounts(self, dialog: LoginDialog):
+	def load_accounts(
+		self,
+		dialog: MDDialog
+	):
 		self.account_list_widget : AccountList = AccountList()
 
 		accounts = self.pwd_manager.get_website_username_pair_list()
@@ -187,7 +190,7 @@ class VaultScreen(MDScreen):
 
 	def _load_account_batch(
 			self,
-			dialog: LoginDialog | None = None,	# is only needed for the first batch
+			dialog: MDDialog | None = None,	# is only needed for the first batch
 			first_batch: bool = False
 		) -> bool:
 		batch_size = min(BATCH_SIZE, self.number_accounts)

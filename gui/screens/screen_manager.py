@@ -8,6 +8,7 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from gui.screens.welcome_screen import WelcomeScreen
 from gui.screens.vault_screen import VaultScreen
 from gui.dialogs.selection_screen.login_dialog import LoginDialog
+from gui.dialogs.selection_screen.new_vault_dialog import NewVaultDialog
 from gui.dialogs.error_dialog import ErrorDialog
 from gui.widgets.input_field import InputField
 from gui.widgets.vault_screen.search_bar import SearchBar
@@ -53,7 +54,7 @@ class AppScreenManager(MDScreenManager):
 		)
 
 		# Signal that this is the first time we queue the selection screen
-		self.welcome_screen.on_start = True
+		self.welcome_screen.prompt_login = True
 
 		super().__init__(
 			self.welcome_screen,
@@ -64,10 +65,36 @@ class AppScreenManager(MDScreenManager):
 			*args,
 			**kwargs
 		)
-
 	"""
 		Opens the vault and triggers screen change on success.
 		Emits error on failure.
+	"""
+	def open_new_vault(
+		self,
+		dialog: NewVaultDialog,
+		vault_name: str,
+		password: str
+	):
+		try:
+			app_data_path = self.app_data_path
+			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
+			self.vault_screen.pwd_manager = pwd_manager
+			self.vault_screen.login_dialog = dialog
+			self.switch_screen(
+				"vault",
+				vault_name=vault_name
+			)
+			return
+
+		except:
+			self.show_error_dialog(
+				error_title="Error",
+				error_message="Failed to open newly created vault"
+			)
+
+	"""
+		Opens the vault and triggers screen change on success.
+		Emits error on failure directly into the login dialog.
 	"""
 	def open_vault(
 		self,
