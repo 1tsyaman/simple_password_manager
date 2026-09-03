@@ -16,10 +16,10 @@ from gui.dialogs.vault_screen.new_account_dialog import NewAccountDialog
 from gui.dialogs.vault_screen.account_details_dialog import AccountDetailsDialog
 from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
 from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
-from gui.widgets.selection_screen.export_picker import ExportFilePicker
-from gui.dialogs.selection_screen.rename_vault_dialog import RenameVaultDialog
+from gui.widgets.vault_screen.export_picker import ExportFilePicker
+from gui.dialogs.vault_screen.rename_vault_dialog import RenameVaultDialog
 from gui.widgets.vault_screen.search_bar import SearchBar
-from gui.widgets.selection_screen.import_picker import ImportFilePicker
+from gui.widgets.welcome_screen.import_picker import ImportFilePicker
 from gui.widgets.labels import NoAccountsLabel
 from gui.widgets.plus_button import PlusButton
 from gui.utils.clipboard import copy_text
@@ -126,7 +126,7 @@ class VaultScreen(MDScreen):
 			search_function=self.search_accounts,
 			search_text="Search accounts...",
 			leading_button_icon="arrow-left",
-			leading_button_callback=self.screen_manager.back_to_selection,
+			leading_button_callback=self.screen_manager.back_to_welcome_screen,
 			trailing_button_icon="dots-vertical",
 			trailing_button_callback=self.show_vault_context_menu,
 		)
@@ -145,7 +145,7 @@ class VaultScreen(MDScreen):
 		self.load_accounts(dialog=dialog)
 
 	def on_back(self):
-		self.screen_manager.back_to_selection()
+		self.screen_manager.back_to_welcome_screen()
 
 	def on_leave(self, *args):
 		self.clear()

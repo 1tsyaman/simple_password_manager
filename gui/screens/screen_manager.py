@@ -5,7 +5,7 @@ from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.transition import MDSharedAxisTransition
 from kivymd.uix.boxlayout import MDBoxLayout
 
-from gui.screens.selection_screen import SelectionScreen
+from gui.screens.welcome_screen import WelcomeScreen
 from gui.screens.vault_screen import VaultScreen
 from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.error_dialog import ErrorDialog
@@ -40,7 +40,7 @@ class AppScreenManager(MDScreenManager):
 		self.app_data_path = str(io.get_app_data_path())
 		self.top_container = top_container
 
-		self.selection_screen = SelectionScreen(
+		self.welcome_screen = WelcomeScreen(
 			app_data_path=self.app_data_path,
 			app_name=self.app_name,
 			screen_manager=self
@@ -53,10 +53,10 @@ class AppScreenManager(MDScreenManager):
 		)
 
 		# Signal that this is the first time we queue the selection screen
-		self.selection_screen.on_start = True
+		self.welcome_screen.on_start = True
 
 		super().__init__(
-			self.selection_screen,
+			self.welcome_screen,
 			self.vault_screen,
 			transition=MDSharedAxisTransition(
 				transition_axis="x",
@@ -117,7 +117,7 @@ class AppScreenManager(MDScreenManager):
 		screen: str,
 		vault_name: str ="",
 	):
-		if (screen in ["selection", "vault"] \
+		if (screen in ["welcome", "vault"] \
 			and (
 					self.current != "vault"
 					or self.vault_screen_can_switch()	# current = vault? -> check if we can exit
@@ -134,13 +134,13 @@ class AppScreenManager(MDScreenManager):
 	def force_exist_vault_screen(self, dialog: ErrorDialog):
 		dialog.dismiss()
 		self.vault_screen.force_exit_vault = True
-		self.switch_screen("selection")
+		self.switch_screen("welcome")
 
-	def back_to_selection(self):
-		self.switch_screen("selection")
+	def back_to_welcome_screen(self):
+		self.switch_screen("welcome")
 
 	def lock_vault(self):
-		self._switch_screen("selection")
+		self._switch_screen("welcome")
 
 	def exit_app(self):
 		self.app.stop()

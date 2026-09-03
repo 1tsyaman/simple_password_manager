@@ -7,7 +7,7 @@ from kivy.clock import Clock
 
 from kivymd.uix.filemanager import MDFileManager
 
-from gui.widgets.selection_screen.file_picker import FilePicker, BUFFER_SIZE
+from gui.widgets.welcome_screen.file_picker import FilePicker, BUFFER_SIZE
 
 
 if platform == "android":

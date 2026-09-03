@@ -5,7 +5,7 @@ from kivy.utils import platform
 
 from kivymd.uix.filemanager import MDFileManager
 
-from gui.widgets.selection_screen.file_picker import FilePicker, BUFFER_SIZE
+from gui.widgets.welcome_screen.file_picker import FilePicker, BUFFER_SIZE
 
 from storage.io import VAULT_ENDING
 

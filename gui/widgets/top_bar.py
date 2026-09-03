@@ -35,34 +35,6 @@ class TopBar(MDTopAppBar):
 			**kwargs
 		)
 
-
-class SelectionScreenTopBar(TopBar):
-	def __init__(
-		self,
-		import_callback		: Callable,
-		settings_callback	: Callable,
-		*args,
-		**kwargs
-	):
-		super().__init__(
-			title="Password Manager",
-			*args,
-			**kwargs
-		)
-
-		import_button = MDActionTopAppBarButton(
-			icon="file-import",
-			on_release=lambda *_: import_callback()
-		)
-		settings_button	= MDActionTopAppBarButton(
-			icon="cog",
-			on_release=lambda *_: settings_callback()
-		)
-
-		self.trailing_buttons_container.add_widget(import_button)
-		self.trailing_buttons_container.add_widget(settings_button)
-
-
 class SettingsScreenTopBar(TopBar):
 	def __init__(
 		self,
