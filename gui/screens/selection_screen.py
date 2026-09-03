@@ -7,7 +7,7 @@ from kivymd.uix.screen import MDScreen
 from kivymd.uix.appbar import MDActionTopAppBarButton
 from kivymd.uix.boxlayout import MDBoxLayout
 
-from gui.widgets.top_bar import TopBar
+from gui.widgets.top_bar import SelectionScreenTopBar
 from gui.widgets.labels import NoVaultsLabel
 from gui.widgets.input_field import InputField
 from gui.widgets.selection_screen.vault_list import VaultEntry, VaultList
@@ -75,20 +75,10 @@ class SelectionScreen(MDScreen):
 		is called before entering the screen
 	"""
 	def refresh(self):
-		top_bar = TopBar(
-			title=self.app_name
+		top_bar = SelectionScreenTopBar(
+			import_callback=self.show_import_vault_file_picker,
+			settings_callback=lambda *_: self.screen_manager.switch_screen("settings")
 		)
-		import_button: MDActionTopAppBarButton = top_bar.import_vault_button
-
-		top_bar.remove_back_button()
-
-		# Enable import button
-		top_bar.import_callback = self.show_import_vault_file_picker
-		import_button.disabled = False
-		import_button.opacity = 1
-
-		# Import vault button
-		top_bar.import_callback = self.show_import_vault_file_picker
 
 		self.screen_manager.switch_top_bar(top_bar)
 

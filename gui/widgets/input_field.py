@@ -4,7 +4,6 @@ from kivymd.uix.textfield import (
 	MDTextFieldHelperText,
 	MDTextFieldHintText,
 	MDTextFieldLeadingIcon,
-	MDTextFieldTrailingIcon,
 )
 
 from gui.widgets.focusable_text_field import FocusableTextField
