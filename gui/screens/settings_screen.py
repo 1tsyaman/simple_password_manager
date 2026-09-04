@@ -21,6 +21,7 @@ NUMERIC_RANGES = {
 }
 
 class SettingsScreen(MDScreen):
+	settings_obj: Settings
 	def __init__(
 		self,
 		app_data_path	: str,
@@ -78,3 +79,6 @@ class SettingsScreen(MDScreen):
 		value: object
 	):
 		self.settings_obj.set_settings_value(key, value)
+
+	def on_leave(self, *args):
+		self.settings_obj.sync_to_file()

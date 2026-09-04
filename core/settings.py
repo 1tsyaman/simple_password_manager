@@ -90,6 +90,10 @@ class Settings:
 
 		self.sync_to_file()
 
+	"""
+		Does not sync to file, synchronization should be done explicitly
+		This avoids having constant changes spamming writes to the file
+	"""
 	def set_settings_value(
 		self,
 		key:	str,
@@ -105,7 +109,6 @@ class Settings:
 			return
 
 		self.settings[section][key] = value
-		self.sync_to_file()
 
 	"""
 		@raises:
