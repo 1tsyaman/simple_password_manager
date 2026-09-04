@@ -250,13 +250,14 @@ def __decrypt_data(
 		- OSError
 """
 def __atomic_write(
-	data: dict,
-	path: Path
+	data	: dict,
+	path	: Path,
+	indent	: int | None = None
 ):
 	tmp_path = path.with_name(path.name + ".tmp")
 
 	with open(tmp_path, 'w', encoding="utf-8") as fd:
-		json.dump(data, fd)
+		json.dump(data, fd, indent=indent)
 
 		fd.flush()			# force python to actually pass buffer to os
 		os.fsync(fd.fileno())		# sync makes os carry out the write operation to disk

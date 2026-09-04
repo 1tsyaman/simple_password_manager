@@ -1,9 +1,13 @@
 import os
 import sys
+import json
 import importlib
 from pathlib import Path
 
 from core.pwd_manager import PwdManager
+from core.errors import (
+	InvalidJSONError,
+)
 
 VAULT_ENDING = ".vault"
 INVALID_PATH_ERROR	= "Given vault path does not exist"
@@ -80,6 +84,20 @@ def load_vault(path: str, pwd: str) -> PwdManager:
 	pwd_manager = PwdManager.from_encrypted_file(path, pwd)
 
 	return pwd_manager
+
+"""
+	@raises:
+		- FileNotFoundError
+		- OSError
+		- InvalidJSONError
+
+"""
+def load_settings(path: str) -> dict[str, dict]:
+	try:
+		with open(path, 'r', encoding="utf-8") as fd:
+			return json.load(fd)
+	except (json.JSONDecodeError, UnicodeDecodeError):
+		raise InvalidJSONError
 
 """
 	@raises:

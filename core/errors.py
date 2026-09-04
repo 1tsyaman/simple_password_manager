@@ -49,6 +49,21 @@ class ImageOpenError(Exception):
 class QRDecodeError(Exception):
 	pass
 
+class NoSettingsFileError(Exception):
+	pass
+
+class InvalidJSONError(Exception):
+	pass
+
+class InvalidSettingsFile(Exception):
+	pass
+
+class SettingsFileModifiedError(Exception):
+	pass
+
+class SettingsKeyNotSetError(Exception):
+	pass
+
 """
 	Raised whenever some impossible incosistency occures.
 	
