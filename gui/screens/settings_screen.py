@@ -8,40 +8,14 @@ from gui.widgets.top_bar import SettingsScreenTopBar
 from gui.widgets.settings_screen.settings_menu import SettingsMenu
 
 from core.pwd_manager import PwdManager
+from core.settings import Settings
 
 # to avoid cicular import issues
 if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
 
-SETTINGS = {
-	"Password Generation": {
-		"special_chars":		"!\"#$%&'()*+,-./:<=>?@[\\]^_`{|}~",
-		"password_length":		24,
-		"use_uppercase":		True,
-		"use_lowercase":		True,
-		"use_digits":			True,
-		"use_special":			True
-	},
-
-	"Security":	{
-		"timeout_duration":		60,
-		"lock_on_minimize":		True,
-		"clipboard_timeout":	30,
-		"show_passwords":		True
-	},
-
-	"Others": {
-		"theme":				"Light"
-	}
-}
-
-NUMERIC_RANGES = {
-	"password_length":		(8, 128),
-	"timeout_duration":		(10, 600),
-	"clipboard_timeout":	(5, 120),
-}
-
 class SettingsScreen(MDScreen):
+	settings: Settings
 	def __init__(
 		self,
 		app_data_path	: str,
@@ -55,8 +29,6 @@ class SettingsScreen(MDScreen):
 		self.pwd_manager	= pwd_manager
 
 		self.vault_name	= ""	# is set by the screen manager
-
-		self.settings= SETTINGS	# TODO: Actually extract that from the pwd_manager
 
 		self.main_container = MDBoxLayout()		# contains the account_list widget
 

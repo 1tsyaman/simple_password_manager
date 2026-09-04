@@ -25,6 +25,7 @@ from gui.widgets.plus_button import PlusButton
 from gui.utils.clipboard import copy_text
 
 from core.pwd_manager import PwdManager
+from core.settings import Settings
 from core.errors import (
 	EntryExistsError,
 	KeyLengthError,
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
 
 class VaultScreen(MDScreen):
+	settings: Settings	# Set by screen_manager
+
 	def __init__(
 		self,
 		app_data_path	: str,
@@ -600,7 +603,8 @@ class VaultScreen(MDScreen):
 			settings_callback=lambda: self.screen_manager.switch_screen(
 											"settings",
 											vault_name=self.vault_name,
-											pwd_manager=self.pwd_manager
+											pwd_manager=self.pwd_manager,
+											settings=self.settings
 									),
 			export_callback=lambda: self.show_export_vault_dialog(),
 			rename_callback=lambda: self.show_rename_vault_dialog(),

@@ -87,20 +87,35 @@ class Settings:
 		self._key			= key
 		self._salt			= salt
 
-		self.store_settings(settings)
+		self.sync_to_file()
 
+	def set_settings_value(
+		self,
+		key:	str,
+		value:	str
+	):
+		if key in PWD_GEN_SUBSECTIONS:
+			section = "Password Generation"
+		elif key in SECURITY_SUBSECTIONS:
+			section = "Security"
+		elif key in OTHERS_SUBSECTIONS:
+			section = "Others"
+		else:
+			return
+
+		self.settings[section][key] = value
+		self.sync_to_file()
 
 	"""
 		@raises:
 			- SettingsKeyNotSetError
 			- OSError
 	"""
-	def store_settings(
-		self,
-		settings: dict[str, dict]
-	):
+	def sync_to_file(self):
 		if not self._key_is_set():
 			raise SettingsKeyNotSetError
+
+		settings = self.settings
 
 		data = self.encode_data(settings)
 
@@ -113,8 +128,6 @@ class Settings:
 			"Salt": 	f"{bytes.hex(self._salt)}",
 			"Hash":		f"{bytes.hex(hash)}"
 		}
-
-		self.settings = settings
 
 		atomic_write(settings, Path(self.config_path), indent=4)
 
@@ -136,7 +149,8 @@ class Settings:
 		if not self._key_is_set():
 			raise SettingsKeyNotSetError
 
-		self.store_settings(DEFAULT_SETTINGS)
+		self.settings = DEFAULT_SETTINGS
+		self.sync_to_file()
 
 	def _key_is_set(self) -> bool:
 		return len(self._key) != 0 and len(self._salt) != 0

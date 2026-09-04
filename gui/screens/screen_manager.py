@@ -16,6 +16,7 @@ from gui.widgets.input_field import InputField
 from gui.widgets.vault_screen.search_bar import SearchBar
 
 from core.pwd_manager import PwdManager
+from core.settings import Settings
 from core.errors import (
 	PasswordError,
 	KeyLengthError,
@@ -86,6 +87,10 @@ class AppScreenManager(MDScreenManager):
 		try:
 			app_data_path = self.app_data_path
 			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
+			self.vault_screen.settings = Settings.load_settings(
+				app_data_path=self.app_data_path,
+				password=password
+			)
 			self.vault_screen.pwd_manager = pwd_manager
 			self.vault_screen.login_dialog = dialog
 			self.switch_screen(
@@ -117,6 +122,10 @@ class AppScreenManager(MDScreenManager):
 		try:
 			app_data_path = self.app_data_path
 			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
+			self.vault_screen.settings = Settings.load_settings(
+				app_data_path=self.app_data_path,
+				password=password
+			)
 			self.vault_screen.pwd_manager = pwd_manager
 			self.vault_screen.login_dialog = dialog
 			self.switch_screen(
@@ -152,6 +161,7 @@ class AppScreenManager(MDScreenManager):
 		screen		: str,
 		vault_name	: str ="",
 		pwd_manager	: PwdManager | None = None,
+		settings	: Settings | None = None
 	):
 		if (screen in ["welcome", "vault", "settings"] \
 			and (
@@ -159,7 +169,7 @@ class AppScreenManager(MDScreenManager):
 					or self.vault_screen_can_switch()	# current = vault? -> check if we can exit
 			)
 		):
-			return self._switch_screen(screen, vault_name, pwd_manager)
+			return self._switch_screen(screen, vault_name, pwd_manager, settings)
 
 	def vault_screen_can_switch(self):
 		vault_screen = self.vault_screen
@@ -231,6 +241,7 @@ class AppScreenManager(MDScreenManager):
 		screen		: str,
 		vault_name	: str = "",
 		pwd_manager	: PwdManager | None = None,
+		settings	: Settings | None = None,
 		lock_vault	: bool = False,
 	):
 		attribute = f"{screen}_screen"
@@ -254,7 +265,8 @@ class AppScreenManager(MDScreenManager):
 			screen_object.vault_name = vault_name
 
 		if screen == "settings":
-			screen_object.pwd_manager = pwd_manager
+			screen_object.pwd_manager	= pwd_manager
+			screen_object.settings		= settings
 
 		screen_object.top_bar = self.top_container
 		self.current = screen
