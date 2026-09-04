@@ -64,6 +64,15 @@ class AppScreenManager(MDScreenManager):
 		# Signal that this is the first time we queue the selection screen
 		self.welcome_screen.prompt_login = True
 
+		"""
+			This flag is set only when a vault is imported
+			After a vault is imported, welcome_screen.refresh is called and
+				welcome_screen.prompt_login is set -> if self.create_settings
+				is also set, the current vault is a new (imported)
+				vault and we create new settings file for it
+		"""
+		self.create_settings = False
+
 		super().__init__(
 			self.welcome_screen,
 			self.vault_screen,
@@ -74,6 +83,7 @@ class AppScreenManager(MDScreenManager):
 			*args,
 			**kwargs
 		)
+
 	"""
 		Opens the vault and triggers screen change on success.
 		Emits error on failure.
@@ -122,12 +132,23 @@ class AppScreenManager(MDScreenManager):
 		try:
 			app_data_path = self.app_data_path
 			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
+
+			if self.create_settings:
+				# This vault is imported, create a fresh settings file for it
+				Settings.from_password(
+					app_data_path=self.app_data_path,
+					password=password
+				)
+
+				self.create_settings = False
+
 			self.vault_screen.settings = Settings.load_settings(
 				app_data_path=self.app_data_path,
 				password=password
 			)
 			self.vault_screen.pwd_manager = pwd_manager
 			self.vault_screen.login_dialog = dialog
+
 			self.switch_screen(
 				"vault",
 				vault_name=vault_name
@@ -266,7 +287,7 @@ class AppScreenManager(MDScreenManager):
 
 		if screen == "settings":
 			screen_object.pwd_manager	= pwd_manager
-			screen_object.settings		= settings
+			screen_object.settings_obj	= settings
 
 		screen_object.top_bar = self.top_container
 		self.current = screen

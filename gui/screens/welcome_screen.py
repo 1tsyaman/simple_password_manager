@@ -196,6 +196,12 @@ class WelcomeScreen(MDScreen):
 				error=e
 			)
 
+	def finish_importing_vault(self):
+		self.prompt_login = True
+		self.screen_manager.create_settings	= True
+
+		self.refresh()
+
 ####	Open Dialog/Menu Methods	####
 
 	def show_new_vault_dialog(self):
@@ -204,11 +210,9 @@ class WelcomeScreen(MDScreen):
 		).open()
 
 	def show_import_vault_file_picker(self):
-		self.prompt_login = True
-
 		ImportFilePicker(
 			app_data_path=self.app_data_path,
-			on_finish_callback=self.refresh,
+			on_finish_callback=self.finish_importing_vault,
 			type=".vault"
 		).open()
 

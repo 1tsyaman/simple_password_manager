@@ -14,8 +14,13 @@ from core.settings import Settings
 if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
 
+NUMERIC_RANGES = {
+	"password_length":		(8, 128),
+	"timeout_duration":		(10, 600),
+	"clipboard_timeout":	(5, 120),
+}
+
 class SettingsScreen(MDScreen):
-	settings: Settings
 	def __init__(
 		self,
 		app_data_path	: str,
@@ -31,14 +36,6 @@ class SettingsScreen(MDScreen):
 		self.vault_name	= ""	# is set by the screen manager
 
 		self.main_container = MDBoxLayout()		# contains the account_list widget
-
-		self.main_container.add_widget(
-			SettingsMenu(
-				settings=self.settings,
-				numeric_ranges=NUMERIC_RANGES,
-				change_callback=self.update_settings
-			)
-		)
 
 		app = MDApp.get_running_app()
 		assert app is not None
@@ -66,12 +63,18 @@ class SettingsScreen(MDScreen):
 
 		self.screen_manager.switch_top_bar(top_bar)
 
+		self.main_container.clear_widgets()
+		self.main_container.add_widget(
+			SettingsMenu(
+				settings=self.settings_obj.settings,
+				numeric_ranges=NUMERIC_RANGES,
+				change_callback=self.update_settings
+			)
+		)
+
 	def update_settings(
 		self,
 		key: str,
 		value: object
 	):
-		for section in self.settings:
-			for setting in section:
-				if key == setting:
-					self.settings[section][setting] = value
+		self.settings_obj.set_settings_value(key, value)

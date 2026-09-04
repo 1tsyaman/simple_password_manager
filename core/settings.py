@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+import copy
 from pathlib import Path
 
 import storage.io as io
@@ -92,7 +93,7 @@ class Settings:
 	def set_settings_value(
 		self,
 		key:	str,
-		value:	str
+		value:	object
 	):
 		if key in PWD_GEN_SUBSECTIONS:
 			section = "Password Generation"
@@ -115,7 +116,7 @@ class Settings:
 		if not self._key_is_set():
 			raise SettingsKeyNotSetError
 
-		settings = self.settings
+		settings = copy.deepcopy(self.settings)
 
 		data = self.encode_data(settings)
 
