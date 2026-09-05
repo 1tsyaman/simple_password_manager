@@ -9,9 +9,10 @@ from kivymd.uix.textfield import MDTextField
 class TextSetting(MDBoxLayout):
 	def __init__(
 		self,
-		title				: str,
-		value				: str,
-		set_value_callback	: Callable,
+		title						: str,
+		value						: str,
+		set_value_callback			: Callable,
+		text_cleanup_callback		: Callable | None = None,
 		*args,
 		**kwargs
 	):
@@ -23,6 +24,9 @@ class TextSetting(MDBoxLayout):
 			**kwargs
 		)
 
+		self.set_value_callback		= set_value_callback
+		self.text_cleanup_callback	= text_cleanup_callback
+
 		self.add_widget(
 			MDLabel(
 				text=title,
@@ -30,13 +34,28 @@ class TextSetting(MDBoxLayout):
 			)
 		)
 
-		field = MDTextField(
+		self.field = MDTextField(
 			text=value,
 			mode="outlined"
 		)
 
-		field.bind(
-			text=lambda _, text: set_value_callback(text)
+		self.field.bind(
+			text=lambda _, text: self._set_value(text)
 		)
 
-		self.add_widget(field)
+		self.add_widget(self.field)
+
+	def _set_value(
+		self,
+		value: str
+	):
+		if self.text_cleanup_callback is not None:
+			value = self.text_cleanup_callback(value)
+
+			# only update if we changed the user's input
+			if value != self.field.text:
+				self.field.text = value
+				return
+
+		# only set the value once after clean up
+		self.set_value_callback(value)

@@ -529,38 +529,14 @@ class PwdManager:
 		self,
 		pwd: str,
 	) -> tuple[bool, str]:
-		if len(pwd) < self.pwd_length:
-			return False, f'must be at least {self.pwd_length} characters long'
-
-		if self.use_digits:
-			for digit in DIGITS:
-				if digit in pwd:
-					break
-			else:
-				return False, 'must contain at least one digit'
-
-		for letter in LETTERS_LOWER:
-			if letter in pwd:
-				break
-		else:
-			return False, 'must contain at least one lowercase character'
-
-		if self.use_uppercase:
-			for letter in LETTERS_UPPER:
-				if letter in pwd:
-					break
-			else:
-				return False, 'must contain at least one uppercase character'
-
-		if self.use_special:
-			for spec in self.special_chars:
-				if spec in pwd:
-					break
-			else:
-				return False, 'must contain at least one special character'
-
-		return True, ''
-
+		return PwdManager._pwd_satisfies_explicit_conditions(
+			pwd=pwd,
+			pwd_length=self.pwd_length,
+			use_digits=self.use_digits,
+			use_uppercase=self.use_uppercase,
+			use_special=self.use_special,
+			special_chars=self.special_chars
+		)
 	def __remove_entry(self: PwdManager, entry: Entry) -> None:
 		self.entries.pop(entry)
 
@@ -675,7 +651,7 @@ class PwdManager:
 		path: str,
 		pwd: str
 	) -> PwdManager:
-		satisfies, _ = PwdManager._pwd_satisfies_generic_conditions(pwd)
+		satisfies, _ = PwdManager._pwd_satisfies_explicit_conditions(pwd)
 
 		if not satisfies:
 			raise PasswordError
@@ -766,7 +742,7 @@ class PwdManager:
 		path	: str,
 		pwd		: str
 	) -> PwdManager:
-		satisfies, reason = PwdManager._pwd_satisfies_generic_conditions(pwd)
+		satisfies, reason = PwdManager._pwd_satisfies_explicit_conditions(pwd)
 
 		if not satisfies:
 			raise PasswordRequirementsError(
@@ -806,7 +782,7 @@ class PwdManager:
 		path	: str,
 		pwd		: str
 	) -> PwdManager:
-		satisfies, reason = PwdManager._pwd_satisfies_generic_conditions(pwd)
+		satisfies, reason = PwdManager._pwd_satisfies_explicit_conditions(pwd)
 
 		if not satisfies:
 			raise PasswordError(f"Password does not meet the minimum requirements: {reason}")
@@ -913,8 +889,42 @@ class PwdManager:
 				)
 
 	@staticmethod
-	def _pwd_satisfies_generic_conditions(pwd: str) -> tuple[bool, str]:
-		if len(pwd) < MIN_PWD_LENGTH:
-			return False, f'must be at least {MIN_PWD_LENGTH} characters long'
+	def _pwd_satisfies_explicit_conditions(
+		pwd				: str,
+		pwd_length		: int		= MIN_PWD_LENGTH,
+		use_digits		: bool		= True,
+		use_uppercase 	: bool		= True,
+		use_special		: bool		= True,
+		special_chars	: list[str]	= SPECIAL_CHARS,
+	) -> tuple[bool, str]:
+		if len(pwd) < pwd_length:
+			return False, f'must be at least {pwd_length} characters long'
+
+		if use_digits:
+			for digit in DIGITS:
+				if digit in pwd:
+					break
+			else:
+				return False, 'must contain at least one digit'
+
+		for letter in LETTERS_LOWER:
+			if letter in pwd:
+				break
+		else:
+			return False, 'must contain at least one lowercase character'
+
+		if use_uppercase:
+			for letter in LETTERS_UPPER:
+				if letter in pwd:
+					break
+			else:
+				return False, 'must contain at least one uppercase character'
+
+		if use_special:
+			for spec in special_chars:
+				if spec in pwd:
+					break
+			else:
+				return False, 'must contain at least one special character'
 
 		return True, ''

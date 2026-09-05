@@ -11,12 +11,15 @@ from gui.widgets.settings_screen.section import SettingSection
 from gui.widgets.settings_screen.switch import SwitchSetting
 from gui.widgets.settings_screen.text import TextSetting
 
+from core.types import config_t
+
 class SettingsMenu(MDScrollView):
 	def __init__(
 		self,
-		settings: dict,
-		numeric_ranges: dict[str, tuple[int, int]],
-		change_callback: Callable[[str, object], None] | None = None,
+		settings				: dict,
+		allowed_special_chars	: list[str],
+		numeric_ranges			: dict[str, tuple[int, int]],
+		change_callback			: Callable[[str, config_t], None] | None = None,
 		**kwargs
 	):
 		super().__init__(
@@ -25,9 +28,10 @@ class SettingsMenu(MDScrollView):
 			**kwargs
 		)
 
-		self.settings = settings
-		self.numeric_ranges = numeric_ranges
-		self.change_callback = change_callback
+		self.settings				= settings
+		self.numeric_ranges			= numeric_ranges
+		self.change_callback		= change_callback
+		self.allowed_special_chars	= allowed_special_chars
 
 		self.content = MDBoxLayout(
 			orientation="vertical",
@@ -55,7 +59,7 @@ class SettingsMenu(MDScrollView):
 		self,
 		section: str,
 		key: str,
-		value: object
+		value: config_t
 	):
 		title = key.replace("_", " ").capitalize()
 
@@ -131,7 +135,8 @@ class SettingsMenu(MDScrollView):
 			TextSetting(
 				title=title,
 				value=value,
-				set_value_callback=lambda text: self._set_value(section, key, text)
+				set_value_callback=lambda text: self._set_value(section, key, text),
+				text_cleanup_callback=self._get_clean_special_char_string
 			)
 		)
 
@@ -156,9 +161,26 @@ class SettingsMenu(MDScrollView):
 		self,
 		section: str,
 		key: str,
-		value: object
+		value: config_t
 	):
 		self.settings[section][key] = value
 
 		if self.change_callback is not None:
 			self.change_callback(key, value)
+
+
+	def _get_clean_special_char_string(
+		self,
+		special_chars: str
+	) -> str:
+		ls = list(
+			dict.fromkeys(
+				[char for char in special_chars if char in self.allowed_special_chars]
+			)
+		)
+
+		res = ""
+		for char in ls:
+			res += char
+
+		return res

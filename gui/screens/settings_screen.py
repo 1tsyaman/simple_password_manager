@@ -7,8 +7,9 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from gui.widgets.top_bar import SettingsScreenTopBar
 from gui.widgets.settings_screen.settings_menu import SettingsMenu
 
-from core.pwd_manager import PwdManager
+from core.pwd_manager import PwdManager, SPECIAL_CHARS
 from core.settings import Settings
+from core.types import config_t
 
 # to avoid cicular import issues
 if TYPE_CHECKING:
@@ -69,14 +70,15 @@ class SettingsScreen(MDScreen):
 			SettingsMenu(
 				settings=self.settings_obj.settings,
 				numeric_ranges=NUMERIC_RANGES,
-				change_callback=self.update_settings
+				change_callback=self.update_settings,
+				allowed_special_chars=SPECIAL_CHARS
 			)
 		)
 
 	def update_settings(
 		self,
 		key: str,
-		value: object
+		value: config_t
 	):
 		self.settings_obj.set_settings_value(key, value)
 
