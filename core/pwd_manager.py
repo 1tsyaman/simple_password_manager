@@ -42,8 +42,8 @@ PWD			= "pwd"
 TOTP_SECRET	= "totp_secret"
 TOTP_URI	= "totp_uri"
 
-
-URI_INVALID_MESSAGE	= "Provided TOTP URI is invalid."
+# Union type alias
+type config_t = str | int | bool
 
 class PwdManager:
 	"""
@@ -64,10 +64,17 @@ class PwdManager:
 		key	: bytes = bytes(0),
 		salt: bytes = bytes(0)
 	):
-		self.entries	: dict[Entry, dict[str, str]]	= {}
-		self.file_path	: str							= path
-		self._key		: bytes							= key
-		self._salt		: bytes							= salt
+		self.entries		: dict[Entry, dict[str, str]]	= {}
+		self.file_path		: str							= path
+		self._key			: bytes							= key
+		self._salt			: bytes							= salt
+
+		# Default config
+		self.special_chars	: list[str]						= SPECIAL_CHARS
+		self.pwd_length		: int							= PWD_LENGTH
+		self.use_uppercase	: bool							= True
+		self.use_digits		: bool							= True
+		self.use_special	: bool							= True
 
 ####	Vault modifiers		####
 
@@ -84,10 +91,7 @@ class PwdManager:
 		self: PwdManager,
 		pwd	: str
 	) -> None:
-		satisfies, reason = PwdManager._pwd_satisfies_conditions(
-			pwd,
-			len_min=MIN_PWD_LENGTH
-		)
+		satisfies, reason = self._pwd_satisfies_conditions(pwd)
 
 		if not satisfies:
 			raise PasswordRequirementsError(reason=reason)
@@ -152,6 +156,46 @@ class PwdManager:
 		pwd_manager_copy.entries = deepcopy(self.entries)
 
 		return pwd_manager_copy
+
+	def set_pwd_gen_config(
+		self,
+		config: dict[str, config_t]
+	):
+		for key in config.keys():
+			value = config[key]
+
+			match key:
+				case "special_chars":
+					assert isinstance(value, str)
+					self.special_chars = [char for char in value
+														if char in SPECIAL_CHARS]
+				case "password_length":
+					assert isinstance(value, int)
+					self.pwd_length = value
+				case "use_uppercase":
+					assert isinstance(value, bool)
+					self.use_uppercase = value
+				case "use_digits":
+					assert isinstance(value, bool)
+					self.use_digits = value
+				case "use_special":
+					assert isinstance(value, bool)
+					self.use_special = value
+
+	def generate_random_pwd(self):
+		chars = self._get_char_list()
+
+		while True:
+			pwd = ""
+
+			for _ in range(PWD_LENGTH):
+				pwd += rand.choice(chars)
+
+			satisfies, _ = self._pwd_satisfies_conditions(pwd)
+			if satisfies:
+				break
+
+		return pwd
 
 ####	Entry modifiers		####
 
@@ -472,6 +516,53 @@ class PwdManager:
 
 ####	Private methods		####
 
+	def _get_char_list(self) -> list[str]:
+		chars = LETTERS_LOWER
+		if self.use_uppercase:
+			chars.extend(LETTERS_UPPER)
+		if self.use_digits:
+			chars.extend(DIGITS)
+		if self.use_special:
+			chars.extend(self.special_chars)
+
+		return chars
+
+	def _pwd_satisfies_conditions(
+		self,
+		pwd: str,
+	) -> tuple[bool, str]:
+		if len(pwd) < self.pwd_length:
+			return False, f'must be at least {self.pwd_length} characters long'
+
+		if self.use_digits:
+			for digit in DIGITS:
+				if digit in pwd:
+					break
+			else:
+				return False, 'must contain at least one digit'
+
+		for letter in LETTERS_LOWER:
+			if letter in pwd:
+				break
+		else:
+			return False, 'must contain at least one lowercase character'
+
+		if self.use_uppercase:
+			for letter in LETTERS_UPPER:
+				if letter in pwd:
+					break
+			else:
+				return False, 'must contain at least one uppercase character'
+
+		if self.use_special:
+			for spec in self.special_chars:
+				if spec in pwd:
+					break
+			else:
+				return False, 'must contain at least one special character'
+
+		return True, ''
+
 	def __remove_entry(self: PwdManager, entry: Entry) -> None:
 		self.entries.pop(entry)
 
@@ -559,21 +650,6 @@ class PwdManager:
 
 		return totp_code
 
-	@staticmethod
-	def generate_random_pwd():
-		CHARS = LETTERS_LOWER + LETTERS_UPPER + DIGITS + SPECIAL_CHARS
-		while True:
-			pwd = ""
-
-			for _ in range(PWD_LENGTH):
-				pwd += rand.choice(CHARS)
-
-			satisfies, _ = PwdManager._pwd_satisfies_conditions(pwd)
-			if satisfies:
-				break
-
-		return pwd
-
 	"""
 		decrypted_data has the following form:
 		{
@@ -601,10 +677,7 @@ class PwdManager:
 		path: str,
 		pwd: str
 	) -> PwdManager:
-		satisfies, _ = PwdManager._pwd_satisfies_conditions(
-			pwd=pwd,
-			len_min=MIN_PWD_LENGTH
-		)
+		satisfies, _ = PwdManager._pwd_satisfies_generic_conditions(pwd)
 
 		if not satisfies:
 			raise PasswordError
@@ -695,10 +768,7 @@ class PwdManager:
 		path	: str,
 		pwd		: str
 	) -> PwdManager:
-		satisfies, reason = PwdManager._pwd_satisfies_conditions(
-			pwd=pwd,
-			len_min=MIN_PWD_LENGTH
-		)
+		satisfies, reason = PwdManager._pwd_satisfies_generic_conditions(pwd)
 
 		if not satisfies:
 			raise PasswordRequirementsError(
@@ -738,10 +808,7 @@ class PwdManager:
 		path	: str,
 		pwd		: str
 	) -> PwdManager:
-		satisfies, reason = PwdManager._pwd_satisfies_conditions(
-			pwd=pwd,
-			len_min=MIN_PWD_LENGTH
-		)
+		satisfies, reason = PwdManager._pwd_satisfies_generic_conditions(pwd)
 
 		if not satisfies:
 			raise PasswordError(f"Password does not meet the minimum requirements: {reason}")
@@ -826,37 +893,6 @@ class PwdManager:
 		return pwd_manager
 
 	@staticmethod
-	def _pwd_satisfies_conditions(pwd: str, len_min=PWD_LENGTH) -> tuple[bool, str]:
-		if len(pwd) < len_min:
-			return False, f'must be at least {len_min} characters long'
-
-		for digit in DIGITS:
-			if digit in pwd:
-				break
-		else:
-			return False, 'must contain at least one digit'
-
-		for letter in LETTERS_LOWER:
-			if letter in pwd:
-				break
-		else:
-			return False, 'must contain at least one lowercase character'
-
-		for letter in LETTERS_UPPER:
-			if letter in pwd:
-				break
-		else:
-			return False, 'must contain at least one uppercase character'
-
-		for spec in SPECIAL_CHARS:
-			if spec in pwd:
-				break
-		else:
-			return False, 'must contain at least one special character'
-
-		return True, ''
-
-	@staticmethod
 	def _has_new_format(data: object) -> bool:
 		return 	isinstance(data, dict) 	\
 			and all(
@@ -877,3 +913,10 @@ class PwdManager:
 					and isinstance(value, str)
 						for key, value in data.items()
 				)
+
+	@staticmethod
+	def _pwd_satisfies_generic_conditions(pwd: str) -> tuple[bool, str]:
+		if len(pwd) < MIN_PWD_LENGTH:
+			return False, f'must be at least {MIN_PWD_LENGTH} characters long'
+
+		return True, ''
