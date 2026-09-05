@@ -20,6 +20,8 @@ class SimplePasswordManagerApp(MDApp):
 	def __init__(self, **kwargs):
 		self.watchdog_thread = None
 		self.watchdog_deadline = 0
+		self.inactivity_timeout_duration = INACTIVITY_TIMEOUT_DURATION
+		self.lock_on_minimize = True
 
 		super().__init__(**kwargs)
 
@@ -40,6 +42,10 @@ class SimplePasswordManagerApp(MDApp):
 		self.schedule_watchdog()
 
 	def on_pause(self):
+		if self.lock_on_minimize:
+			self.cancel_watchdog_if_scheduled()
+			self.lock_vault()
+
 		return super().on_pause()
 
 	def on_resume(self):
@@ -52,10 +58,10 @@ class SimplePasswordManagerApp(MDApp):
 
 	def schedule_watchdog(self):
 		# Add absolute deadline that can be used if app is paused
-		self.watchdog_deadline = time() + INACTIVITY_TIMEOUT_DURATION
+		self.watchdog_deadline = time() + self.inactivity_timeout_duration
 		self.watchdog_thread = Clock.schedule_once(
 			lambda *_: self.lock_vault(),
-			INACTIVITY_TIMEOUT_DURATION,
+			self.inactivity_timeout_duration,
 		)
 
 	def cancel_watchdog_if_scheduled(self):
@@ -65,6 +71,19 @@ class SimplePasswordManagerApp(MDApp):
 	def reset_watchdog(self):
 		self.cancel_watchdog_if_scheduled()
 		self.schedule_watchdog()
+
+	def set_timeout_duration(
+		self,
+		value: int
+	):
+		self.inactivity_timeout_duration = value
+		self.reset_watchdog()
+
+	def set_lock_on_minimize(
+		self,
+		value: bool
+	):
+		self.lock_on_minimize = value
 
 	def lock_vault(self):
 		self._close_all_dialogs()

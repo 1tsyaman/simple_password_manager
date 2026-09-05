@@ -23,6 +23,10 @@ from core.errors import (
 	KeyDerivationError,
 	VaultFormatError,
 	CorruptedVaultError,
+	NoSettingsFileError,
+	InvalidSettingsFile,
+	SettingsFileModifiedError,
+	SettingsLoadError,
 	log
 )
 
@@ -58,7 +62,8 @@ class AppScreenManager(MDScreenManager):
 		self.settings_screen = SettingsScreen(
 			app_data_path=self.app_data_path,
 			screen_manager=self,
-			pwd_manager=pwd_manager
+			pwd_manager=pwd_manager,
+			app=self.app,
 		)
 
 		# Signal that this is the first time we queue the selection screen
@@ -133,19 +138,16 @@ class AppScreenManager(MDScreenManager):
 			app_data_path = self.app_data_path
 			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
 
-			if self.create_settings:
-				# This vault is imported, create a fresh settings file for it
-				Settings.from_password(
-					app_data_path=self.app_data_path,
-					password=password
-				)
+			try:
+				settings = self._load_settings(password)
+			except SettingsLoadError:
+				# Error dialog is shown by self._load_settings
+				return
 
-				self.create_settings = False
+			pwd_gen_config = settings.get_pwd_gen_config()
+			pwd_manager.set_pwd_gen_config(pwd_gen_config)
 
-			self.vault_screen.settings = Settings.load_settings(
-				app_data_path=self.app_data_path,
-				password=password
-			)
+			self.vault_screen.settings = settings
 			self.vault_screen.pwd_manager = pwd_manager
 			self.vault_screen.login_dialog = dialog
 
@@ -291,3 +293,57 @@ class AppScreenManager(MDScreenManager):
 
 		screen_object.top_bar = self.top_container
 		self.current = screen
+
+	"""
+		@raises:
+			- SettingsLoadError
+	"""
+	def _load_settings(
+		self,
+		password: str
+	) -> Settings:
+		if self.create_settings:
+			# This vault is imported, create a fresh settings file for it
+			Settings.from_password(
+				app_data_path=self.app_data_path,
+				password=password
+			)
+
+			self.create_settings = False
+
+		error_message = ""
+		try:
+			return Settings.load_settings(
+				app_data_path=self.app_data_path,
+				password=password
+			)
+		except NoSettingsFileError:
+			error_message = "Settings file was not found."
+		except InvalidSettingsFile:
+			error_message = "Settings file is invalid."
+		except SettingsFileModifiedError:
+			error_message = "Settings file was illegally modified."
+		except OSError:
+			self.show_error_dialog(
+				error_title="Fatal error:",
+				error_message="Failed to load settings, check log."
+			)
+			raise SettingsLoadError
+
+		finally:
+			if len(error_message) != 0:
+				self.show_error_dialog(
+					error_title="Error",
+					error_message=f"{error_message} Loading default settings."
+				)
+			try:
+				return Settings.from_password(
+					app_data_path=self.app_data_path,
+					password=password
+				)
+			except:
+				self.show_error_dialog(
+					error_title="Error",
+					error_message="Failed to laod default settings."
+				)
+				raise SettingsLoadError

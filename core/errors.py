@@ -64,6 +64,9 @@ class SettingsFileModifiedError(Exception):
 class SettingsKeyNotSetError(Exception):
 	pass
 
+class SettingsLoadError(Exception):
+	pass
+
 """
 	Raised whenever some impossible incosistency occures.
 	

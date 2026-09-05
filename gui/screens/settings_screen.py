@@ -17,8 +17,7 @@ if TYPE_CHECKING:
 
 NUMERIC_RANGES = {
 	"password_length":		(8, 128),
-	"timeout_duration":		(10, 600),
-	"clipboard_timeout":	(5, 120),
+	"timeout_duration":		(10, 300)
 }
 
 class SettingsScreen(MDScreen):
@@ -28,19 +27,18 @@ class SettingsScreen(MDScreen):
 		app_data_path	: str,
 		screen_manager	: "AppScreenManager",	# forward reference for type checking
 		pwd_manager		: PwdManager,
+		app				: MDApp,
 		*args,
 		**kwargs
 	):
 		self.app_data_path	= app_data_path
 		self.screen_manager	= screen_manager
 		self.pwd_manager	= pwd_manager
+		self.app			= app
 
 		self.vault_name	= ""	# is set by the screen manager
 
 		self.main_container = MDBoxLayout()		# contains the account_list widget
-
-		app = MDApp.get_running_app()
-		assert app is not None
 
 		super().__init__(
 			name="settings",
@@ -87,3 +85,8 @@ class SettingsScreen(MDScreen):
 
 		pwd_gen_config = self.settings_obj.get_pwd_gen_config()
 		self.pwd_manager.set_pwd_gen_config(pwd_gen_config)
+
+		app_settings = self.settings_obj.get_security_config()
+
+		self.app.set_timeout_duration(app_settings["timeout_duration"])
+		self.app.set_lock_on_minimize(app_settings["lock_on_minimize"])

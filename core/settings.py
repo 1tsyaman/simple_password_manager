@@ -32,15 +32,12 @@ PWD_GEN_SUBSECTIONS		= [
 	"special_chars",
 	"password_length",
 	"use_uppercase",
-	"use_lowercase",
 	"use_digits",
 	"use_special",
 ]
 SECURITY_SUBSECTIONS	= [
 	"timeout_duration",
 	"lock_on_minimize",
-	"clipboard_timeout",
-	"show_passwords"
 ]
 OTHERS_SUBSECTIONS		= [
 	"theme"
@@ -55,7 +52,6 @@ DEFAULT_SETTINGS = {
 		"special_chars":		"!\"#$%&'()*+,-./:<=>?@[\\]^_`{|}~",
 		"password_length":		24,
 		"use_uppercase":		True,
-		"use_lowercase":		True,
 		"use_digits":			True,
 		"use_special":			True
 	},
@@ -63,8 +59,6 @@ DEFAULT_SETTINGS = {
 	"Security":	{
 		"timeout_duration":		60,
 		"lock_on_minimize":		True,
-		"clipboard_timeout":	30,
-		"show_passwords":		True
 	},
 
 	"Others": {
@@ -113,6 +107,9 @@ class Settings:
 
 	def get_pwd_gen_config(self) -> dict[str, config_t]:
 		return self.settings["Password Generation"]
+
+	def get_security_config(self) -> dict[str, config_t]:
+		return self.settings["Security"]
 
 	"""
 		@raises:
