@@ -1,6 +1,7 @@
 from time import time
 
 from kivy.clock import Clock
+from kivy.utils import platform
 from kivy.core.window import Window
 
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -86,11 +87,11 @@ class SimplePasswordManagerApp(MDApp):
 		self.lock_on_minimize = value
 
 	def lock_vault(self):
-		self._close_all_dialogs()
+		self.close_all_dialogs()
 		self.screen_manager.lock_vault()
 		self.schedule_watchdog()
 
-	def _close_all_dialogs(self):
+	def close_all_dialogs(self):
 		stack = list(Window.children)
 
 		while stack:
@@ -134,7 +135,7 @@ class SimplePasswordManagerApp(MDApp):
 		# Top container (contains TopBar or SearchBar)
 		self.top_container = MDBoxLayout(
 			size_hint_y=None,
-			height = "60dp",
+			height="60dp",
 		)
 
 		# Occupies the rest of the phone screen
@@ -145,6 +146,15 @@ class SimplePasswordManagerApp(MDApp):
 			top_container=self.top_container,
 			pwd_manager=PwdManager()	# dummy pwd manager to initialize vault screen
 		)
+
+		if platform == "android":
+			# padding above the top bar
+			self.main_container.add_widget(
+				MDBoxLayout(
+					size_hint_y=None,
+					height="30dp"
+				)
+			)
 
 		self.main_container.add_widget(
 			self.top_container

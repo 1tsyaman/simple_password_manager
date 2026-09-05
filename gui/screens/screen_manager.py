@@ -291,6 +291,9 @@ class AppScreenManager(MDScreenManager):
 			screen_object.pwd_manager	= pwd_manager
 			screen_object.settings_obj	= settings
 
+		if self.current == "vault":
+			self.app.close_all_dialogs()
+
 		screen_object.top_bar = self.top_container
 		self.current = screen
 
