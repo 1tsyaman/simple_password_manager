@@ -307,12 +307,13 @@ class AppScreenManager(MDScreenManager):
 	) -> Settings:
 		if self.create_settings:
 			# This vault is imported, create a fresh settings file for it
-			Settings.from_password(
+			settings = Settings.from_password(
 				app_data_path=self.app_data_path,
 				password=password
 			)
 
 			self.create_settings = False
+			return settings
 
 		error_message = ""
 		try:
@@ -320,6 +321,7 @@ class AppScreenManager(MDScreenManager):
 				app_data_path=self.app_data_path,
 				password=password
 			)
+
 		except NoSettingsFileError:
 			error_message = "Settings file was not found."
 		except InvalidSettingsFile:
@@ -333,20 +335,18 @@ class AppScreenManager(MDScreenManager):
 			)
 			raise SettingsLoadError
 
-		finally:
-			if len(error_message) != 0:
-				self.show_error_dialog(
-					error_title="Error",
-					error_message=f"{error_message} Loading default settings."
-				)
-			try:
-				return Settings.from_password(
-					app_data_path=self.app_data_path,
-					password=password
-				)
-			except:
-				self.show_error_dialog(
-					error_title="Error",
-					error_message="Failed to laod default settings."
-				)
-				raise SettingsLoadError
+		self.show_error_dialog(
+			error_title="Error",
+			error_message=f"{error_message} Loading default settings."
+		)
+		try:
+			return Settings.from_password(
+				app_data_path=self.app_data_path,
+				password=password
+			)
+		except:
+			self.show_error_dialog(
+				error_title="Error",
+				error_message="Failed to laod default settings."
+			)
+			raise SettingsLoadError

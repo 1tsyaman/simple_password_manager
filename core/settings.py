@@ -83,8 +83,6 @@ class Settings:
 		self._key			= key
 		self._salt			= salt
 
-		self.sync_to_file()
-
 	"""
 		Does not sync to file, synchronization should be done explicitly
 		This avoids having constant changes spamming writes to the file
@@ -220,12 +218,17 @@ class Settings:
 	) -> Settings:
 		salt, key = derive_key(password)
 
-		return Settings(
+		settings_obj = Settings(
 			app_data_path=app_data_path,
 			settings=settings,
 			key=key,
 			salt=salt
 		)
+
+		settings_obj.sync_to_file()
+
+		return settings_obj
+
 
 	@staticmethod
 	def encode_data(data: dict) -> bytes:
