@@ -4,6 +4,7 @@ from threading import Thread, Lock
 from typing import TYPE_CHECKING, Any
 
 from kivy.clock import Clock
+from kivy.utils import platform
 from kivy.uix.widget import Widget
 
 from kivymd.app import MDApp
@@ -37,6 +38,7 @@ from core.errors import (
 )
 
 import storage.io as io
+from storage.qr_reader import read_qr_code_from_camera
 
 
 BATCH_SIZE = 100
@@ -643,11 +645,18 @@ class VaultScreen(MDScreen):
 		self,
 		details_dialog	: AccountDetailsDialog,
 	):
+		if platform == "android":
+			message		= "Scan the setup QR Code."
+			yes_label	= "Scan"
+		else:
+			message		= "Select a picture of the setup QR Code."
+			yes_label	= "Select"
+
 		YesNoDialog(
 			headline="Setup TOTP:",
-			message="Select a picture of the setup QR Code.",
+			message=message,
 			yes_callback=lambda *_:self.open_qr_code_importer(details_dialog),
-			yes_text="Select",
+			yes_text=yes_label,
 			no_text="Dismiss",
 			red_option="",
 			icon="qrcode" 
@@ -655,17 +664,27 @@ class VaultScreen(MDScreen):
 
 	def open_qr_code_importer(
 		self,
-		details_dialog	: AccountDetailsDialog,
+		details_dialog: AccountDetailsDialog,
 	):
+		if platform == "android":
+			read_qr_code_from_camera(
+				callback=lambda uri: self._process_qr_code_uri(
+					uri=uri,
+					details_dialog=details_dialog
+				)
+			)
+
+			return
+
 		random = rand.randint(1, 1000)
 		prefix = f"QR_CODE_{random}"
 
 		ImportFilePicker(
 			app_data_path=self.app_data_path,
-			on_finish_callback=lambda *_: 	self._process_qr_code_picture(
-												prefix=prefix,
-												details_dialog=details_dialog
-											),
+			on_finish_callback=lambda *_: self._process_qr_code_picture(
+				prefix=prefix,
+				details_dialog=details_dialog
+			),
 			type="picture",
 			image_prefix=prefix
 		).open()
@@ -715,5 +734,22 @@ class VaultScreen(MDScreen):
 					error_title="Clean Up Error",
 					error_message="Could not delete copied QR code image"
 				)
+
+		details_dialog.set_totp_preview_uri(uri, preview)
+
+	def _process_qr_code_uri(
+		self,
+		uri: str,
+		details_dialog: AccountDetailsDialog,
+	):
+		try:
+			preview = self.pwd_manager.get_totp_preview_from_uri(uri)
+		except TotpUriError:
+			self.screen_manager.show_error_dialog(
+				error_title="TOTP Error",
+				error_message="QR code does not encode a valid TOTP config URI"
+			)
+
+			return
 
 		details_dialog.set_totp_preview_uri(uri, preview)
