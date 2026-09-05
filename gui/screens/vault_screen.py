@@ -243,7 +243,10 @@ class VaultScreen(MDScreen):
 										)
 
 	def show_add_account_dialog(self):
-		NewAccountDialog(add_account_callback=self.add_account).open()
+		NewAccountDialog(
+			add_account_callback=self.add_account,
+			random_pwd_callback=self.pwd_manager.generate_random_pwd
+		).open()
 
 	"""
 		Adds the account and starts an *asynchronous* thread to sync vault

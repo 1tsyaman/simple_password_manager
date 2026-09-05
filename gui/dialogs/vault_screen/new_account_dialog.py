@@ -18,7 +18,8 @@ from core.pwd_manager import PwdManager
 class NewAccountDialog(MDDialog):
 	def __init__(
 		self,
-		add_account_callback: Callable,
+		add_account_callback	: Callable,
+		random_pwd_callback		: Callable[[], str],
 		*args,
 		**kwargs
 	):
@@ -34,7 +35,7 @@ class NewAccountDialog(MDDialog):
 			title="Password",
 			icon="key",
 			trailing_icon="auto-fix",
-			trailing_callback=self._generate_pwd
+			trailing_callback=lambda *_: setattr(self.password_field, "text", random_pwd_callback())
 		)
 		self.description_field			= InputField(
 			title="Description",
@@ -97,6 +98,3 @@ class NewAccountDialog(MDDialog):
 			password=password,
 			description=description
 		)
-
-	def _generate_pwd(self):
-		self.password_field.text = PwdManager.generate_random_pwd()

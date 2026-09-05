@@ -82,3 +82,6 @@ class SettingsScreen(MDScreen):
 
 	def on_leave(self, *args):
 		self.settings_obj.sync_to_file()
+
+		pwd_gen_config = self.settings_obj.get_pwd_gen_config()
+		self.pwd_manager.set_pwd_gen_config(pwd_gen_config)

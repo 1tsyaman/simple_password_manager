@@ -13,6 +13,7 @@ from core.encrypt import (
 from core.entry import Entry
 from core.keys import derive_key
 from core.totp import TOTP_Config
+from core.types import config_t
 from core.errors import (
 	PasswordError,
 	PasswordRequirementsError,
@@ -41,9 +42,6 @@ PWD_LENGTH		= 24
 PWD			= "pwd"
 TOTP_SECRET	= "totp_secret"
 TOTP_URI	= "totp_uri"
-
-# Union type alias
-type config_t = str | int | bool
 
 class PwdManager:
 	"""
@@ -188,7 +186,7 @@ class PwdManager:
 		while True:
 			pwd = ""
 
-			for _ in range(PWD_LENGTH):
+			for _ in range(self.pwd_length):
 				pwd += rand.choice(chars)
 
 			satisfies, _ = self._pwd_satisfies_conditions(pwd)

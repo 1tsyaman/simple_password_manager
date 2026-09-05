@@ -9,6 +9,7 @@ import storage.io as io
 from core.encrypt import __atomic_write as atomic_write
 from core.authenticate import generate_tag, is_authentic
 from core.keys import derive_key
+from core.types import config_t
 from core.errors import (
 	NoSettingsFileError,
 	InvalidJSONError,
@@ -109,6 +110,9 @@ class Settings:
 			return
 
 		self.settings[section][key] = value
+
+	def get_pwd_gen_config(self) -> dict[str, config_t]:
+		return self.settings["Password Generation"]
 
 	"""
 		@raises:
