@@ -244,8 +244,28 @@ class Settings:
 			and _is_sublist(HMAC_SUBSECTIONS,		list(settings["HMAC"].keys()))
 
 	@staticmethod
-	def get_config_path(app_data_path: str):
-		return os.path.join(app_data_path, RELATIVE_CONFIG_PATH)
+	def get_config_path(app_data_path: str) -> str:
+		path = os.path.join(app_data_path, RELATIVE_CONFIG_PATH)
+		if not os.path.exists(path):
+			Settings._create_path(path)
+
+		return path
+
+	"""
+		Assumes that path is a path/to/file
+	"""
+	@staticmethod
+	def _create_path(path: str):
+		directry_path = os.path.dirname(path)
+
+		try:
+			os.makedirs(directry_path)
+		except FileExistsError:
+			# directory already exists
+			pass
+
+		# create the file
+		open(path, 'a').close()
 
 
 def _is_sublist(ls1: list, ls2: list):
