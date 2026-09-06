@@ -34,15 +34,6 @@ class VaultSession:
 		password		: str,
 		new_vault		: bool = False
 	) -> None:
-		self.app_data_path	= app_data_path
-		self.vault_path		= os.path.join(app_data_path, vault_name + VAULT_ENDING)
-
-		if new_vault:
-			self.salt = get_random_salt()
-			io.create_path(self.vault_path)
-		else:
-			self.salt = get_salt_from_vault(self.vault_path)
-
 		satisfies, reason = password_satisfies_explicit_conditions(password)
 
 		if not satisfies:
@@ -53,20 +44,69 @@ class VaultSession:
 			else:
 				raise PasswordError
 
+		self.app_data_path	= app_data_path
+		self.vault_path		= os.path.join(app_data_path, vault_name + VAULT_ENDING)
+
+		if new_vault:
+			self.salt = get_random_salt()
+			io.create_path(self.vault_path)
+		else:
+			self.salt = get_salt_from_vault(self.vault_path)
+
 		# derrive master key
 		_, master_key = derive_master_key(
 			pwd=password,
 			salt=self.salt
 		)
 
-		self.vault_key = derive_subkey(
-			master_key=master_key,
-			purpose="vault-encryption"
+		self.vault_key	= self._derive_vault_key(master_key)
+		self.auth_key 	= self._derive_auth_key(master_key)
+
+	"""
+		@raises:
+			- PasswordRequirementsError(reason)
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- KeyDerivationError
+			- OverflowError
+			- OSError
+	"""
+	def modify_master_password(
+		self,
+		password	: str,
+		pwd_manager	: PwdManager,
+		settings	: Settings | None = None	# temporary
+	):
+		satisfies, reason = password_satisfies_explicit_conditions(password)
+		
+		if not satisfies:
+			raise PasswordRequirementsError(
+				reason=reason
+			)
+
+		self.salt, master_key = derive_master_key(password)
+
+		self.vault_key	= self._derive_vault_key(master_key)
+		self.auth_key	= self._derive_auth_key(master_key)
+
+		pwd_manager.set_key_salt_pair(
+			key=self.vault_key,
+			salt=self.salt
 		)
-		self.auth_key = derive_subkey(
-			master_key=master_key,
-			purpose="settings-auth"
-		)
+
+		if settings is not None:
+			settings.set_key_salt_pair(
+				key=self.auth_key,
+				salt=self.salt
+			)
+
+		"""
+			TODO: Encrypt both atomically -> one json file
+			{
+				"vault":	{actual vault json content},
+				"settings":	{actual settings json content}
+			}
+		"""
 
 	"""
 		@raises:
@@ -108,6 +148,7 @@ class VaultSession:
 		return Settings.load_settings(
 			app_data_path=self.app_data_path,
 			key=self.auth_key,
+			salt=self.salt
 		)
 
 	"""
@@ -120,4 +161,18 @@ class VaultSession:
 			app_data_path=self.app_data_path,
 			key=self.auth_key,
 			salt=self.salt
+		)
+
+	@staticmethod
+	def _derive_vault_key(master_key: bytes) -> bytes:
+		return derive_subkey(
+			master_key=master_key,
+			purpose="vault-encryption"
+		)
+
+	@staticmethod
+	def _derive_auth_key(master_key: bytes) -> bytes:
+		return derive_subkey(
+			master_key=master_key,
+			purpose="settings-auth"
 		)

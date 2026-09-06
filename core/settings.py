@@ -64,6 +64,14 @@ class Settings:
 
 		self.settings[section][key] = value
 
+	def set_key_salt_pair(
+		self,
+		key:	bytes,
+		salt:	bytes
+	):
+		self._key	= key
+		self._salt	= salt
+
 	def get_pwd_gen_config(self) -> dict[str, config_t]:
 		return self.settings["Password Generation"]
 
@@ -124,6 +132,7 @@ class Settings:
 	def load_settings(
 		app_data_path	: str,
 		key				: bytes,
+		salt			: bytes,
 	) -> Settings:
 		config_path = Settings.get_config_path(app_data_path)
 
@@ -144,10 +153,7 @@ class Settings:
 			raise InvalidSettingsFile
 
 		hmac = settings.pop("HMAC")
-
-		salt = bytes.fromhex(hmac["Salt"])
 		hash = bytes.fromhex(hmac["Hash"])
-
 		data = Settings.encode_data(settings)
 
 		if not is_authentic(data, key, hash):

@@ -31,7 +31,7 @@ from core.errors import (
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
 
-def _init(argv: list[str]) -> PwdManager | int:
+def _init(argv: list[str]) -> tuple[VaultSession, PwdManager] | int:
 	parser = argparse.ArgumentParser(
 		description="Simple Password Manager CLI"
 	)
@@ -110,7 +110,6 @@ def _init(argv: list[str]) -> PwdManager | int:
 		pwd = act.grab_master_password(new=True)
 
 		try:
-			# TODO: After adding settings feature to CLI, move logic out of load_vault here
 			vault_session = VaultSession(
 				app_data_path=directory,
 				vault_name=vault_name,
@@ -133,9 +132,12 @@ def _init(argv: list[str]) -> PwdManager | int:
 			sleep(100)
 			return -1
 
-	return pwd_manager
+	return vault_session, pwd_manager
 
-def _main_loop(pwd_manager: PwdManager):
+def _main_loop(
+	vault_session	: VaultSession,
+	pwd_manager		: PwdManager
+):
 	index = 0
 	modified = False
 
@@ -178,7 +180,7 @@ def _main_loop(pwd_manager: PwdManager):
 						act.gen_rand_password(pwd_manager)
 						break
 					case "m":
-						modified |= act.modify_master_password(pwd_manager)
+						modified |= act.modify_master_password(vault_session, pwd_manager)
 						break
 					case "f":
 						entry = act.search_entries(pwd_manager)
@@ -257,15 +259,20 @@ def timeout_exit() -> None:
 def main(argv):
 	pwd_manager: PwdManager | int = -1
 	try:
-		pwd_manager = _init(argv)
+		res = _init(argv)
 
-		if not isinstance(pwd_manager, PwdManager):	# returns int if it fails
+		if isinstance(res, int):	# returns int if it fails
 			sleep(2)
 			quit_program(exit_code=pwd_manager, message="Failed to initalize PwdManager object.")
 
 		sleep(1)	# show success before clearing the screen
 
-		_main_loop(pwd_manager)
+		vault_session, pwd_manager = res
+
+		_main_loop(
+			vault_session=vault_session,
+			pwd_manager=pwd_manager
+		)
 		quit_program(exit_code=0, message="Goodbye")
 
 	except KeyboardInterrupt:				# this covers two cases: timeout, or ctrl+c input by user

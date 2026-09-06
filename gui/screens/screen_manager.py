@@ -327,6 +327,7 @@ class AppScreenManager(MDScreenManager):
 			error_title="Error",
 			error_message=f"{error_message} Loading default settings."
 		)
+
 		try:
 			return vault_session.create_settings()
 		except:

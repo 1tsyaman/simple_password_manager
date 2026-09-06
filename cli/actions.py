@@ -1,5 +1,6 @@
 from time import sleep
 from core.pwd_manager import PwdManager
+from core.vault_loader import VaultSession
 from core.constants import MIN_PWD_LENGTH
 from core.passwords import password_satisfies_explicit_conditions
 from core.entry import Entry
@@ -167,7 +168,10 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 						return modified
 
 
-def modify_master_password(pwd_manager: PwdManager) -> bool:
+def modify_master_password(
+	vault_session	: VaultSession,
+	pwd_manager		: PwdManager
+) -> bool:
 	clear_screen()
 
 	print("Enter your new master password or leave empty to go back.")
@@ -182,7 +186,10 @@ def modify_master_password(pwd_manager: PwdManager) -> bool:
 
 		if key == "y":
 			try:
-				pwd_manager.modify_master_password(pwd)
+				vault_session.modify_master_password(
+					password=pwd,
+					pwd_manager=pwd_manager
+				)
 
 			except FileNotFoundError as e:
 				print(f"Master password update failed: Vault file path is incorrect: {e}")

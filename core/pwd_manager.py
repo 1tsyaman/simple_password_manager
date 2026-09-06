@@ -77,38 +77,6 @@ class PwdManager:
 ####	Vault modifiers		####
 
 	"""
-		@raises:
-			- PasswordRequirementsError(reason)
-			- FileNotFoundError(path) [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- OverflowError
-			- OSError
-	"""
-	def modify_master_password(
-		self: PwdManager,
-		pwd	: str
-	) -> None:
-		satisfies, reason = self._pwd_satisfies_conditions(pwd)
-
-		if not satisfies:
-			raise PasswordRequirementsError(reason=reason)
-
-		salt, key = derive_master_key(pwd)
-		old_key, old_salt = self._key, self._salt
-
-		self._key	= key
-		self._salt	= salt
-
-		# rewrite the vault file to update the password
-		try:
-			self.encrypt()
-		except BaseException:
-			self._key	= old_key
-			self._salt	= old_salt
-			raise
-
-	"""
 		encrypts the PwdManager object and writes it into the vault file
 		{
 			"(website, username, description)": {
@@ -179,6 +147,14 @@ class PwdManager:
 				case "use_special":
 					assert isinstance(value, bool)
 					self.use_special = value
+
+	def set_key_salt_pair(
+		self,
+		key:	bytes,
+		salt:	bytes
+	):
+		self._key	= key
+		self._salt	= salt
 
 	def generate_random_pwd(self):
 		chars = self._get_char_list()
@@ -734,27 +710,6 @@ class PwdManager:
 		return pwd_manager
 
 ####	Private statics		####
-
-	"""
-		creates a PwdManager object and initializes the vault file
-		@raises:
-			- FileNotFoundError(path) [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- OSError
-	"""
-	@staticmethod
-	def _pwd_manager_from_pwd(
-		path	: str,
-		pwd		: str
-	) -> PwdManager:
-		salt, key = derive_master_key(pwd)
-
-		return PwdManager.pwd_manager_from_key(
-			path=path,
-			key=key,
-			salt=salt
-		)
 
 	@staticmethod
 	def _has_correct_format(data: object) -> bool:
