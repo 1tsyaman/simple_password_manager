@@ -4,15 +4,14 @@ from argon2.exceptions import HashingError
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-
 from core.errors import KeyDerivationError
-
-KEY_LEN				= 32		# 32 bytes = 256-bit AES key
-SALT_LEN			= 16		# 16 random bytes is a good salt size
-
-ARGON2_TIME_COST	= 3
-ARGON2_MEMORY_COST	= 64 * 1024	# 64 MiB, value is in KiB
-ARGON2_PARALLELISM	= 1
+from core.constants import (
+	KEY_LEN,
+	SALT_LEN,
+	ARGON2_TIME_COST,
+	ARGON2_MEMORY_COST,
+	ARGON2_PARALLELISM
+)
 
 """
 	Uses expensive Argon2 to derive a master key from

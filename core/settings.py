@@ -17,53 +17,15 @@ from core.errors import (
 	SettingsKeyNotSetError,
 	log
 )
-
-RELATIVE_CONFIG_PATH = "config/settings.json"
-
-SETTINGS_DICT_SECTIONS	= [
-	"Password Generation",
-	"Security",
-	"Others",
-	"HMAC"
-]
-
-PWD_GEN_SUBSECTIONS		= [
-	"special_chars",
-	"password_length",
-	"use_uppercase",
-	"use_digits",
-	"use_special",
-]
-SECURITY_SUBSECTIONS	= [
-	"timeout_duration",
-	"lock_on_minimize",
-]
-OTHERS_SUBSECTIONS		= [
-	"theme"
-]
-HMAC_SUBSECTIONS		= [
-	"Salt",
-	"Hash"
-]
-
-DEFAULT_SETTINGS = {
-	"Password Generation": {
-		"special_chars":		"!\"#$%&'()*+,-./:<=>?@[\\]^_`{|}~",
-		"password_length":		24,
-		"use_uppercase":		True,
-		"use_digits":			True,
-		"use_special":			True
-	},
-
-	"Security":	{
-		"timeout_duration":		60,
-		"lock_on_minimize":		True,
-	},
-
-	"Others": {
-		"theme":				"Light"
-	}
-}
+from core.constants import (
+	RELATIVE_CONFIG_PATH,
+	SETTINGS_DICT_SECTIONS,
+	PWD_GEN_SUBSECTIONS,
+	SECURITY_SUBSECTIONS,
+	OTHERS_SUBSECTIONS,
+	HMAC_SUBSECTIONS,
+	DEFAULT_SETTINGS
+)
 
 class Settings:
 	"""
@@ -242,26 +204,9 @@ class Settings:
 	def get_config_path(app_data_path: str) -> str:
 		path = os.path.join(app_data_path, RELATIVE_CONFIG_PATH)
 		if not os.path.exists(path):
-			Settings._create_path(path)
+			io.create_path(path)
 
 		return path
-
-	"""
-		Assumes that path is a path/to/file
-	"""
-	@staticmethod
-	def _create_path(path: str):
-		directry_path = os.path.dirname(path)
-
-		try:
-			os.makedirs(directry_path)
-		except FileExistsError:
-			# directory already exists
-			pass
-
-		# create the file
-		open(path, 'a').close()
-
 
 def _is_sublist(ls1: list, ls2: list):
 	return all(elem in ls2 for elem in ls1)

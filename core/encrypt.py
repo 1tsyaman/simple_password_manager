@@ -15,18 +15,13 @@ from core.errors import (
 	VaultFormatError,
 	CorruptedVaultError
 )
-
-NONCE			= "nonce"
-CIPHERTEXT		= "ciphertext"
-ASSOCIATED_DATA	= "associated_data"
-SALT			= "salt"
-
-RECORD_KEYS = [
+from core.constants import (
 	NONCE,
 	CIPHERTEXT,
 	ASSOCIATED_DATA,
-	SALT
-]
+	SALT,
+	RECORD_KEYS
+)
 
 """
 	@raises:

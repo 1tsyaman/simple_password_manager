@@ -1,10 +1,17 @@
 import os
 
-from storage.io import VAULT_ENDING
+from storage.constants import VAULT_ENDING
 from core.encrypt import get_salt_from_vault
 from core.keys import derive_master_key, derive_subkey, get_random_salt
 from core.pwd_manager import PwdManager
 from core.settings import Settings
+from core.passwords import password_satisfies_explicit_conditions
+from core.errors import (
+	PasswordError,
+	PasswordRequirementsError
+)
+
+import storage.io as io
 
 class VaultSession:
 	vault_path	: str
@@ -16,6 +23,8 @@ class VaultSession:
 		@raises:
 			- FileNotFoundError(path) [OSError]
 			- VaultFormatError
+			- PasswordRequirementsError
+			- PasswordError
 			- OSError
 	"""
 	def __init__(
@@ -30,8 +39,19 @@ class VaultSession:
 
 		if new_vault:
 			self.salt = get_random_salt()
+			io.create_path(self.vault_path)
 		else:
 			self.salt = get_salt_from_vault(self.vault_path)
+
+		satisfies, reason = password_satisfies_explicit_conditions(password)
+
+		if not satisfies:
+			if new_vault:
+				raise PasswordRequirementsError(
+					reason=reason
+				)
+			else:
+				raise PasswordError
 
 		# derrive master key
 		_, master_key = derive_master_key(

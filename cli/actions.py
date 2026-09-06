@@ -1,6 +1,7 @@
-import sys
 from time import sleep
-from core.pwd_manager import PwdManager, MIN_PWD_LENGTH
+from core.pwd_manager import PwdManager
+from core.constants import MIN_PWD_LENGTH
+from core.passwords import password_satisfies_explicit_conditions
 from core.entry import Entry
 from core.errors import (
 	KeyLengthError,
@@ -29,7 +30,7 @@ def add_entry(pwd_manager: PwdManager) -> bool:
 	key = get_key()
 
 	if key == 'y':
-		password = PwdManager.generate_random_pwd()
+		password = pwd_manager.generate_random_pwd()
 
 		if safe_copy(password):
 			print(f"password = {str_color(password, 'r')} was copied to clipboard")
@@ -312,12 +313,12 @@ def grab_master_password(new=False) -> str:
 
 	while pwd != pwd_conf:
 		pwd = input_password("Enter master password: ")
-		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+		satisfies, reason = password_satisfies_explicit_conditions(pwd)
 
 		while (new and not satisfies):
 			display_password_rejection_reason(reason=reason, min_len=MIN_PWD_LENGTH)
 			pwd = input_password("Enter master password: ")
-			satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+			satisfies, reason = password_satisfies_explicit_conditions(pwd)
 
 		if not new:
 			break
@@ -421,10 +422,10 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 	
 	return True
 
-def gen_rand_password() -> None:
+def gen_rand_password(pwd_manager: PwdManager) -> None:
 	clear_screen()
 
-	pwd = PwdManager.generate_random_pwd()
+	pwd = pwd_manager.generate_random_pwd()
 	if safe_copy(pwd):
 		print(f"Your random password {str_color(pwd, 'r')} was copied to clipboard!")
 	else:

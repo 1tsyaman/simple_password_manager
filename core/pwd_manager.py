@@ -8,14 +8,12 @@ from copy import deepcopy
 from core.encrypt import (
 	encrypt_data,
 	decrypt_data,
-	get_key_from_pwd
 )
 from core.entry import Entry
 from core.keys import derive_master_key
 from core.totp import TOTP_Config
 from core.types import config_t
 from core.errors import (
-	PasswordError,
 	PasswordRequirementsError,
 	EntryExistsError,
 	NoSuchEntryError,
@@ -27,21 +25,23 @@ from core.errors import (
 	QRDecodeError,
 	log
 )
+from core.passwords import (
+	password_satisfies_explicit_conditions,
+	generate_random_password,
+	LETTERS_LOWER,
+	LETTERS_UPPER,
+	DIGITS,
+	SPECIAL_CHARS,
+	PWD_LENGTH
+)
+from core.constants import (
+	PWD,
+	TOTP_SECRET,
+	TOTP_URI
+)
 
 from storage.qr_reader import read_qr_code
 
-# Config
-LETTERS_LOWER	= [l for l in "abcdefghijklmnopqrstuvwxyz"]
-LETTERS_UPPER	= [l.upper() for l in LETTERS_LOWER]
-DIGITS			= [d for d in "1234567890"]
-SPECIAL_CHARS	= [s for s in "!\"#$%&'()*+,-./:<=>?@[\\]^_`{|}~"]
-MIN_PWD_LENGTH	= 8
-PWD_LENGTH		= 24
-
-# Keywords
-PWD			= "pwd"
-TOTP_SECRET	= "totp_secret"
-TOTP_URI	= "totp_uri"
 
 class PwdManager:
 	"""
@@ -183,17 +183,13 @@ class PwdManager:
 	def generate_random_pwd(self):
 		chars = self._get_char_list()
 
-		while True:
-			pwd = ""
-
-			for _ in range(self.pwd_length):
-				pwd += rand.choice(chars)
-
-			satisfies, _ = self._pwd_satisfies_conditions(pwd)
-			if satisfies:
-				break
-
-		return pwd
+		return generate_random_password(
+			chars=chars,
+			password_length=self.pwd_length,
+			use_digits=self.use_digits,
+			use_uppercase=self.use_uppercase,
+			use_special=self.use_special
+		)
 
 ####	Entry modifiers		####
 
@@ -529,14 +525,15 @@ class PwdManager:
 		self,
 		pwd: str,
 	) -> tuple[bool, str]:
-		return PwdManager._pwd_satisfies_explicit_conditions(
-			pwd=pwd,
-			pwd_length=self.pwd_length,
+		return password_satisfies_explicit_conditions(
+			password=pwd,
+			password_length=self.pwd_length,
 			use_digits=self.use_digits,
 			use_uppercase=self.use_uppercase,
 			use_special=self.use_special,
 			special_chars=self.special_chars
 		)
+
 	def __remove_entry(self: PwdManager, entry: Entry) -> None:
 		self.entries.pop(entry)
 
@@ -639,38 +636,6 @@ class PwdManager:
 
 	"""
 		@raises:
-			- PasswordError
-			- FileNotFoundError(path) [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- VaultFormatError
-			- CorruptedVaultError
-			- InconsistentVaultState
-			- OSError
-	"""
-	@staticmethod
-	def from_encrypted_file_pwd(
-		path: str,
-		pwd: str
-	) -> PwdManager:
-		satisfies, _ = PwdManager._pwd_satisfies_explicit_conditions(pwd)
-
-		if not satisfies:
-			raise PasswordError
-
-		salt, key = get_key_from_pwd(
-			pwd=pwd,
-			file_path=path
-		)
-
-		return PwdManager.from_encrypted_file_key(
-			path=path,
-			key=key,
-			salt=salt
-		)
-
-	"""
-		@raises:
 			- FileNotFoundError(path) [OSError]
 			- KeyLengthError
 			- VaultFormatError
@@ -695,15 +660,7 @@ class PwdManager:
 			file_path=path
 		)
 
-		if not PwdManager._has_new_format(data):
-			# Fallback
-			if PwdManager._has_old_format(data):
-				return PwdManager._from_encrypted_file_old(
-					path=path,
-					key=key,
-					salt=salt
-				)
-
+		if not PwdManager._has_correct_format(data):
 			raise VaultFormatError
 
 		for tup in data:
@@ -776,109 +733,7 @@ class PwdManager:
 
 		return pwd_manager
 
-	"""
-		@raises:
-			- PasswordRequirementsError(reason)
-			- FileNotFoundError(path) [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- OSError
-	"""
-	@staticmethod
-	def pwd_manager_from_pwd(
-		path	: str,
-		pwd		: str
-	) -> PwdManager:
-		satisfies, reason = PwdManager._pwd_satisfies_explicit_conditions(pwd)
-
-		if not satisfies:
-			raise PasswordRequirementsError(
-				reason=reason
-			)
-
-		pwd_manager = PwdManager._pwd_manager_from_pwd(
-			path=path,
-			pwd=pwd
-		)
-		return pwd_manager
-
 ####	Private statics		####
-
-	"""
-		*This is the old format (pre TOTP support)*
-
-		decrypted_data has the following form:
-		{
-			"website, username, description": password,
-			.
-			.
-			.
-		}
-
-		@raises:
-			- PasswordError
-			- FileNotFoundError [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- VaultFormatError
-			- CorruptedVaultError
-			- OSError
-	"""
-	@staticmethod
-	def _from_encrypted_file_old(
-		path	: str,
-		key		: bytes,
-		salt	: bytes,
-	) -> PwdManager:
-		pwd_manager = PwdManager()
-
-		pwd_manager.file_path 	= path
-		pwd_manager._key		= key
-		pwd_manager._salt		= salt
-
-		data: dict[str, str] = decrypt_data(
-			key=key,
-			file_path=path
-		)
-
-		try:
-			for tup in data:
-				website, username, description = (
-					value.strip()
-						for value in tup.split(",", 2)
-				)
-
-				try:
-					pwd_manager.add_entry(
-						website=website,
-						username=username,
-						description=description,
-						password=data[tup]
-					)
-				except EntryExistsError:
-					# Fallback to avoid data loss
-					while True:
-						random = rand.randint(1, 1000)
-						website = website + f"_dup_{random}"
-						try:
-							pwd_manager.add_entry(
-								website=website,
-								username=username,
-								description=description,
-								password=data[tup]
-							)
-							break
-						except EntryExistsError:
-							continue
-
-		except (
-			KeyError,
-			TypeError,
-			ValueError
-		) as e:
-			raise VaultFormatError from e
-
-		return pwd_manager
 
 	"""
 		creates a PwdManager object and initializes the vault file
@@ -902,7 +757,7 @@ class PwdManager:
 		)
 
 	@staticmethod
-	def _has_new_format(data: object) -> bool:
+	def _has_correct_format(data: object) -> bool:
 		return 	isinstance(data, dict) 	\
 			and all(
 					isinstance(key, str)
@@ -912,54 +767,3 @@ class PwdManager:
 					and isinstance(value.get(TOTP_URI), str)
 						for key, value in data.items()
 				)
-
-	@staticmethod
-	def _has_old_format(data: object) -> bool:
-		return isinstance(data, dict) 	\
-			and all(
-					isinstance(key, str)
-					and len(key.split(",", 2)) == 3
-					and isinstance(value, str)
-						for key, value in data.items()
-				)
-
-	@staticmethod
-	def _pwd_satisfies_explicit_conditions(
-		pwd				: str,
-		pwd_length		: int		= MIN_PWD_LENGTH,
-		use_digits		: bool		= True,
-		use_uppercase 	: bool		= True,
-		use_special		: bool		= True,
-		special_chars	: list[str]	= SPECIAL_CHARS,
-	) -> tuple[bool, str]:
-		if len(pwd) < pwd_length:
-			return False, f'must be at least {pwd_length} characters long'
-
-		if use_digits:
-			for digit in DIGITS:
-				if digit in pwd:
-					break
-			else:
-				return False, 'must contain at least one digit'
-
-		for letter in LETTERS_LOWER:
-			if letter in pwd:
-				break
-		else:
-			return False, 'must contain at least one lowercase character'
-
-		if use_uppercase:
-			for letter in LETTERS_UPPER:
-				if letter in pwd:
-					break
-			else:
-				return False, 'must contain at least one uppercase character'
-
-		if use_special:
-			for spec in special_chars:
-				if spec in pwd:
-					break
-			else:
-				return False, 'must contain at least one special character'
-
-		return True, ''

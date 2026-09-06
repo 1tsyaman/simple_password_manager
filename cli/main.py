@@ -25,6 +25,7 @@ from core.errors import (
 	CorruptedVaultError,
 	PasswordRequirementsError,
 	InconsistentVaultState,
+	log
 )
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
@@ -53,6 +54,7 @@ def _init(argv: list[str]) -> PwdManager | int:
 		pwd = act.grab_master_password()
 
 		try:
+			# TODO: After adding settings feature to CLI, move logic out of load_vault here
 			pwd_manager = load_vault(path, pwd)
 		except PasswordError:
 			print("Vault loading failed: Password incorrect")
@@ -102,6 +104,7 @@ def _init(argv: list[str]) -> PwdManager | int:
 		pwd = act.grab_master_password(new=True)
 
 		try:
+			# TODO: After adding settings feature to CLI, move logic out of load_vault here
 			pwd_manager = create_and_load_vault(path, pwd)
 		except KeyLengthError:
 			print("Vault creation failed: Key length is unexpected")
@@ -114,6 +117,8 @@ def _init(argv: list[str]) -> PwdManager | int:
 			return -1
 		except OSError as e:
 			print(f"Vault creation failed: {e}")
+			log("FAILED", e)
+			sleep(100)
 			return -1
 
 	return pwd_manager
@@ -158,7 +163,7 @@ def _main_loop(pwd_manager: PwdManager):
 						modified |= act.add_entry(pwd_manager)
 						break
 					case "g":
-						act.gen_rand_password()
+						act.gen_rand_password(pwd_manager)
 						break
 					case "m":
 						modified |= act.modify_master_password(pwd_manager)

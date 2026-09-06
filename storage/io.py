@@ -5,14 +5,14 @@ import importlib
 from pathlib import Path
 
 from core.pwd_manager import PwdManager
+from core.vault_loader import VaultSession
 from core.errors import (
 	InvalidJSONError,
 )
-
-VAULT_ENDING = ".vault"
-INVALID_PATH_ERROR	= "Given vault path does not exist"
-DEBUG = False
-
+from storage.constants import (
+	VAULT_ENDING,
+	DEBUG
+)
 """
 	@returns the private app data path if on android
 	@returns the executable binary directory if on windows/linux
@@ -78,12 +78,15 @@ def load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdMana
 			- OSError
 """
 def load_vault(path: str, pwd: str) -> PwdManager:
-	if not Path(path).exists():
-		raise FileNotFoundError
+	dir				= os.path.dirname(path)
+	vault_name, _	= os.path.splitext(os.path.basename(path))
+	vault_session = VaultSession(
+		app_data_path=dir,
+		vault_name=vault_name,
+		password=pwd
+	)
 
-	pwd_manager = PwdManager.from_encrypted_file_pwd(path, pwd)
-
-	return pwd_manager
+	return vault_session.get_pwd_manager()
 
 """
 	@raises:
@@ -107,30 +110,17 @@ def load_settings(path: str) -> dict[str, dict]:
 		- KeyDerivationError
 		- OSError
 """
-def create_and_load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdManager:
-	path = os.path.join(app_data_path, vault_name + VAULT_ENDING)
-
-	try:
-		return create_and_load_vault(path=path, pwd=pwd)
-	except Exception:
-		os.remove(path)	# remove file if created
-		raise			# raise the exception that was caught here
-
-"""
-	@raises:
-		- FileNotFoundError(path) [OSError]
-		- PasswordRequirementsError(reason)
-		- KeyLengthError
-		- KeyDerivationError
-		- OSError
-"""
 def create_and_load_vault(path: str, pwd: str) -> PwdManager:
-	
-	Path(path).touch()
-	
-	pwd_manager = PwdManager.pwd_manager_from_pwd(path, pwd)
+	dir				= os.path.dirname(path)
+	vault_name, _	= os.path.splitext(os.path.basename(path))
+	vault_session = VaultSession(
+		app_data_path=dir,
+		vault_name=vault_name,
+		password=pwd,
+		new_vault=True
+	)
 
-	return pwd_manager
+	return vault_session.create_pwd_manager()
 
 """
 	@raises:
@@ -185,3 +175,15 @@ def get_unique_image_path_with_prefix(
 			return os.path.join(dir, file)
 
 	raise FileNotFoundError
+
+"""
+	Assumes that path is a path/to/file
+"""
+def create_path(path: str):
+	directory_path = os.path.dirname(path)
+
+	if directory_path != "":
+		os.makedirs(directory_path, exist_ok=True)
+
+	# create the file
+	open(path, 'a').close()
