@@ -4,8 +4,6 @@ import json
 import importlib
 from pathlib import Path
 
-from core.pwd_manager import PwdManager
-from core.vault_loader import VaultSession
 from core.errors import (
 	InvalidJSONError,
 )
@@ -50,43 +48,12 @@ def get_app_data_path() -> Path:
 def get_vault_list(dir: str) -> list[str]:
 	return [file[:-6] for file in os.listdir(dir) if file.endswith(VAULT_ENDING)]
 
-"""
-	@raises:
-			- PasswordError
-			- FileNotFoundError(path) [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- VaultFormatError
-			- CorruptedVaultError
-			- InconsistentVaultState
-			- OSError
-"""
-def load_vault_for_gui(app_data_path: str, vault_name: str, pwd: str) -> PwdManager:
-	path = os.path.join(app_data_path, vault_name + VAULT_ENDING)
 
-	return load_vault(path=path, pwd=pwd)
-
-"""
-	@raises:
-			- PasswordError
-			- FileNotFoundError(path) [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- VaultFormatError
-			- CorruptedVaultError
-			- InconsistentVaultState
-			- OSError
-"""
-def load_vault(path: str, pwd: str) -> PwdManager:
+def get_dir_path_and_vault_name(path: str) -> tuple[str, str]:
 	dir				= os.path.dirname(path)
 	vault_name, _	= os.path.splitext(os.path.basename(path))
-	vault_session = VaultSession(
-		app_data_path=dir,
-		vault_name=vault_name,
-		password=pwd
-	)
 
-	return vault_session.get_pwd_manager()
+	return dir, vault_name
 
 """
 	@raises:
@@ -102,25 +69,6 @@ def load_settings(path: str) -> dict[str, dict]:
 	except (json.JSONDecodeError, UnicodeDecodeError):
 		raise InvalidJSONError
 
-"""
-	@raises:
-		- FileNotFoundError(path) [OSError]
-		- PasswordRequirementsError(reason)
-		- KeyLengthError
-		- KeyDerivationError
-		- OSError
-"""
-def create_and_load_vault(path: str, pwd: str) -> PwdManager:
-	dir				= os.path.dirname(path)
-	vault_name, _	= os.path.splitext(os.path.basename(path))
-	vault_session = VaultSession(
-		app_data_path=dir,
-		vault_name=vault_name,
-		password=pwd,
-		new_vault=True
-	)
-
-	return vault_session.create_pwd_manager()
 
 """
 	@raises:

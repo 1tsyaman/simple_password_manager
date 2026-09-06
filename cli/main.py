@@ -10,11 +10,12 @@ from typing import Never
 import cli.actions as act
 
 from core.pwd_manager import PwdManager
+from core.vault_loader import VaultSession
 from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
 from cli.display import display_list, clear_screen, print_footer
 from cli.util import format_prev_next_str, is_valid_index
-from storage.io import load_vault, create_and_load_vault, vault_exists, delete_file
+from storage.io import vault_exists, delete_file, get_dir_path_and_vault_name
 from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
 
 from core.errors import (
@@ -49,13 +50,18 @@ def _init(argv: list[str]) -> PwdManager | int:
 	init_watchdog(exit_func=timeout_exit)
 
 	path = args.path
+	directory, vault_name = get_dir_path_and_vault_name(path)
 
 	if not args.create:
 		pwd = act.grab_master_password()
 
 		try:
-			# TODO: After adding settings feature to CLI, move logic out of load_vault here
-			pwd_manager = load_vault(path, pwd)
+			vault_session = VaultSession(
+				app_data_path=directory,
+				vault_name=vault_name,
+				password=pwd
+			)
+			pwd_manager = vault_session.get_pwd_manager()
 		except PasswordError:
 			print("Vault loading failed: Password incorrect")
 			return -1
@@ -105,7 +111,13 @@ def _init(argv: list[str]) -> PwdManager | int:
 
 		try:
 			# TODO: After adding settings feature to CLI, move logic out of load_vault here
-			pwd_manager = create_and_load_vault(path, pwd)
+			vault_session = VaultSession(
+				app_data_path=directory,
+				vault_name=vault_name,
+				password=pwd,
+				new_vault=True
+			)
+			pwd_manager = vault_session.create_pwd_manager()
 		except KeyLengthError:
 			print("Vault creation failed: Key length is unexpected")
 			return -1
