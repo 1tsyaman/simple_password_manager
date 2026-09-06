@@ -81,7 +81,7 @@ def load_vault(path: str, pwd: str) -> PwdManager:
 	if not Path(path).exists():
 		raise FileNotFoundError
 
-	pwd_manager = PwdManager.from_encrypted_file(path, pwd)
+	pwd_manager = PwdManager.from_encrypted_file_pwd(path, pwd)
 
 	return pwd_manager
 

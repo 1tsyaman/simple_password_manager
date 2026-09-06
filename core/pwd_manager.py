@@ -11,7 +11,7 @@ from core.encrypt import (
 	get_key_from_pwd
 )
 from core.entry import Entry
-from core.keys import derive_key
+from core.keys import derive_master_key
 from core.totp import TOTP_Config
 from core.types import config_t
 from core.errors import (
@@ -94,7 +94,7 @@ class PwdManager:
 		if not satisfies:
 			raise PasswordRequirementsError(reason=reason)
 
-		salt, key = derive_key(pwd)
+		salt, key = derive_master_key(pwd)
 		old_key, old_salt = self._key, self._salt
 
 		self._key	= key
@@ -635,7 +635,9 @@ class PwdManager:
 			.
 			.
 		}
+	"""
 
+	"""
 		@raises:
 			- PasswordError
 			- FileNotFoundError(path) [OSError]
@@ -647,7 +649,7 @@ class PwdManager:
 			- OSError
 	"""
 	@staticmethod
-	def from_encrypted_file(
+	def from_encrypted_file_pwd(
 		path: str,
 		pwd: str
 	) -> PwdManager:
@@ -656,16 +658,37 @@ class PwdManager:
 		if not satisfies:
 			raise PasswordError
 
-		pwd_manager = PwdManager()
-		pwd_manager.file_path = path
-
 		salt, key = get_key_from_pwd(
 			pwd=pwd,
 			file_path=path
 		)
 
-		pwd_manager._key	= key
-		pwd_manager._salt	= salt
+		return PwdManager.from_encrypted_file_key(
+			path=path,
+			key=key,
+			salt=salt
+		)
+
+	"""
+		@raises:
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- VaultFormatError
+			- CorruptedVaultError
+			- InconsistentVaultState
+			- OSError
+	"""
+	@staticmethod
+	def from_encrypted_file_key(
+		path	: str,
+		key		: bytes,
+		salt	: bytes
+	) -> PwdManager:
+		pwd_manager = PwdManager()
+
+		pwd_manager.file_path 	= path
+		pwd_manager._key		= key
+		pwd_manager._salt		= salt
 
 		data = decrypt_data(
 			key=key,
@@ -677,7 +700,8 @@ class PwdManager:
 			if PwdManager._has_old_format(data):
 				return PwdManager._from_encrypted_file_old(
 					path=path,
-					pwd=pwd
+					key=key,
+					salt=salt
 				)
 
 			raise VaultFormatError
@@ -726,6 +750,29 @@ class PwdManager:
 						message=f"Failed while setting up TOTP config"
 					)
 					raise InconsistentVaultState
+
+		return pwd_manager
+
+	"""
+		creates a PwdManager object and initializes the vault file
+		@raises:
+			- FileNotFoundError(path) [OSError]
+			- KeyLengthError
+			- OSError
+	"""
+	@staticmethod
+	def pwd_manager_from_key(
+		path	: str,
+		key		: bytes,
+		salt	: bytes,
+	) -> PwdManager:
+		pwd_manager = PwdManager(
+			path=path,
+			key=key,
+			salt=salt
+		)
+
+		pwd_manager.encrypt()
 
 		return pwd_manager
 
@@ -780,22 +827,14 @@ class PwdManager:
 	@staticmethod
 	def _from_encrypted_file_old(
 		path	: str,
-		pwd		: str
+		key		: bytes,
+		salt	: bytes,
 	) -> PwdManager:
-		satisfies, reason = PwdManager._pwd_satisfies_explicit_conditions(pwd)
-
-		if not satisfies:
-			raise PasswordError(f"Password does not meet the minimum requirements: {reason}")
-
 		pwd_manager = PwdManager()
-		pwd_manager.file_path = path
 
-		salt, key = get_key_from_pwd(
-			pwd=pwd,
-			file_path=path
-		)
-		pwd_manager._key	= key
-		pwd_manager._salt	= salt
+		pwd_manager.file_path 	= path
+		pwd_manager._key		= key
+		pwd_manager._salt		= salt
 
 		data: dict[str, str] = decrypt_data(
 			key=key,
@@ -854,17 +893,13 @@ class PwdManager:
 		path	: str,
 		pwd		: str
 	) -> PwdManager:
-		salt, key = derive_key(pwd)
+		salt, key = derive_master_key(pwd)
 
-		pwd_manager = PwdManager(
+		return PwdManager.pwd_manager_from_key(
 			path=path,
 			key=key,
 			salt=salt
 		)
-
-		pwd_manager.encrypt()
-
-		return pwd_manager
 
 	@staticmethod
 	def _has_new_format(data: object) -> bool:

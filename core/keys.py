@@ -2,6 +2,9 @@ import os
 from argon2.low_level import hash_secret_raw, Type
 from argon2.exceptions import HashingError
 
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
 from core.errors import KeyDerivationError
 
 KEY_LEN				= 32		# 32 bytes = 256-bit AES key
@@ -12,11 +15,14 @@ ARGON2_MEMORY_COST	= 64 * 1024	# 64 MiB, value is in KiB
 ARGON2_PARALLELISM	= 1
 
 """
+	Uses expensive Argon2 to derive a master key from
+		a password and a salt
+
 	@raises:
 		- OSError
 		- KeyDerivationError
 """
-def derive_key(
+def derive_master_key(
 	pwd: str,
 	salt: bytes = bytes(0)
 ) -> tuple[bytes,bytes]:
@@ -38,3 +44,19 @@ def derive_key(
 		raise KeyDerivationError from e
 
 	return salt, key
+
+def get_random_salt() -> bytes:
+	return os.urandom(SALT_LEN)
+
+def derive_subkey(
+	master_key	: bytes,
+	purpose		: str
+) -> bytes:
+	info = purpose.encode("utf-8")
+
+	return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=info,
+    ).derive(master_key)

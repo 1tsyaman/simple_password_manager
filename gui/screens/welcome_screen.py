@@ -17,6 +17,7 @@ from gui.widgets.welcome_screen.card_widgets import NoVaultWidget, OpenVaultWidg
 import storage.io as io
 
 from core.settings import Settings
+from core.vault_loader import VaultSession
 from core.errors import (
 	PasswordRequirementsError,
 	KeyLengthError,
@@ -157,19 +158,21 @@ class WelcomeScreen(MDScreen):
 			return
 
 		try:
-			app_data_path = self.app_data_path
-			io.create_and_load_vault_for_gui(app_data_path, name, password)
-
-			# Create a default settings file
-			Settings.from_password(
-				app_data_path=self.app_data_path,
-				password=password
+			vault_session = VaultSession(
+				app_data_path=app_data_path,
+				vault_name=name,
+				password=password,
+				new_vault=True
 			)
+
+			pwd_manager	= vault_session.create_pwd_manager()
+			settings	= vault_session.create_settings()
 
 			self.screen_manager.open_new_vault(
 				dialog=dialog,
 				vault_name=name,
-				password=password
+				pwd_manager=pwd_manager,
+				settings=settings
 			)
 
 		except FileNotFoundError:

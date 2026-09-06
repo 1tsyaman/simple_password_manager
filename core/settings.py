@@ -8,7 +8,6 @@ from pathlib import Path
 import storage.io as io
 from core.encrypt import __atomic_write as atomic_write
 from core.authenticate import generate_tag, is_authentic
-from core.keys import derive_key
 from core.types import config_t
 from core.errors import (
 	NoSettingsFileError,
@@ -134,12 +133,6 @@ class Settings:
 
 		atomic_write(settings, Path(self.config_path), indent=4)
 
-	def set_key(
-		self,
-		password: str
-	):
-		self._salt, self._key = derive_key(password)
-
 	"""
 		Overwrites the ./config/settings.json file with an authenticated
 			settings.json file containing the DEFAULT_SETTINGS
@@ -168,7 +161,7 @@ class Settings:
 	@staticmethod
 	def load_settings(
 		app_data_path	: str,
-		password		: str,
+		key				: bytes,
 	) -> Settings:
 		config_path = Settings.get_config_path(app_data_path)
 
@@ -193,11 +186,6 @@ class Settings:
 		salt = bytes.fromhex(hmac["Salt"])
 		hash = bytes.fromhex(hmac["Hash"])
 
-		_, key = derive_key(
-			pwd=password,
-			salt=salt
-		)
-
 		data = Settings.encode_data(settings)
 
 		if not is_authentic(data, key, hash):
@@ -210,14 +198,18 @@ class Settings:
 			salt=salt
 		)
 
+	"""
+		@raises:
+			- SettingsKeyNotSetError
+			- OSError
+	"""
 	@staticmethod
-	def from_password(
+	def from_key(
 		app_data_path	: str,
-		password		: str,
+		key				: bytes,
+		salt			: bytes,
 		settings		: dict[str, dict] = DEFAULT_SETTINGS,
 	) -> Settings:
-		salt, key = derive_key(password)
-
 		settings_obj = Settings(
 			app_data_path=app_data_path,
 			settings=settings,

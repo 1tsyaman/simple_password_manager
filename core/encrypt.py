@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
 
 from core.keys import (
-	derive_key,
+	derive_master_key,
 	KEY_LEN,
 	SALT_LEN
 )
@@ -98,18 +98,15 @@ def __encrypt_data(
 
 	return encrypted, nonce
 
-
 """
 	@raises:
 		- FileNotFoundError(path) [OSError]
 		- VaultFormatError
-		- KeyDerivationError
 		- OSError
 """
-def get_key_from_pwd(
-	pwd: str,
+def get_salt_from_vault(
 	file_path: str
-) -> tuple[bytes, bytes]:
+) -> bytes:
 	path = Path(file_path)
 
 	if not path.exists():
@@ -150,7 +147,22 @@ def get_key_from_pwd(
 	if len(salt) != SALT_LEN:
 		raise VaultFormatError
 
-	return derive_key(pwd, salt)
+	return salt
+
+"""
+	@raises:
+		- FileNotFoundError(path) [OSError]
+		- VaultFormatError
+		- KeyDerivationError
+		- OSError
+"""
+def get_key_from_pwd(
+	pwd: str,
+	file_path: str
+) -> tuple[bytes, bytes]:
+	salt = get_salt_from_vault(file_path)
+
+	return derive_master_key(pwd, salt)
 
 """
 	@raises:

@@ -17,6 +17,7 @@ from gui.widgets.vault_screen.search_bar import SearchBar
 
 from core.pwd_manager import PwdManager
 from core.settings import Settings
+from core.vault_loader import VaultSession
 from core.errors import (
 	PasswordError,
 	KeyLengthError,
@@ -95,30 +96,18 @@ class AppScreenManager(MDScreenManager):
 	"""
 	def open_new_vault(
 		self,
-		dialog: NewVaultDialog,
-		vault_name: str,
-		password: str
+		dialog		: NewVaultDialog,
+		vault_name	: str,
+		pwd_manager	: PwdManager,
+		settings	: Settings,
 	):
-		try:
-			app_data_path = self.app_data_path
-			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
-			self.vault_screen.settings = Settings.load_settings(
-				app_data_path=self.app_data_path,
-				password=password
-			)
-			self.vault_screen.pwd_manager = pwd_manager
-			self.vault_screen.login_dialog = dialog
-			self.switch_screen(
-				"vault",
-				vault_name=vault_name
-			)
-			return
-
-		except:
-			self.show_error_dialog(
-				error_title="Error",
-				error_message="Failed to open newly created vault"
-			)
+		self.vault_screen.login_dialog	= dialog
+		self.vault_screen.pwd_manager	= pwd_manager
+		self.vault_screen.settings		= settings
+		self.switch_screen(
+			"vault",
+			vault_name=vault_name
+		)
 
 	"""
 		Opens the vault and triggers screen change on success.
@@ -136,25 +125,30 @@ class AppScreenManager(MDScreenManager):
 
 		try:
 			app_data_path = self.app_data_path
-			pwd_manager = io.load_vault_for_gui(app_data_path, vault_name, password)
+			vault_session = VaultSession(
+				app_data_path=app_data_path,
+				vault_name=vault_name,
+				password=password
+			)
 
-			try:
-				settings = self._load_settings(password)
-			except SettingsLoadError:
-				# Error dialog is shown by self._load_settings
-				return
+			pwd_manager = vault_session.get_pwd_manager()
+			settings = self._load_settings(vault_session)
 
 			pwd_gen_config = settings.get_pwd_gen_config()
 			pwd_manager.set_pwd_gen_config(pwd_gen_config)
 
-			self.vault_screen.settings = settings
-			self.vault_screen.pwd_manager = pwd_manager
-			self.vault_screen.login_dialog = dialog
+			self.vault_screen.settings		= settings
+			self.vault_screen.pwd_manager	= pwd_manager
+			self.vault_screen.login_dialog	= dialog
 
 			self.switch_screen(
 				"vault",
 				vault_name=vault_name
 			)
+			return
+
+		except SettingsLoadError:
+			# This is handled by self._load_settings
 			return
 
 		except PasswordError:
@@ -303,24 +297,18 @@ class AppScreenManager(MDScreenManager):
 	"""
 	def _load_settings(
 		self,
-		password: str
+		vault_session: VaultSession
 	) -> Settings:
 		if self.create_settings:
 			# This vault is imported, create a fresh settings file for it
-			settings = Settings.from_password(
-				app_data_path=self.app_data_path,
-				password=password
-			)
+			settings = vault_session.create_settings()
 
 			self.create_settings = False
 			return settings
 
 		error_message = ""
 		try:
-			return Settings.load_settings(
-				app_data_path=self.app_data_path,
-				password=password
-			)
+			return vault_session.get_settings()
 
 		except NoSettingsFileError:
 			error_message = "Settings file was not found."
@@ -340,10 +328,7 @@ class AppScreenManager(MDScreenManager):
 			error_message=f"{error_message} Loading default settings."
 		)
 		try:
-			return Settings.from_password(
-				app_data_path=self.app_data_path,
-				password=password
-			)
+			return vault_session.create_settings()
 		except:
 			self.show_error_dialog(
 				error_title="Error",
