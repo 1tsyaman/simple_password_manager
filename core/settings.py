@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import os
-import json
 import copy
-from pathlib import Path
+from collections.abc import Callable
 
 import storage.io as io
-from core.encrypt import __atomic_write as atomic_write
-from core.authenticate import generate_tag, is_authentic
+from core.authenticate import generate_tag, is_authentic, encode_data
 from core.types import config_t
 from core.errors import (
-	NoSettingsFileError,
-	InvalidJSONError,
-	InvalidSettingsFile,
+	InvalidVaultFile,
 	SettingsFileModifiedError,
 	SettingsKeyNotSetError,
 	log
@@ -34,12 +30,12 @@ class Settings:
 	"""
 	def __init__(
 		self,
-		app_data_path	: str,
+		sync_callback	: Callable[[dict[str, dict]], None],
 		settings		: dict[str, dict],
 		key				: bytes,
 		salt			: bytes
 	):
-		self.config_path 	= self.get_config_path(app_data_path)
+		self.sync_callback	= sync_callback
 		self.settings		= settings
 		self._key			= key
 		self._salt			= salt
@@ -87,9 +83,12 @@ class Settings:
 		if not self._key_is_set():
 			raise SettingsKeyNotSetError
 
-		settings = copy.deepcopy(self.settings)
+		settings = self.get_hashed_settings()
+		return self.sync_callback(settings)
 
-		data = self.encode_data(settings)
+	def get_hashed_settings(self) -> dict[str, dict]:
+		settings = copy.deepcopy(self.settings)
+		data = encode_data(settings)
 
 		hash = generate_tag(
 			data=data,
@@ -101,7 +100,7 @@ class Settings:
 			"Hash":		f"{bytes.hex(hash)}"
 		}
 
-		atomic_write(settings, Path(self.config_path), indent=4)
+		return settings
 
 	"""
 		Overwrites the ./config/settings.json file with an authenticated
@@ -123,47 +122,31 @@ class Settings:
 
 	"""
 		@raises:
-			- NoSettingsFileError
-			- InvalidSettingsFile
+			- InvalidVaultFile
 			- SettingsFileModifiedError
-			- OSError
 	"""
 	@staticmethod
 	def load_settings(
-		app_data_path	: str,
+		settings		: dict[str, dict],
 		key				: bytes,
 		salt			: bytes,
+		sync_callback	: Callable[[dict[str, dict]], None]
 	) -> Settings:
-		config_path = Settings.get_config_path(app_data_path)
-
-		try:
-			settings = io.load_settings(config_path)
-		except FileNotFoundError:
-			raise NoSettingsFileError
-		except OSError as e:
-			log(
-				message=f"Failed to open settings file {config_path}",
-				error=e
-			)
-			raise
-		except InvalidJSONError:
-			raise InvalidSettingsFile
-
 		if not Settings.settings_dict_is_valid(settings):
-			raise InvalidSettingsFile
+			raise InvalidVaultFile
 
 		hmac = settings.pop("HMAC")
 		hash = bytes.fromhex(hmac["Hash"])
-		data = Settings.encode_data(settings)
+		data = encode_data(settings)
 
 		if not is_authentic(data, key, hash):
 			raise SettingsFileModifiedError
 
 		return Settings(
-			app_data_path=app_data_path,
 			settings=settings,
 			key=key,
-			salt=salt
+			salt=salt,
+			sync_callback=sync_callback
 		)
 
 	"""
@@ -173,30 +156,20 @@ class Settings:
 	"""
 	@staticmethod
 	def from_key(
-		app_data_path	: str,
 		key				: bytes,
 		salt			: bytes,
+		sync_callback	: Callable[[dict[str, dict]], None],
 		settings		: dict[str, dict] = DEFAULT_SETTINGS,
 	) -> Settings:
 		settings_obj = Settings(
-			app_data_path=app_data_path,
 			settings=settings,
 			key=key,
-			salt=salt
+			salt=salt,
+			sync_callback=sync_callback
 		)
 
 		settings_obj.sync_to_file()
-
 		return settings_obj
-
-
-	@staticmethod
-	def encode_data(data: dict) -> bytes:
-		return json.dumps(
-			data,
-			sort_keys=True,
-			separators=(",", ":")
-		).encode()
 
 	@staticmethod
 	def settings_dict_is_valid(settings: dict[str, dict]) -> bool:

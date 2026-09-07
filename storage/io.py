@@ -60,9 +60,8 @@ def get_dir_path_and_vault_name(path: str) -> tuple[str, str]:
 		- FileNotFoundError
 		- OSError
 		- InvalidJSONError
-
 """
-def load_settings(path: str) -> dict[str, dict]:
+def load_json(path: str) -> dict[str, dict]:
 	try:
 		with open(path, 'r', encoding="utf-8") as fd:
 			return json.load(fd)

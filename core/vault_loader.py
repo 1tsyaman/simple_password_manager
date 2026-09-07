@@ -1,14 +1,19 @@
 import os
+from pathlib import Path
 
 from storage.constants import VAULT_ENDING
-from core.encrypt import get_salt_from_vault
+from core.encrypt import get_salt_from_vault, __atomic_write
 from core.keys import derive_master_key, derive_subkey, get_random_salt
 from core.pwd_manager import PwdManager
 from core.settings import Settings
 from core.passwords import password_satisfies_explicit_conditions
 from core.errors import (
 	PasswordError,
-	PasswordRequirementsError
+	PasswordRequirementsError,
+	InvalidVaultFile,
+	NoVaultFileError,
+	InvalidJSONError,
+	log,
 )
 
 import storage.io as io
@@ -18,6 +23,7 @@ class VaultSession:
 	vault_key	: bytes
 	auth_key	: bytes
 	salt		: bytes
+	json		: dict[str, dict]
 
 	"""
 		@raises:
@@ -44,8 +50,7 @@ class VaultSession:
 			else:
 				raise PasswordError
 
-		self.app_data_path	= app_data_path
-		self.vault_path		= os.path.join(app_data_path, vault_name + VAULT_ENDING)
+		self.vault_path	= os.path.join(app_data_path, vault_name + VAULT_ENDING)
 
 		if new_vault:
 			self.salt = get_random_salt()
@@ -62,6 +67,11 @@ class VaultSession:
 		self.vault_key	= self._derive_vault_key(master_key)
 		self.auth_key 	= self._derive_auth_key(master_key)
 
+		self.json = {
+			"Vault":	{},
+			"Settings":	{}
+		}
+
 	"""
 		@raises:
 			- PasswordRequirementsError(reason)
@@ -75,7 +85,7 @@ class VaultSession:
 		self,
 		password	: str,
 		pwd_manager	: PwdManager,
-		settings	: Settings | None = None	# temporary
+		settings	: Settings
 	):
 		satisfies, reason = password_satisfies_explicit_conditions(password)
 		
@@ -94,19 +104,15 @@ class VaultSession:
 			salt=self.salt
 		)
 
-		if settings is not None:
-			settings.set_key_salt_pair(
-				key=self.auth_key,
-				salt=self.salt
-			)
+		settings.set_key_salt_pair(
+			key=self.auth_key,
+			salt=self.salt
+		)
 
-		"""
-			TODO: Encrypt both atomically -> one json file
-			{
-				"vault":	{actual vault json content},
-				"settings":	{actual settings json content}
-			}
-		"""
+		self.sync(
+			pwd_manager=pwd_manager,
+			settings=settings
+		)
 
 	"""
 		@raises:
@@ -118,10 +124,29 @@ class VaultSession:
 			- OSError
 	"""
 	def get_pwd_manager(self) -> PwdManager:
+		try:
+			self.json = self.read_json()
+		except FileNotFoundError:
+			raise NoVaultFileError
+		except InvalidJSONError:
+			raise InvalidVaultFile
+		except OSError as e:
+			log(
+				message=f"Failed to open vault file {self.vault_path}",
+				error=e
+			)
+			raise
+
+		if not "Vault" in self.json.keys():
+			raise InvalidVaultFile
+
+		vault = self.json["Vault"]
+
 		return PwdManager.from_encrypted_file_key(
-			path=self.vault_path,
+			vault=vault,
 			key=self.vault_key,
-			salt=self.salt
+			salt=self.salt,
+			sync_callback=self.sync_vault
 		)
 
 	"""
@@ -132,23 +157,42 @@ class VaultSession:
 	"""
 	def create_pwd_manager(self) -> PwdManager:
 		return PwdManager.pwd_manager_from_key(
-			path=self.vault_path,
 			key=self.vault_key,
-			salt=self.salt
+			salt=self.salt,
+			sync_callback=self.sync_vault
 		)
 
 	"""
 		@raises:
-			- NoSettingsFileError
-			- InvalidSettingsFile
+			- NoVaultFileError
+			- InvalidVaultFile
 			- SettingsFileModifiedError
 			- OSError
 	"""
 	def get_settings(self) -> Settings:
+		try:
+			self.json = self.read_json()
+		except FileNotFoundError:
+			raise NoVaultFileError
+		except InvalidJSONError:
+			raise InvalidVaultFile
+		except OSError as e:
+			log(
+				message=f"Failed to open vault file {self.vault_path}",
+				error=e
+			)
+			raise
+
+		if not "Settings" in self.json.keys():
+			raise InvalidVaultFile
+
+		settings = self.json["Settings"]
+
 		return Settings.load_settings(
-			app_data_path=self.app_data_path,
+			settings=settings,
 			key=self.auth_key,
-			salt=self.salt
+			salt=self.salt,
+			sync_callback=self.sync_settings
 		)
 
 	"""
@@ -158,9 +202,9 @@ class VaultSession:
 	"""
 	def create_settings(self) -> Settings:
 		return Settings.from_key(
-			app_data_path=self.app_data_path,
 			key=self.auth_key,
-			salt=self.salt
+			salt=self.salt,
+			sync_callback=self.sync_settings,
 		)
 
 	@staticmethod
@@ -176,3 +220,79 @@ class VaultSession:
 			master_key=master_key,
 			purpose="settings-auth"
 		)
+
+	"""
+		@raises:
+			- FileNotFoundError
+			- InvalidJSONError
+			- OSError
+	"""
+	def sync_settings(
+		self,
+		settings: dict[str, dict]	# hashed dict
+	):
+		try:
+			self.json = self.read_json()
+		except FileNotFoundError:
+			raise NoVaultFileError
+		except InvalidJSONError:
+			raise InvalidVaultFile
+		except OSError as e:
+			log(
+				message=f"Failed to open vault file {self.vault_path}",
+				error=e
+			)
+			raise
+
+		self.json["Settings"] = settings
+
+		__atomic_write(self.json, Path(self.vault_path), indent=4)
+
+	"""
+		@raises:
+			- FileNotFoundError
+			- InvalidJSONError
+			- OSError
+	"""
+	def sync_vault(
+		self,
+		vault: dict[str, str]	# encrypted dict
+	):
+		try:
+			self.json = self.read_json()
+		except FileNotFoundError:
+			raise NoVaultFileError
+		except InvalidJSONError:
+			raise InvalidVaultFile
+		except OSError as e:
+			log(
+				message=f"Failed to open vault file {self.vault_path}",
+				error=e
+			)
+			raise
+
+		self.json["Vault"] = vault
+
+		__atomic_write(self.json, Path(self.vault_path), indent=4)
+
+	def sync(
+		self,
+		pwd_manager	: PwdManager,
+		settings	: Settings
+	):
+		encrypted_vault = pwd_manager.get_encrypted_vault()
+		hashed_settings = settings.get_hashed_settings()
+
+		self.json["Vault"]		= encrypted_vault
+		self.json["Settings"]	= hashed_settings
+
+		__atomic_write(self.json, Path(self.vault_path), indent=4)
+
+	"""
+		@raises:
+			- FileNotFoundError
+			- InvalidJSONError
+			- OSError
+	"""
+	def read_json(self) -> dict[str, dict]:
+		return io.load_json(self.vault_path)

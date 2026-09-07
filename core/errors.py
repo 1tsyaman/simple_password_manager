@@ -49,13 +49,13 @@ class ImageOpenError(Exception):
 class QRDecodeError(Exception):
 	pass
 
-class NoSettingsFileError(Exception):
+class NoVaultFileError(Exception):
 	pass
 
 class InvalidJSONError(Exception):
 	pass
 
-class InvalidSettingsFile(Exception):
+class InvalidVaultFile(Exception):
 	pass
 
 class SettingsFileModifiedError(Exception):

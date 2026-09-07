@@ -25,23 +25,15 @@ from core.constants import (
 
 """
 	@raises:
-		- FileNotFoundError(path) [OSError]
 		- KeyLengthError
 		- OverflowError
-		- OSError
 """
 def encrypt_data(
 	data: dict,
 	key: bytes,
 	salt: bytes,
-	file_path: str,
 	associated_data: str
-) -> None:
-	path = Path(file_path)
-
-	if (not path.exists()):
-		raise FileNotFoundError(file_path)
-
+) -> dict[str, str]:
 	if len(key) != KEY_LEN:
 		raise KeyLengthError
 
@@ -64,17 +56,12 @@ def encrypt_data(
 		associated_data=ad
 	)
 
-	record = {
+	return {
 		SALT:				salt.hex(),
 		NONCE:				nonce.hex(),
 		CIPHERTEXT:			encrypted.hex(),
 		ASSOCIATED_DATA:	ad.hex()
 	}
-
-	__atomic_write(
-		record,
-		path
-	)
 
 
 def __encrypt_data(
@@ -161,37 +148,16 @@ def get_key_from_pwd(
 
 """
 	@raises:
-		- FileNotFoundError(path) [OSError]
 		- KeyLengthError
 		- VaultFormatError
 		- CorruptedVaultError
-		- OSError
 """
 def decrypt_data(
-	key: bytes,
-	file_path: str
+	key		: bytes,
+	record	: dict[str, str]
 ) -> dict:
-	path = Path(file_path)
-
-	if (not path.exists()):
-		raise FileNotFoundError(file_path)
-	
 	if len(key) != KEY_LEN:
 		raise KeyLengthError
-
-	try:
-		with open(path, 'r', encoding="utf-8") as fd:
-			record = json.load(fd)
-
-	except (
-		json.JSONDecodeError,
-		UnicodeDecodeError,
-		RecursionError
-	) as e:
-		raise VaultFormatError from e
-
-	if not isinstance(record, dict):
-		raise VaultFormatError
 
 	if any(
 		dict_key not in record 

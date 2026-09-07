@@ -48,21 +48,19 @@ if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
 
 class VaultScreen(MDScreen):
-	settings: Settings	# Set by screen_manager
-
+	settings	: Settings		# Set by screen_manager
+	pwd_manager	: PwdManager 	# Set by screen_manager
 	def __init__(
 		self,
 		app_data_path	: str,
 		phone_screen	: MDScreen,
 		screen_manager	: "AppScreenManager",	# forward reference for type checking
-		pwd_manager		: PwdManager,
 		*args,
 		**kwargs
 	):
 		self.app_data_path	= app_data_path
 		self.phone_screen	= phone_screen
 		self.screen_manager	= screen_manager
-		self.pwd_manager	= pwd_manager
 		self.vault_name		= ""
 
 		self.main_container = MDBoxLayout()		# contains the account_list widget

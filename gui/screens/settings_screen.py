@@ -21,19 +21,19 @@ NUMERIC_RANGES = {
 }
 
 class SettingsScreen(MDScreen):
-	settings_obj: Settings
+	settings_obj: Settings		# Set by screen_manager
+	pwd_manager	: PwdManager 	# Set by screen_manager
+
 	def __init__(
 		self,
 		app_data_path	: str,
 		screen_manager	: "AppScreenManager",	# forward reference for type checking
-		pwd_manager		: PwdManager,
 		app				: MDApp,
 		*args,
 		**kwargs
 	):
 		self.app_data_path	= app_data_path
 		self.screen_manager	= screen_manager
-		self.pwd_manager	= pwd_manager
 		self.app			= app
 
 		self.vault_name	= ""	# is set by the screen manager

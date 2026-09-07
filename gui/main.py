@@ -143,8 +143,7 @@ class SimplePasswordManagerApp(MDApp):
 			app=self,
 			app_name=APP_NAME,
 			phone_screen=self.phone_screen,
-			top_container=self.top_container,
-			pwd_manager=PwdManager()	# dummy pwd manager to initialize vault screen
+			top_container=self.top_container
 		)
 
 		if platform == "android":

@@ -24,8 +24,8 @@ from core.errors import (
 	KeyDerivationError,
 	VaultFormatError,
 	CorruptedVaultError,
-	NoSettingsFileError,
-	InvalidSettingsFile,
+	NoVaultFileError,
+	InvalidVaultFile,
 	SettingsFileModifiedError,
 	SettingsLoadError,
 	log
@@ -40,7 +40,6 @@ class AppScreenManager(MDScreenManager):
 		app_name: str,
 		phone_screen: MDScreen,
 		top_container: MDBoxLayout,
-		pwd_manager: PwdManager,
 		*args,
 		**kwargs
 	):
@@ -58,12 +57,10 @@ class AppScreenManager(MDScreenManager):
 			app_data_path=self.app_data_path,
 			phone_screen=phone_screen,
 			screen_manager=self,
-			pwd_manager=pwd_manager,
 		)
 		self.settings_screen = SettingsScreen(
 			app_data_path=self.app_data_path,
 			screen_manager=self,
-			pwd_manager=pwd_manager,
 			app=self.app,
 		)
 
@@ -310,9 +307,9 @@ class AppScreenManager(MDScreenManager):
 		try:
 			return vault_session.get_settings()
 
-		except NoSettingsFileError:
+		except NoVaultFileError:
 			error_message = "Settings file was not found."
-		except InvalidSettingsFile:
+		except InvalidVaultFile:
 			error_message = "Settings file is invalid."
 		except SettingsFileModifiedError:
 			error_message = "Settings file was illegally modified."
