@@ -1,49 +1,69 @@
-from threading import Thread, Lock
-from typing import TYPE_CHECKING
+import random as rand
 
-from kivymd.uix.boxlayout import MDBoxLayout
+from threading import Thread, Lock
+from typing import TYPE_CHECKING, Any
+
 from kivy.clock import Clock
+from kivy.utils import platform
+from kivy.uix.widget import Widget
 
 from kivymd.app import MDApp
-from kivymd.uix.appbar import MDActionTopAppBarButton
 from kivymd.uix.screen import MDScreen
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.dialog import MDDialog
 
-from gui.dialogs.login_dialog import LoginDialog
-from gui.dialogs.new_account_dialog import NewAccountDialog
-from gui.dialogs.account_details_dialog import AccountDetailsDialog
-from gui.widgets.account_list import AccountEntry, AccountList
+from gui.dialogs.yes_no_dialog import YesNoDialog
+from gui.dialogs.vault_screen.new_account_dialog import NewAccountDialog
+from gui.dialogs.vault_screen.account_details_dialog import AccountDetailsDialog
+from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
+from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
+from gui.widgets.vault_screen.export_picker import ExportFilePicker
+from gui.dialogs.vault_screen.rename_vault_dialog import RenameVaultDialog
+from gui.widgets.vault_screen.search_bar import SearchBar
+from gui.widgets.welcome_screen.import_picker import ImportFilePicker
 from gui.widgets.labels import NoAccountsLabel
-from gui.widgets.top_bar import TopBar
+from gui.widgets.plus_button import PlusButton
 from gui.utils.clipboard import copy_text
 
 from core.pwd_manager import PwdManager
+from core.settings import Settings
 from core.errors import (
 	EntryExistsError,
 	KeyLengthError,
 	NoSuchEntryError,
 	EntryHasNoTotp,
+	TotpQRCodeError,
+	TotpUriError,
 	log
 )
+
+import storage.io as io
+from storage.qr_reader import read_qr_code_from_camera
+
+
+BATCH_SIZE = 100
 
 # to avoid cicular import issues
 if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
 
 class VaultScreen(MDScreen):
+	settings	: Settings		# Set by screen_manager
+	pwd_manager	: PwdManager 	# Set by screen_manager
 	def __init__(
 		self,
-		app_data_path: str,
-		screen_manager: "AppScreenManager",	# forward reference for type checking
-		pwd_manager: PwdManager,
-		top_bar: TopBar,
+		app_data_path	: str,
+		phone_screen	: MDScreen,
+		screen_manager	: "AppScreenManager",	# forward reference for type checking
 		*args,
 		**kwargs
 	):
-		self.app_data_path = app_data_path
-		self.screen_manager = screen_manager
-		self.pwd_manager = pwd_manager
-		self.top_bar = top_bar
-		self.vault_name = ""
+		self.app_data_path	= app_data_path
+		self.phone_screen	= phone_screen
+		self.screen_manager	= screen_manager
+		self.vault_name		= ""
+
+		self.main_container = MDBoxLayout()		# contains the account_list widget
 
 		"""
 			Guards self.pwd_manager from being modified concurrently
@@ -73,20 +93,27 @@ class VaultScreen(MDScreen):
 		self.change_version = 0
 		self.synced_version = 0
 
-		self.box_container = MDBoxLayout(
-			orientation="vertical"
-		)
-
-		app = MDApp.get_running_app()
-		assert app is not None
+		self.app = MDApp.get_running_app()
+		assert self.app is not None
 
 		super().__init__(
-			self.box_container,
 			name="vault",
-			md_bg_color=app.theme_cls.secondaryContainerColor,
+			md_bg_color=self.app.theme_cls.secondaryContainerColor,
 			*args,
 			**kwargs
 		)
+
+		self.add_widget(
+			self.main_container
+		)
+
+		# Add floating action button '+'
+		self.add_widget(
+			PlusButton(
+				callback=self.show_add_account_dialog
+			)
+		)
+
 
 	def on_pre_enter(self, *args):
 		self.refresh()
@@ -95,24 +122,24 @@ class VaultScreen(MDScreen):
 		Called on pre_enter
 	"""
 	def refresh(self):
-		top_bar = self.top_bar
-		back_button : MDActionTopAppBarButton = top_bar.back_button
-		import_button: MDActionTopAppBarButton = top_bar.import_vault_button
+		# Apply theme
+		other_settings = self.settings.get_other_config()
+		self.app.apply_theme(other_settings["theme"])
 
-		dialog = self.login_dialog
-
-		top_bar.add_back_button(
-			callback=self.screen_manager.back_to_selection
+		search_bar = SearchBar(
+			view_root=self.phone_screen,
+			search_function=self.search_accounts,
+			search_text="Search accounts...",
+			leading_button_icon="arrow-left",
+			leading_button_callback=self.screen_manager.back_to_welcome_screen,
+			trailing_button_icon="dots-vertical",
+			trailing_button_callback=self.show_vault_context_menu,
 		)
-		top_bar.set_title(self.vault_name)
 
-		# Disable import button
-		top_bar.import_callback = None
-		import_button.disabled = True
-		import_button.opacity = 0
-
-		# New account button
-		top_bar.plus_callback = self.show_add_account_dialog
+		self.screen_manager.switch_top_bar(
+			search_bar,
+			padding="2dp"
+		)
 
 		with self.change_lock:
 			self.change_version = 0
@@ -120,7 +147,11 @@ class VaultScreen(MDScreen):
 
 		self.force_exit_vault = False
 
+		dialog: MDDialog = self.login_dialog
 		self.load_accounts(dialog=dialog)
+
+	def on_back(self):
+		self.screen_manager.back_to_welcome_screen()
 
 	def on_leave(self, *args):
 		self.clear()
@@ -133,20 +164,25 @@ class VaultScreen(MDScreen):
 		if hasattr(self, "account_load_event"):
 			self.account_load_event.cancel()
 
-		self.box_container.clear_widgets()
-		self.box_container.add_widget(NoAccountsLabel())
+		self.main_container.clear_widgets()
+		self.main_container.add_widget(NoAccountsLabel())
 
-	def load_accounts(self, dialog: LoginDialog):
-		self.account_list : AccountList = AccountList()
+	def load_accounts(
+		self,
+		dialog: MDDialog
+	):
+		self.account_list_widget : AccountList = AccountList()
 
 		accounts = self.pwd_manager.get_website_username_pair_list()
 		self.number_accounts = len(accounts)	# store number of accounts
 		self.account_iterator = iter(accounts)	# create an iterator
 
+		self.account_list = self.pwd_manager.get_entries_as_json()	# used for search
+
 		# Case: No accounts to load
 		if self.number_accounts == 0:
-			self.box_container.clear_widgets()
-			self.box_container.add_widget(NoAccountsLabel())
+			self.main_container.clear_widgets()
+			self.main_container.add_widget(NoAccountsLabel())
 
 			dialog.dismiss()
 			return
@@ -160,10 +196,10 @@ class VaultScreen(MDScreen):
 
 	def _load_account_batch(
 			self,
-			dialog: LoginDialog | None = None,	# is only needed for the first batch
+			dialog: MDDialog | None = None,	# is only needed for the first batch
 			first_batch: bool = False
 		) -> bool:
-		batch_size = min(10, self.number_accounts)
+		batch_size = min(BATCH_SIZE, self.number_accounts)
 		done = False
 
 		# Add accounts in batches of 10
@@ -176,18 +212,16 @@ class VaultScreen(MDScreen):
 				done = True
 				break
 
-			entry = AccountEntry(
+			self.account_list_widget.add_account(
 				website=website,
 				username=username,
 				on_click_callback=self.show_account_details_dialog
 			)
-			self.account_list.add_account(entry)
 
 		# only switch the screen *once*, after one batch is added
 		if first_batch:
-			container : MDBoxLayout = self.box_container
-			container.clear_widgets()
-			container.add_widget(self.account_list)
+			self.main_container.clear_widgets()
+			self.main_container.add_widget(self.account_list_widget)
 
 			if dialog is not None:
 				dialog.dismiss()
@@ -212,7 +246,10 @@ class VaultScreen(MDScreen):
 										)
 
 	def show_add_account_dialog(self):
-		NewAccountDialog(add_account_callback=self.add_account).open()
+		NewAccountDialog(
+			add_account_callback=self.add_account,
+			random_pwd_callback=self.pwd_manager.generate_random_pwd
+		).open()
 
 	"""
 		Adds the account and starts an *asynchronous* thread to sync vault
@@ -242,18 +279,23 @@ class VaultScreen(MDScreen):
 			username_field.error = True
 			return
 
-		# Add account to list (without refreshing the whole list)
-		entry = AccountEntry(
+		self.account_list_widget.add_account(
 			website=website,
 			username=username,
 			on_click_callback=self.show_account_details_dialog
 		)
-		self.account_list.add_account(entry)
+
+		# Update the internal account list
+		self.account_list.append(
+			self.pwd_manager.get_entry_as_json(
+				website=website,
+				username=username
+			)
+		)
 
 		if self.number_accounts == 0:
-			container : MDBoxLayout = self.box_container
-			container.clear_widgets()
-			container.add_widget(self.account_list)
+			self.main_container.clear_widgets()
+			self.main_container.add_widget(self.account_list_widget)
 
 		with self.change_lock:
 			self.change_version += 1
@@ -276,28 +318,34 @@ class VaultScreen(MDScreen):
 				username=username
 			)
 		except NoSuchEntryError:
-			# Emit error!
+			self.screen_manager.show_error_dialog(
+				error_title="Error",
+				error_message="Something went wrong, the selected entry does not exist"
+			)
 			return
 
 		password = password_desc["password"]
 		description = password_desc["description"]
 
 		kwargs = {
-			"website":			website,
-			"username":			username,
-			"password":			password,
-			"description":		description,
+			"website":				website,
+			"username":				username,
+			"password":				password,
+			"description":			description,
 			"copy_callback":		copy_text,
-			"modify_callback":	self.modify_account_details,
-			"delete_callback":	self.delete_account,
+			"totp_qr_callback":		self.show_qr_code_dialog,
+			"modify_callback":		self.modify_account_details,
+			"delete_callback":		self.delete_account,
 			"account_entry":		instance,
 		}
 
 		try:
-			totp_code, time_remaining = self.pwd_manager.get_totp(website=website, username=username)
-			kwargs["totp_code"] = totp_code
-			kwargs["totp_time_remaining"] = time_remaining
-			kwargs["totp_callback"] = self.pwd_manager.get_totp
+			totp_code, time_remaining = self.pwd_manager.get_totp(website, username)
+
+			kwargs["totp_code"]				= totp_code
+			kwargs["totp_time_remaining"]	= time_remaining
+			kwargs["totp_callback"]			= lambda *_: self.pwd_manager.get_totp(website, username)
+
 		except NoSuchEntryError:
 			self.screen_manager.show_error_dialog(
 				error_title="Error: Inconsistent internal state",
@@ -316,13 +364,13 @@ class VaultScreen(MDScreen):
 	"""
 	def modify_account_details(
 		self,
-		website: str,
-		username: str,
-		new_website: str,
-		new_username: str,
-		new_password: str,
-		new_description: str,
-		account_entry: AccountEntry,
+		website			: str,
+		username		: str,
+		new_website		: str,
+		new_username	: str,
+		new_password	: str,
+		new_description	: str,
+		new_totp_uri	: str | None,
 	) -> bool:
 		try:
 			with self.pwd_manager_lock:
@@ -334,17 +382,39 @@ class VaultScreen(MDScreen):
 					new_password=new_password,
 					new_description=new_description
 				)
-		except NoSuchEntryError:
+
+				if new_totp_uri is not None:
+					self.pwd_manager.set_totp_config_uri(
+						website=website,
+						username=username,
+						uri=new_totp_uri
+					)
+
+		except (NoSuchEntryError, TotpUriError) as e:
+			if isinstance(e, NoSuchEntryError):
+				message = "Vault state is inconsistent: Modified entry does not exist!"
+			else:
+				message = "Failed to set up TOTP"
+
 			self.screen_manager.show_error_dialog(
 				error_title="Error: Changes not saved",
-				error_message="Vault state is inconsistent: Modified entry does not exist!"
+				error_message=message
 			)
 			return False
 
-		account_entry.update_labels(
-			website=new_website,
-			username=new_username
+		self.account_list_widget.update_account(
+			old_website=website,
+			old_username=username,
+			new_website=new_website,
+			new_username=new_username
 		)
+
+		# Update the internal account list
+		for entry in self.account_list:
+			if entry["website"] == website and	entry["username"] == username:
+				entry["website"]		= new_website
+				entry["username"]		= new_username
+				entry["description"]	= new_description
 
 		with self.change_lock:
 			self.change_version += 1
@@ -372,7 +442,15 @@ class VaultScreen(MDScreen):
 				username=username
 			)
 
-		self.account_list.remove_account(account_entry)
+		self.account_list_widget.remove_account(
+				website=website,
+				username=username
+		)
+
+		# Update the internal account list
+		for index, entry in enumerate(self.account_list):
+			if 	entry["website"] == website and	entry["username"] == username:
+				self.account_list.pop(index)
 
 		with self.change_lock:
 			self.change_version += 1
@@ -382,6 +460,79 @@ class VaultScreen(MDScreen):
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
 		).start()
+
+	def search_accounts(
+		self,
+		query: str
+	) -> list[dict[str, Any]]:
+		candidates = []
+		keywords = query.lower().split()
+
+		for entry in self.account_list:
+			if all(
+				any(keyword in str(value).lower() for value in entry.values())
+				for keyword in keywords
+			):
+				candidates.append(entry)
+
+		return [
+			{
+				"viewclass": "AccountEntry",
+				"website": entry["website"],
+				"username": entry["username"],
+				"on_click_callback": self.show_account_details_dialog,
+				"callback": None
+			}
+			for entry in candidates
+		]
+
+	def rename_vault(
+		self,
+		old_name: str,
+		new_name: str
+	):
+		try:
+			io.rename_vault(
+				path=self.app_data_path,
+				vault_name=old_name,
+				new_vault_name=new_name
+			)
+
+			self.refresh()
+
+		except (
+			FileNotFoundError,
+			FileExistsError,
+			OSError,
+		) as e:
+			log(
+				message=f"Something went wrong while renaming vault {old_name}.",
+				error=e
+			)
+
+			self.screen_manager.show_error_dialog(
+				error_title="Rename Error:",
+				error_message="Failed to rename vault, check log"
+			)
+
+	def delete_vault(self):
+		try:
+			io.delete_vault_for_gui(
+				app_data_path=self.app_data_path,
+				vault_name=self.vault_name
+			)
+			self.on_back()
+		except OSError as e:
+			self.screen_manager.show_error_dialog(
+				error_title="Deletion Error:",
+				error_message=f"Could not delete the vault {self.vault_name}, check log"
+			)
+
+			log(
+				message=f"Something went wrong while deleting vault {self.vault_name}.",
+				error=e
+			)
+
 
 	"""
 		Creates a snapshot of the current state of self.pwd_manager and encrypts it.
@@ -448,3 +599,158 @@ class VaultScreen(MDScreen):
 			0
 		)
 		return False
+
+	def show_vault_context_menu(
+		self,
+		button: Widget,
+		*args
+	):
+		VaultContextMenu(
+			settings_callback=lambda: self.screen_manager.switch_screen(
+											"settings",
+											vault_name=self.vault_name,
+											pwd_manager=self.pwd_manager,
+											settings=self.settings
+									),
+			export_callback=lambda: self.show_export_vault_dialog(),
+			rename_callback=lambda: self.show_rename_vault_dialog(),
+			delete_callback=lambda: self.show_delete_vault_dialog(),
+			caller=button
+		).open()
+
+	def show_rename_vault_dialog(self):
+		vault_name = self.vault_name
+
+		RenameVaultDialog(
+			vault_name=vault_name,
+			rename_callback=self.rename_vault
+		).open()
+
+	def show_export_vault_dialog(self):
+		vault_name = self.vault_name
+
+		ExportFilePicker(
+			app_data_path=self.app_data_path,
+			vault_name=vault_name
+		).open()
+
+	def show_delete_vault_dialog(self):
+		vault_name = self.vault_name
+		YesNoDialog(
+			headline=f"Delete {vault_name}?",
+			message="This action cannot be undone.",
+			yes_callback=self.delete_vault,
+		).open()
+
+	def show_qr_code_dialog(
+		self,
+		details_dialog	: AccountDetailsDialog,
+	):
+		if platform == "android":
+			message		= "Scan the setup QR Code."
+			yes_label	= "Scan"
+		else:
+			message		= "Select a picture of the setup QR Code."
+			yes_label	= "Select"
+
+		YesNoDialog(
+			headline="Setup TOTP:",
+			message=message,
+			yes_callback=lambda *_:self.open_qr_code_importer(details_dialog),
+			yes_text=yes_label,
+			no_text="Dismiss",
+			red_option="",
+			icon="qrcode" 
+		).open()
+
+	def open_qr_code_importer(
+		self,
+		details_dialog: AccountDetailsDialog,
+	):
+		if platform == "android":
+			read_qr_code_from_camera(
+				callback=lambda uri: self._process_qr_code_uri(
+					uri=uri,
+					details_dialog=details_dialog
+				)
+			)
+
+			return
+
+		random = rand.randint(1, 1000)
+		prefix = f"QR_CODE_{random}"
+
+		ImportFilePicker(
+			app_data_path=self.app_data_path,
+			on_finish_callback=lambda *_: self._process_qr_code_picture(
+				prefix=prefix,
+				details_dialog=details_dialog
+			),
+			type="picture",
+			image_prefix=prefix
+		).open()
+
+	"""
+		Assumes that there is a single picture
+			in our private app data
+	"""
+	def _process_qr_code_picture(
+		self,
+		prefix: str,
+		details_dialog: AccountDetailsDialog,
+	):
+		try:
+			path = io.get_unique_image_path_with_prefix(
+				dir=self.app_data_path,
+				image_prefix=prefix
+			)
+		except FileNotFoundError:
+			self.screen_manager.show_error_dialog(
+				error_title="Import Error",
+				error_message="Could not find the selected image"
+			)
+
+			return
+
+		try:
+			uri, preview = self.pwd_manager.get_totp_uri_and_preview_from_qr_code(path)
+		except (TotpQRCodeError ,TotpUriError) as e:
+			if isinstance(e, TotpQRCodeError):
+				message = "Failed to find (or decode) the QR code in the selected image"
+			else:
+				message = "QR code does not encode a valid TOTP config URI"
+
+			self.screen_manager.show_error_dialog(
+				error_title="TOTP Error",
+				error_message=message
+			)
+
+			return
+		finally:
+			# Delete the imported image (clean up)
+			try:
+				io.delete_file(path)
+			except OSError:
+				self.screen_manager.show_error_dialog(
+					error_title="Clean Up Error",
+					error_message="Could not delete copied QR code image"
+				)
+
+		details_dialog.set_totp_preview_uri(uri, preview)
+
+	def _process_qr_code_uri(
+		self,
+		uri: str,
+		details_dialog: AccountDetailsDialog,
+	):
+		try:
+			preview = self.pwd_manager.get_totp_preview_from_uri(uri)
+		except TotpUriError:
+			self.screen_manager.show_error_dialog(
+				error_title="TOTP Error",
+				error_message="QR code does not encode a valid TOTP config URI"
+			)
+
+			return
+
+		details_dialog.set_totp_preview_uri(uri, preview)

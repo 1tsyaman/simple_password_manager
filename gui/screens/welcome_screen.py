@@ -1,20 +1,23 @@
 from typing import TYPE_CHECKING
 
-from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.clock import Clock
 
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
-from kivymd.uix.appbar import MDActionTopAppBarButton
+from kivymd.uix.anchorlayout import MDAnchorLayout
+
+from gui.dialogs.selection_screen.login_dialog import LoginDialog
+from gui.dialogs.selection_screen.new_vault_dialog import NewVaultDialog
 
 from gui.widgets.top_bar import TopBar
-from gui.widgets.labels import NoVaultsLabel
 from gui.widgets.input_field import InputField
-from gui.widgets.vault_list import VaultEntry, VaultList
-from gui.widgets.file_picker import ImportFilePicker
-from gui.dialogs.login_dialog import LoginDialog
-from gui.dialogs.new_vault_dialog import NewVaultDialog
+from gui.widgets.welcome_screen.import_picker import ImportFilePicker
+from gui.widgets.welcome_screen.card_widgets import NoVaultWidget, OpenVaultWidget
 
 import storage.io as io
+
+from core.settings import Settings
+from core.vault_loader import VaultSession
 from core.errors import (
 	PasswordRequirementsError,
 	KeyLengthError,
@@ -22,36 +25,39 @@ from core.errors import (
 	log
 )
 
-# to avoid cicular import issues
 if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
 
-class SelectionScreen(MDScreen):
+class WelcomeScreen(MDScreen):
 	def __init__(
 		self,
-		app_data_path: str,
-		screen_manager: "AppScreenManager",	# forward reference for type checking
-		top_bar: TopBar,
+		app_data_path	: str,
+		app_name		: str,
+		screen_manager	: "AppScreenManager",
 		*args,
 		**kwargs
 	):
-		self.app_data_path = app_data_path
-		self.screen_manager = screen_manager
-		self.top_bar = top_bar
+		self.app_data_path	= app_data_path
+		self.app_name		= app_name
+		self.screen_manager	= screen_manager
 
-		self.box_container = MDBoxLayout(
-			orientation="vertical"
+		self.main_container = MDAnchorLayout(
+		    anchor_x="center",
+		    anchor_y="center"
 		)
 
 		app = MDApp.get_running_app()
 		assert app is not None
 
 		super().__init__(
-			self.box_container,
-			name="selection",
+			name="welcome",
 			md_bg_color=app.theme_cls.secondaryContainerColor,
 			*args,
 			**kwargs
+		)
+
+		self.add_widget(
+			self.main_container
 		)
 
 	def on_pre_enter(self, *args):
@@ -61,47 +67,51 @@ class SelectionScreen(MDScreen):
 		is called before entering the screen
 	"""
 	def refresh(self):
-		top_bar: TopBar = self.top_bar
-		import_button: MDActionTopAppBarButton = top_bar.import_vault_button
+		top_bar = TopBar(
+			title=self.app_name
+		)
 
-		top_bar.remove_back_button()
-		top_bar.reset_title()
-
-		# Enable import button
-		top_bar.import_callback = self.show_import_vault_file_picker
-		import_button.disabled = False
-		import_button.opacity = 1
-
-		# New vault button
-		top_bar.plus_callback = self.show_new_vault_dialog
-
-		# Import vault button
-		top_bar.import_callback = self.show_import_vault_file_picker
+		self.screen_manager.switch_top_bar(top_bar)
 
 		self.load_vaults()
 
 	def load_vaults(self):
 		# refresh vault list
 		app_data_path = self.app_data_path
-		container : MDBoxLayout = self.box_container
-		self.vaults = io.get_vault_list(app_data_path)
+		vault_list = io.get_vault_list(app_data_path)
 
-		if len(self.vaults) == 0:
+		if len(vault_list) == 0:
 			# Add no_vaults_label
-			container.clear_widgets()
-			container.add_widget(NoVaultsLabel())
+			self.main_container.clear_widgets()
+			self.main_container.add_widget(
+				NoVaultWidget(
+					create_callback=self.show_new_vault_dialog,
+					import_callback=self.show_import_vault_file_picker
+				)
+			)
+
+			self.prompt_login = False
 			return
 
-		vault_list = VaultList()
+		# Open first vault in the list
+		vault = vault_list[0]
 
-		for vault in self.vaults:
-			entry = VaultEntry(name=vault)
-			entry.bind(on_release=self.show_open_vault_dialog)
+		self.main_container.clear_widgets()
+		self.main_container.add_widget(
+			OpenVaultWidget(
+				open_callback=lambda *_: self.show_open_vault_dialog(vault)
+			)
+		)
 
-			vault_list.add_vault(entry)
+		if self.prompt_login:
+			self.prompt_login = False	# never true again while running
+			Clock.schedule_once(
+				lambda *_: self.show_open_vault_dialog(vault),
+				0
+			)
 
-		container.clear_widgets()
-		container.add_widget(vault_list)
+	def on_back(self):
+		self.screen_manager.exit_app()
 
 	def on_leave(self, *args):
 		self.clear()
@@ -110,13 +120,7 @@ class SelectionScreen(MDScreen):
 		is called when leaving the screen
 	"""
 	def clear(self):
-		self.box_container.clear_widgets()
-		self.box_container.add_widget(NoVaultsLabel())
-
-##	New Vault Functions	##
-
-	def show_new_vault_dialog(self):
-		NewVaultDialog(create_vault_callback=self.create_vault).open()
+		self.main_container.clear_widgets()
 
 	def create_vault(
 		self,
@@ -154,10 +158,22 @@ class SelectionScreen(MDScreen):
 			return
 
 		try:
-			app_data_path = self.app_data_path
-			io.create_and_load_vault_for_gui(app_data_path, name, password)
-			self.load_vaults()
-			dialog.dismiss()
+			vault_session = VaultSession(
+				app_data_path=app_data_path,
+				vault_name=name,
+				password=password,
+				new_vault=True
+			)
+
+			pwd_manager	= vault_session.create_pwd_manager()
+			settings	= vault_session.create_settings()
+
+			self.screen_manager.open_new_vault(
+				dialog=dialog,
+				vault_name=name,
+				pwd_manager=pwd_manager,
+				settings=settings
+			)
 
 		except FileNotFoundError:
 			name_field.error_widget.text = "Could not create vault file"
@@ -183,19 +199,28 @@ class SelectionScreen(MDScreen):
 				error=e
 			)
 
+	def finish_importing_vault(self):
+		self.prompt_login = True
+		self.screen_manager.create_settings	= True
 
-##	Open Vault Function	##
+		self.refresh()
 
-	def show_open_vault_dialog(self, instance: VaultEntry) -> None:
-		login_dialog = LoginDialog(
-			vault=instance.vault_name,
-			login_callback=self.screen_manager.open_vault
+####	Open Dialog/Menu Methods	####
+
+	def show_new_vault_dialog(self):
+		NewVaultDialog(
+			create_vault_callback=self.create_vault
 		).open()
-
-##	Import Vault Function	##
 
 	def show_import_vault_file_picker(self):
 		ImportFilePicker(
 			app_data_path=self.app_data_path,
-			refresh_callback=self.refresh
+			on_finish_callback=self.finish_importing_vault,
+			type=".vault"
+		).open()
+
+	def show_open_vault_dialog(self, vault_name: str) -> None:
+		LoginDialog(
+			vault=vault_name,
+			login_callback=self.screen_manager.open_vault
 		).open()

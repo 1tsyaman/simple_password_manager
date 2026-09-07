@@ -2,43 +2,45 @@ from __future__ import annotations
 import random as rand
 from pyotp import TOTP
 from hashlib import sha1
-from time import sleep
 from copy import deepcopy
+from collections.abc import Callable
+from threading import RLock
 
 from core.encrypt import (
 	encrypt_data,
 	decrypt_data,
-	get_key_from_pwd
 )
 from core.entry import Entry
-from core.keys import derive_key
 from core.totp import TOTP_Config
+from core.types import config_t
 from core.errors import (
-	PasswordError,
-	PasswordRequirementsError,
 	EntryExistsError,
 	NoSuchEntryError,
 	TotpUriError,
+	TotpQRCodeError,
 	InconsistentVaultState,
 	VaultFormatError,
+	ImageOpenError,
+	QRDecodeError,
 	log
 )
+from core.passwords import (
+	password_satisfies_explicit_conditions,
+	generate_random_password,
+	LETTERS_LOWER,
+	LETTERS_UPPER,
+	DIGITS,
+	SPECIAL_CHARS,
+	PWD_LENGTH
+)
+from core.constants import (
+	PWD,
+	TOTP_SECRET,
+	TOTP_URI
+)
 
-# Config
-LETTERS_LOWER	= [l for l in "abcdefghijklmnopqrstuvwxyz"]
-LETTERS_UPPER	= [l.upper() for l in LETTERS_LOWER]
-DIGITS			= [d for d in "1234567890"]
-SPECIAL_CHARS	= [s for s in "!\"#$%&'()*+,-./:<=>?@[\\]^_`{|}~"]
-MIN_PWD_LENGTH	= 8
-PWD_LENGTH		= 24
+from storage.qr_reader import read_qr_code
 
-# Keywords
-PWD			= "pwd"
-TOTP_SECRET	= "totp_secret"
-TOTP_URI	= "totp_uri"
-
-
-URI_INVALID_MESSAGE	= "Provided TOTP URI is invalid."
 
 class PwdManager:
 	"""
@@ -48,58 +50,33 @@ class PwdManager:
 									TOTP_SECRET:	secret,
 									TOTP_URI:		uri
 								}
-		PwdManager.file_path is a string containing the file path containing the encrypted version.
+		PwdManager.sync_callback is a function that writes the encrypted version of the vault to file.
 		PwdManager._key is the encryption/decryption key.
 		PwdManager._salt is the salt used with the master pwd to create the encryption/decryption key.
+		PwdManager._lock is the RLock that guards the private _key attribute (passed by VaultSession)
 		PwdManager._totp is the TOTP object associated with this account
 	"""
 	def __init__(
 		self,
-		path: str	= "",
-		key	: bytes = bytes(0),
-		salt: bytes = bytes(0)
+		key				: bytes,
+		salt			: bytes,
+		sync_callback	: Callable[[dict[str, str]], None],
+		lock			: RLock,	
 	):
-		self.entries	: dict[Entry, dict[str, str]]	= {}
-		self.file_path	: str							= path
-		self._key		: bytes							= key
-		self._salt		: bytes							= salt
+		self.entries		: dict[Entry, dict[str, str]]		= {}
+		self.sync_callback	: Callable[[dict[str, str]], None]	= sync_callback
+		self._key			: bytes								= key
+		self._salt			: bytes								= salt
+		self._lock			: RLock								= lock
+
+		# Default config
+		self.special_chars	: list[str]						= SPECIAL_CHARS
+		self.pwd_length		: int							= PWD_LENGTH
+		self.use_uppercase	: bool							= True
+		self.use_digits		: bool							= True
+		self.use_special	: bool							= True
 
 ####	Vault modifiers		####
-
-	"""
-		@raises:
-			- PasswordRequirementsError(reason)
-			- FileNotFoundError(path) [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- OverflowError
-			- OSError
-	"""
-	def modify_master_password(
-		self: PwdManager,
-		pwd	: str
-	) -> None:
-		satisfies, reason = PwdManager._pwd_satisfies_conditions(
-			pwd,
-			len_min=MIN_PWD_LENGTH
-		)
-
-		if not satisfies:
-			raise PasswordRequirementsError(reason=reason)
-
-		salt, key = derive_key(pwd)
-		old_key, old_salt = self._key, self._salt
-
-		self._key	= key
-		self._salt	= salt
-
-		# rewrite the vault file to update the password
-		try:
-			self.encrypt()
-		except BaseException:
-			self._key	= old_key
-			self._salt	= old_salt
-			raise
 
 	"""
 		encrypts the PwdManager object and writes it into the vault file
@@ -117,6 +94,34 @@ class PwdManager:
 			- OSError
 	"""
 	def encrypt(self: PwdManager) -> None:
+		with self._lock:
+			record = self.get_encrypted_vault()
+			self.sync_callback(record)
+
+
+	"""
+		Returns a carbon copy of the current password manager
+	"""
+	def get_snapshot(self) -> PwdManager:
+		with self._lock:
+			key		= self._key
+			salt	= self._salt
+
+		pwd_manager_copy = PwdManager(
+			key=key,
+			salt=salt,
+			sync_callback=self.sync_callback,
+			lock=self._lock
+		)
+
+		pwd_manager_copy.entries = deepcopy(self.entries)
+
+		return pwd_manager_copy
+
+	"""
+		Assumes that self._lock is acquired
+	"""
+	def get_encrypted_vault(self) -> dict[str, str]:
 		data = {
 			f"{entry.get_website()}, {entry.get_username()}, {entry.get_description()}":
 				{
@@ -126,27 +131,57 @@ class PwdManager:
 					for entry in self.entries
 		}
 
-		encrypt_data(
+		return encrypt_data(
 			data=data,
 			key=self._key,
 			salt=self._salt,
-			file_path=self.file_path,
 			associated_data=""
 		)
 
-	"""
-		Returns a carbon copy of the current password manager
-	"""
-	def get_snapshot(self) -> PwdManager:
-		pwd_manager_copy = PwdManager(
-			path=self.file_path,
-			key=self._key,
-			salt=self._salt
+	def set_pwd_gen_config(
+		self,
+		config: dict[str, config_t]
+	):
+		for key in config.keys():
+			value = config[key]
+
+			match key:
+				case "special_chars":
+					assert isinstance(value, str)
+					self.special_chars = [char for char in value
+														if char in SPECIAL_CHARS]
+				case "password_length":
+					assert isinstance(value, int)
+					self.pwd_length = value
+				case "use_uppercase":
+					assert isinstance(value, bool)
+					self.use_uppercase = value
+				case "use_digits":
+					assert isinstance(value, bool)
+					self.use_digits = value
+				case "use_special":
+					assert isinstance(value, bool)
+					self.use_special = value
+
+	def set_key_salt_pair(
+		self,
+		key:	bytes,
+		salt:	bytes
+	):
+		with self._lock:
+			self._key	= key
+			self._salt	= salt
+
+	def generate_random_pwd(self):
+		chars = self._get_char_list()
+
+		return generate_random_password(
+			chars=chars,
+			password_length=self.pwd_length,
+			use_digits=self.use_digits,
+			use_uppercase=self.use_uppercase,
+			use_special=self.use_special
 		)
-
-		pwd_manager_copy.entries = deepcopy(self.entries)
-
-		return pwd_manager_copy
 
 ####	Entry modifiers		####
 
@@ -247,6 +282,43 @@ class PwdManager:
 
 	def get_entry_list_len(self: PwdManager) -> int:
 		return len(self.entries)
+
+	"""
+		Returns a list of dictionaries
+			{
+				"website":		'website',
+				"username":		'username',
+				"description":	'description',
+				"totp_config":	{
+									"issuer":		'issuer',
+									"account":		'account',
+									"algorithm":	'algorithm',
+									"digits":		digits,
+									"period":		period"
+								}
+			}
+		
+		"totp_config" can be {} if there is no config set up
+	"""
+	def get_entries_as_json(self: PwdManager) -> list[dict]:
+		return [entry.get_json()
+					for entry in self.entries]
+
+	def get_entry_as_json(
+		self,
+		website: str,
+		username: str
+	) -> dict:
+		entry = self.__get_entry_with_username_or_None(
+			website=website,
+			username=username
+		)
+
+		if entry is None:
+			raise NoSuchEntryError
+
+		return entry.get_json()
+
 
 ####	Entry attribute getters		####
 
@@ -354,12 +426,33 @@ class PwdManager:
 
 		self.entries[entry][PWD] = password
 
+
+	"""
+		@raises:
+			- NoSuchEntryError
+			- TotpQRCodeError
+			- TotpUriError
+	"""
+	def set_totp_config_qr_code(
+		self	: PwdManager,
+		website	: str,
+		username: str,
+		qr_path	: str,
+	):
+		uri = self.get_uri_from_qr_code(qr_path)
+
+		return self.set_totp_config_uri(
+			website=website,
+			username=username,
+			uri=uri
+		)
+
 	"""
 		@raises:
 			- NoSuchEntryError
 			- TotpUriError
 	"""
-	def set_totp_config(
+	def set_totp_config_uri(
 		self	: PwdManager,
 		website	: str,
 		username: str,
@@ -409,6 +502,30 @@ class PwdManager:
 
 ####	Private methods		####
 
+	def _get_char_list(self) -> list[str]:
+		chars = LETTERS_LOWER
+		if self.use_uppercase:
+			chars.extend(LETTERS_UPPER)
+		if self.use_digits:
+			chars.extend(DIGITS)
+		if self.use_special:
+			chars.extend(self.special_chars)
+
+		return chars
+
+	def _pwd_satisfies_conditions(
+		self,
+		pwd: str,
+	) -> tuple[bool, str]:
+		return password_satisfies_explicit_conditions(
+			password=pwd,
+			password_length=self.pwd_length,
+			use_digits=self.use_digits,
+			use_uppercase=self.use_uppercase,
+			use_special=self.use_special,
+			special_chars=self.special_chars
+		)
+
 	def __remove_entry(self: PwdManager, entry: Entry) -> None:
 		self.entries.pop(entry)
 
@@ -454,20 +571,47 @@ class PwdManager:
 
 ####	Statics		####
 
+	"""
+		@raises:
+			- TotpQRCodeError
+	"""
 	@staticmethod
-	def generate_random_pwd():
-		CHARS = LETTERS_LOWER + LETTERS_UPPER + DIGITS + SPECIAL_CHARS
-		while True:
-			pwd = ""
+	def get_uri_from_qr_code(image_path: str) -> str:
+		try:
+			return read_qr_code(image_path)
+		except (ImageOpenError, QRDecodeError):
+			raise TotpQRCodeError
 
-			for _ in range(PWD_LENGTH):
-				pwd += rand.choice(CHARS)
+	"""
+		@raises:
+			- TotpQRCodeError
+			- TotpUriError
+	"""
+	@staticmethod
+	def get_totp_uri_and_preview_from_qr_code(image_path: str) -> tuple[str, str]:
+		uri = PwdManager.get_uri_from_qr_code(image_path)
+		preview = PwdManager.get_totp_preview_from_uri(uri)
 
-			satisfies, _ = PwdManager._pwd_satisfies_conditions(pwd)
-			if satisfies:
-				break
+		return uri, preview
 
-		return pwd
+	"""
+		@raises:
+			- TotpUriError
+	"""
+	@staticmethod
+	def get_totp_preview_from_uri(uri: str) -> str:
+		config = TOTP_Config.from_uri(uri)
+
+		totp_config, secret = config
+
+		totp_code = TOTP(
+			s=secret,
+			digits=totp_config.digits,
+			digest=sha1,
+			interval=totp_config.period
+		).now()
+
+		return totp_code
 
 	"""
 		decrypted_data has the following form:
@@ -480,54 +624,38 @@ class PwdManager:
 			.
 			.
 		}
+	"""
 
+	"""
 		@raises:
-			- PasswordError
 			- FileNotFoundError(path) [OSError]
 			- KeyLengthError
-			- KeyDerivationError
 			- VaultFormatError
 			- CorruptedVaultError
 			- InconsistentVaultState
 			- OSError
 	"""
 	@staticmethod
-	def from_encrypted_file(
-		path: str,
-		pwd: str
+	def from_encrypted_file_key(
+		vault			: dict[str, str],
+		key				: bytes,
+		salt			: bytes,
+		sync_callback	: Callable[[dict[str, str]], None],
+		lock			: RLock,
 	) -> PwdManager:
-		satisfies, _ = PwdManager._pwd_satisfies_conditions(
-			pwd=pwd,
-			len_min=MIN_PWD_LENGTH
+		pwd_manager = PwdManager(
+			key=key,
+			salt=salt,
+			sync_callback=sync_callback,
+			lock=lock
 		)
-
-		if not satisfies:
-			raise PasswordError
-
-		pwd_manager = PwdManager()
-		pwd_manager.file_path = path
-
-		salt, key = get_key_from_pwd(
-			pwd=pwd,
-			file_path=path
-		)
-
-		pwd_manager._key	= key
-		pwd_manager._salt	= salt
 
 		data = decrypt_data(
 			key=key,
-			file_path=path
+			record=vault
 		)
 
-		if not PwdManager._has_new_format(data):
-			# Fallback
-			if PwdManager._has_old_format(data):
-				return PwdManager._from_encrypted_file_old(
-					path=path,
-					pwd=pwd
-				)
-
+		if not PwdManager._has_correct_format(data):
 			raise VaultFormatError
 
 		for tup in data:
@@ -564,7 +692,7 @@ class PwdManager:
 
 			if len(uri) > 0:
 				try:
-					pwd_manager.set_totp_config(
+					pwd_manager.set_totp_config_uri(
 						website=website,
 						username=username,
 						uri=uri
@@ -578,181 +706,33 @@ class PwdManager:
 		return pwd_manager
 
 	"""
-		@raises:
-			- PasswordRequirementsError(reason)
-			- FileNotFoundError(path) [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- OSError
-	"""
-	@staticmethod
-	def pwd_manager_from_pwd(
-		path	: str,
-		pwd		: str
-	) -> PwdManager:
-		satisfies, reason = PwdManager._pwd_satisfies_conditions(
-			pwd=pwd,
-			len_min=MIN_PWD_LENGTH
-		)
-
-		if not satisfies:
-			raise PasswordRequirementsError(
-				reason=reason
-			)
-
-		pwd_manager = PwdManager._pwd_manager_from_pwd(
-			path=path,
-			pwd=pwd
-		)
-		return pwd_manager
-
-####	Private statics		####
-
-	"""
-		*This is the old format (pre TOTP support)*
-
-		decrypted_data has the following form:
-		{
-			"website, username, description": password,
-			.
-			.
-			.
-		}
-
-		@raises:
-			- PasswordError
-			- FileNotFoundError [OSError]
-			- KeyLengthError
-			- KeyDerivationError
-			- VaultFormatError
-			- CorruptedVaultError
-			- OSError
-	"""
-	@staticmethod
-	def _from_encrypted_file_old(
-		path	: str,
-		pwd		: str
-	) -> PwdManager:
-		satisfies, reason = PwdManager._pwd_satisfies_conditions(
-			pwd=pwd,
-			len_min=MIN_PWD_LENGTH
-		)
-
-		if not satisfies:
-			raise PasswordError(f"Password does not meet the minimum requirements: {reason}")
-
-		pwd_manager = PwdManager()
-		pwd_manager.file_path = path
-
-		salt, key = get_key_from_pwd(
-			pwd=pwd,
-			file_path=path
-		)
-		pwd_manager._key	= key
-		pwd_manager._salt	= salt
-
-		data: dict[str, str] = decrypt_data(
-			key=key,
-			file_path=path
-		)
-
-		try:
-			for tup in data:
-				website, username, description = (
-					value.strip()
-						for value in tup.split(",", 2)
-				)
-
-				try:
-					pwd_manager.add_entry(
-						website=website,
-						username=username,
-						description=description,
-						password=data[tup]
-					)
-				except EntryExistsError:
-					# Fallback to avoid data loss
-					while True:
-						random = rand.randint(1, 1000)
-						website = website + f"_dup_{random}"
-						try:
-							pwd_manager.add_entry(
-								website=website,
-								username=username,
-								description=description,
-								password=data[tup]
-							)
-							break
-						except EntryExistsError:
-							continue
-
-		except (
-			KeyError,
-			TypeError,
-			ValueError
-		) as e:
-			raise VaultFormatError from e
-
-		return pwd_manager
-
-	"""
 		creates a PwdManager object and initializes the vault file
 		@raises:
 			- FileNotFoundError(path) [OSError]
 			- KeyLengthError
-			- KeyDerivationError
 			- OSError
 	"""
 	@staticmethod
-	def _pwd_manager_from_pwd(
-		path	: str,
-		pwd		: str
+	def pwd_manager_from_key(
+		key				: bytes,
+		salt			: bytes,
+		sync_callback	: Callable[[dict[str, str]], None],
+		lock			: RLock,
 	) -> PwdManager:
-		salt, key = derive_key(pwd)
-
 		pwd_manager = PwdManager(
-			path=path,
 			key=key,
-			salt=salt
+			salt=salt,
+			sync_callback=sync_callback,
+			lock=lock
 		)
 
 		pwd_manager.encrypt()
-
 		return pwd_manager
 
-	@staticmethod
-	def _pwd_satisfies_conditions(pwd: str, len_min=PWD_LENGTH) -> tuple[bool, str]:
-		if len(pwd) < len_min:
-			return False, f'must be at least {len_min} characters long'
-
-		for digit in DIGITS:
-			if digit in pwd:
-				break
-		else:
-			return False, 'must contain at least one digit'
-
-		for letter in LETTERS_LOWER:
-			if letter in pwd:
-				break
-		else:
-			return False, 'must contain at least one lowercase character'
-
-		for letter in LETTERS_UPPER:
-			if letter in pwd:
-				break
-		else:
-			return False, 'must contain at least one uppercase character'
-
-		for spec in SPECIAL_CHARS:
-			if spec in pwd:
-				break
-		else:
-			return False, 'must contain at least one special character'
-
-		return True, ''
+####	Private statics		####
 
 	@staticmethod
-	def _has_new_format(data: object) -> bool:
+	def _has_correct_format(data: object) -> bool:
 		return 	isinstance(data, dict) 	\
 			and all(
 					isinstance(key, str)
@@ -760,15 +740,5 @@ class PwdManager:
 					and isinstance(value, dict)
 					and isinstance(value.get(PWD), str)
 					and isinstance(value.get(TOTP_URI), str)
-						for key, value in data.items()
-				)
-
-	@staticmethod
-	def _has_old_format(data: object) -> bool:
-		return isinstance(data, dict) 	\
-			and all(
-					isinstance(key, str)
-					and len(key.split(",", 2)) == 3
-					and isinstance(value, str)
 						for key, value in data.items()
 				)

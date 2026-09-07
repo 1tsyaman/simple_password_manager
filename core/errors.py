@@ -37,7 +37,34 @@ class EntryHasNoTotp(Exception):
 class TotpUriError(Exception):
 	pass
 
+class TotpQRCodeError(Exception):
+	pass
+
 class InvalidEntryJSON(Exception):
+	pass
+
+class ImageOpenError(Exception):
+	pass
+
+class QRDecodeError(Exception):
+	pass
+
+class NoVaultFileError(Exception):
+	pass
+
+class InvalidJSONError(Exception):
+	pass
+
+class InvalidVaultFile(Exception):
+	pass
+
+class SettingsFileModifiedError(Exception):
+	pass
+
+class SettingsKeyNotSetError(Exception):
+	pass
+
+class SettingsLoadError(Exception):
 	pass
 
 """

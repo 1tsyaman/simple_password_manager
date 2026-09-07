@@ -1,0 +1,20 @@
+{
+    "Password Generation": {
+        "special_chars": "!\"#$%&'()*+,-./:<=>?@[\\]^_`{|}~",
+        "password_length": 24,
+        "use_uppercase": true,
+        "use_digits": true,
+        "use_special": true
+    },
+    "Security": {
+        "timeout_duration": 60,
+        "lock_on_minimize": true
+    },
+    "Others": {
+        "theme": "Light"
+    },
+    "HMAC": {
+        "Salt": "825586e27e367f4f82fa5cca636ebc07",
+        "Hash": "812e3092ddf11bfbfb78f42721e5c9712e35d55901c1d908955f392d7ad4a340"
+    }
+}

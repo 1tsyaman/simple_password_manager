@@ -10,11 +10,13 @@ from typing import Never
 import cli.actions as act
 
 from core.pwd_manager import PwdManager
+from core.settings import Settings
+from core.vault_loader import VaultSession
 from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
 from cli.display import display_list, clear_screen, print_footer
 from cli.util import format_prev_next_str, is_valid_index
-from storage.io import load_vault, create_and_load_vault, vault_exists, delete_vault
+from storage.io import vault_exists, delete_file, get_dir_path_and_vault_name
 from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
 
 from core.errors import (
@@ -25,11 +27,12 @@ from core.errors import (
 	CorruptedVaultError,
 	PasswordRequirementsError,
 	InconsistentVaultState,
+	log
 )
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
 
-def _init(argv: list[str]) -> PwdManager | int:
+def _init(argv: list[str]) -> tuple[VaultSession, PwdManager, Settings] | int:
 	parser = argparse.ArgumentParser(
 		description="Simple Password Manager CLI"
 	)
@@ -48,12 +51,19 @@ def _init(argv: list[str]) -> PwdManager | int:
 	init_watchdog(exit_func=timeout_exit)
 
 	path = args.path
+	directory, vault_name = get_dir_path_and_vault_name(path)
 
 	if not args.create:
 		pwd = act.grab_master_password()
 
 		try:
-			pwd_manager = load_vault(path, pwd)
+			vault_session = VaultSession(
+				app_data_path=directory,
+				vault_name=vault_name,
+				password=pwd
+			)
+			pwd_manager = vault_session.get_pwd_manager()
+			settings	= vault_session.get_settings()
 		except PasswordError:
 			print("Vault loading failed: Password incorrect")
 			return -1
@@ -91,7 +101,7 @@ def _init(argv: list[str]) -> PwdManager | int:
 						message2="Permanently delete the given vault? Y/n")
 			if ans:
 				try:
-					delete_vault(path)
+					delete_file(path)
 				except OSError as e:
 					print(f"Deleting vault failed: {e}")
 					return -1
@@ -102,7 +112,14 @@ def _init(argv: list[str]) -> PwdManager | int:
 		pwd = act.grab_master_password(new=True)
 
 		try:
-			pwd_manager = create_and_load_vault(path, pwd)
+			vault_session = VaultSession(
+				app_data_path=directory,
+				vault_name=vault_name,
+				password=pwd,
+				new_vault=True
+			)
+			pwd_manager = vault_session.create_pwd_manager()
+			settings	= vault_session.create_settings()
 		except KeyLengthError:
 			print("Vault creation failed: Key length is unexpected")
 			return -1
@@ -114,11 +131,17 @@ def _init(argv: list[str]) -> PwdManager | int:
 			return -1
 		except OSError as e:
 			print(f"Vault creation failed: {e}")
+			log("FAILED", e)
+			sleep(100)
 			return -1
 
-	return pwd_manager
+	return vault_session, pwd_manager, settings
 
-def _main_loop(pwd_manager: PwdManager):
+def _main_loop(
+	vault_session	: VaultSession,
+	pwd_manager		: PwdManager,
+	settings		: Settings,
+):
 	index = 0
 	modified = False
 
@@ -127,7 +150,7 @@ def _main_loop(pwd_manager: PwdManager):
 
 		n = pwd_manager.get_entry_list_len()
 		options = display_list(pwd_manager.get_website_and_username_string_list(), index)
-		
+
 		print_footer()
 
 		main_str = ""
@@ -158,10 +181,10 @@ def _main_loop(pwd_manager: PwdManager):
 						modified |= act.add_entry(pwd_manager)
 						break
 					case "g":
-						act.gen_rand_password()
+						act.gen_rand_password(pwd_manager)
 						break
 					case "m":
-						modified |= act.modify_master_password(pwd_manager)
+						modified |= act.modify_master_password(vault_session, pwd_manager, settings)
 						break
 					case "f":
 						entry = act.search_entries(pwd_manager)
@@ -186,7 +209,7 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
 
 	if not is_valid_index(key, index, pwd_manager.get_entry_list_len()):
 		return False
-	
+
 	i = (10 * index) + int(key)
 
 	entry = pwd_manager.get_entry_by_index(i)
@@ -223,7 +246,7 @@ def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
 				return False
 
 		clear_screen()
-		
+
 def cleanup() -> None:
 	clear_screen(header=False)
 	cancel_watchdog()
@@ -240,15 +263,21 @@ def timeout_exit() -> None:
 def main(argv):
 	pwd_manager: PwdManager | int = -1
 	try:
-		pwd_manager = _init(argv)
+		res = _init(argv)
 
-		if not isinstance(pwd_manager, PwdManager):	# returns int if it fails
+		if isinstance(res, int):	# returns int if it fails
 			sleep(2)
 			quit_program(exit_code=pwd_manager, message="Failed to initalize PwdManager object.")
 
 		sleep(1)	# show success before clearing the screen
 
-		_main_loop(pwd_manager)
+		vault_session, pwd_manager, settings = res
+
+		_main_loop(
+			vault_session=vault_session,
+			pwd_manager=pwd_manager,
+			settings=settings
+		)
 		quit_program(exit_code=0, message="Goodbye")
 
 	except KeyboardInterrupt:				# this covers two cases: timeout, or ctrl+c input by user

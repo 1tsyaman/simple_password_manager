@@ -1,6 +1,9 @@
-import sys
 from time import sleep
-from core.pwd_manager import PwdManager, MIN_PWD_LENGTH
+from core.pwd_manager import PwdManager
+from core.settings import Settings
+from core.vault_loader import VaultSession
+from core.constants import MIN_PWD_LENGTH
+from core.passwords import password_satisfies_explicit_conditions
 from core.entry import Entry
 from core.errors import (
 	KeyLengthError,
@@ -29,7 +32,7 @@ def add_entry(pwd_manager: PwdManager) -> bool:
 	key = get_key()
 
 	if key == 'y':
-		password = PwdManager.generate_random_pwd()
+		password = pwd_manager.generate_random_pwd()
 
 		if safe_copy(password):
 			print(f"password = {str_color(password, 'r')} was copied to clipboard")
@@ -135,7 +138,7 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 
 def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 	modified = False
-	
+
 	while True:
 		clear_screen()
 
@@ -166,7 +169,11 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 						return modified
 
 
-def modify_master_password(pwd_manager: PwdManager) -> bool:
+def modify_master_password(
+	vault_session	: VaultSession,
+	pwd_manager		: PwdManager,
+	settings		: Settings,
+) -> bool:
 	clear_screen()
 
 	print("Enter your new master password or leave empty to go back.")
@@ -181,7 +188,11 @@ def modify_master_password(pwd_manager: PwdManager) -> bool:
 
 		if key == "y":
 			try:
-				pwd_manager.modify_master_password(pwd)
+				vault_session.modify_master_password(
+					password=pwd,
+					pwd_manager=pwd_manager,
+					settings=settings
+				)
 
 			except FileNotFoundError as e:
 				print(f"Master password update failed: Vault file path is incorrect: {e}")
@@ -312,12 +323,12 @@ def grab_master_password(new=False) -> str:
 
 	while pwd != pwd_conf:
 		pwd = input_password("Enter master password: ")
-		satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+		satisfies, reason = password_satisfies_explicit_conditions(pwd)
 
 		while (new and not satisfies):
 			display_password_rejection_reason(reason=reason, min_len=MIN_PWD_LENGTH)
 			pwd = input_password("Enter master password: ")
-			satisfies, reason = PwdManager._pwd_satisfies_conditions(pwd, len_min=MIN_PWD_LENGTH)
+			satisfies, reason = password_satisfies_explicit_conditions(pwd)
 
 		if not new:
 			break
@@ -410,7 +421,7 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 		return False
 
 	try:
-		pwd_manager.set_totp_config(website=website, username=username, uri=uri)
+		pwd_manager.set_totp_config_uri(website=website, username=username, uri=uri)
 	except (NoSuchEntryError, TotpUriError) as e:
 		if isinstance(e, NoSuchEntryError):
 			print("Could not set TOTP, entry does not exist!")
@@ -421,10 +432,10 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 	
 	return True
 
-def gen_rand_password() -> None:
+def gen_rand_password(pwd_manager: PwdManager) -> None:
 	clear_screen()
 
-	pwd = PwdManager.generate_random_pwd()
+	pwd = pwd_manager.generate_random_pwd()
 	if safe_copy(pwd):
 		print(f"Your random password {str_color(pwd, 'r')} was copied to clipboard!")
 	else:

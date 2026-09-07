@@ -1,10 +1,13 @@
+from collections.abc import Callable
+
 from kivy.utils import platform
 from kivy.metrics import dp
 from kivy.core.window import Window
 from kivy.clock import Clock
+from kivy.properties import StringProperty
 
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.textfield import MDTextField
+from kivymd.uix.textfield import MDTextField, MDTextFieldTrailingIcon
 
 class AndroidFocusBehaviour:
 	def _ensure_visible(
@@ -106,8 +109,70 @@ class AndroidFocusBehaviour:
 		)
 
 class FocusableTextField(MDTextField, AndroidFocusBehaviour):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.bind(
-			focus=self._handle_focus
+	trailing_icon = StringProperty("")
+
+	def __init__(
+		self,
+		*args,
+		trailing_icon: str = "",
+		trailing_callback: Callable | None = None,
+		**kwargs
+	):
+		self.trailing_callback	= trailing_callback
+
+		self._trailing_icon_widget = MDTextFieldTrailingIcon(
+			icon=trailing_icon
 		)
+
+		super().__init__(
+			self._trailing_icon_widget,
+			*args,
+			**kwargs
+		)
+
+		self.bind(
+			focus=self._handle_focus,
+			trailing_icon=self._switch_icon
+		)
+
+	def _switch_icon(
+			self,
+			instance,
+			value: str
+		):
+		self._trailing_icon_widget.icon = value
+
+	def toggle_password_mask(self):
+		self.password = not self.password
+
+	def password_mask_is_set(self):
+		return self.password
+
+	"""
+		Workaround to make the icon behave like a clickable button
+	"""
+	def on_touch_down(self, touch):
+		if self.trailing_callback is not None:
+			"""
+				The icon is not an actual widget, rather is a shape drawn by KivyMd.
+				We get the coordinates it occupies from KivyMd
+					bottom-left = (icon_x, icon_y)
+					+------------------+
+					|                  |
+					|       icon       |  icon_h
+					|                  |
+					+------------------+
+							icon_w
+			"""
+			icon_x, icon_y = self.get_adjusted_pos_trailing_icon()
+			icon_w, icon_h = self._trailing_icon_widget.texture_size
+
+			# Makeshift trailing_point.collide_point() check
+			if (
+				icon_x <= touch.x <= icon_x + icon_w
+				and icon_y <= touch.y <= icon_y + icon_h
+			):
+				self.trailing_callback()
+				return True
+
+		return super().on_touch_down(touch)

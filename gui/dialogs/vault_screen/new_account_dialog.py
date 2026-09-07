@@ -18,17 +18,30 @@ from core.pwd_manager import PwdManager
 class NewAccountDialog(MDDialog):
 	def __init__(
 		self,
-		add_account_callback: Callable,
+		add_account_callback	: Callable,
+		random_pwd_callback		: Callable[[], str],
 		*args,
 		**kwargs
 	):
-		self.website_field				= InputField(title="Website")
-		self.username_field				= InputField(title="Username")
-		self.password_field				= InputField(title="Password")
-		self.description_field			= InputField(title="Description")
+		self.website_field				= InputField(
+			title="Website",
+			icon="web"
+		)
+		self.username_field				= InputField(
+			title="Username",
+			icon="account"
+		)
+		self.password_field				= InputField(
+			title="Password",
+			icon="key",
+			trailing_icon="auto-fix",
+			trailing_callback=lambda *_: setattr(self.password_field, "text", random_pwd_callback())
+		)
+		self.description_field			= InputField(
+			title="Description",
+			icon="text"
+		)
 		self.add_account_callback		= add_account_callback
-
-		self.password_field.text = PwdManager.generate_random_pwd()	# Auto-fill with random password
 
 		super().__init__(
 			MDDialogIcon(
