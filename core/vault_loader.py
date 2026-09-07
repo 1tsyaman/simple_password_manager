@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from threading import RLock	# Allows the thread that acquired it first to aquire it again
 
 from storage.constants import VAULT_ENDING
 from core.encrypt import get_salt_from_vault, atomic_write
@@ -24,6 +25,9 @@ class VaultSession:
 	auth_key	: bytes
 	salt		: bytes
 	json		: dict[str, dict]
+
+	# Guards the reads/writes on the vault file and in-memory keys/salt
+	lock		: RLock
 
 	"""
 		@raises:
@@ -73,6 +77,7 @@ class VaultSession:
 
 		self.vault_key	= self._derive_vault_key(master_key)
 		self.auth_key 	= self._derive_auth_key(master_key)
+		self.lock 		= RLock()
 
 
 	"""
@@ -97,47 +102,48 @@ class VaultSession:
 				reason=reason
 			)
 
-		old_salt		= self.salt
-		old_vault_key	= self.vault_key
-		old_auth_key	= self.auth_key
+		salt, master_key = derive_master_key(password)
 
-		salt, master_key	= derive_master_key(password)
-		vault_key			= self._derive_vault_key(master_key)
-		auth_key			= self._derive_auth_key(master_key)
+		with self.lock:
+			old_salt		= self.salt
+			old_vault_key	= self.vault_key
+			old_auth_key	= self.auth_key
 
-		self._set_salt_and_keys(salt, vault_key, auth_key)
-		pwd_manager.set_key_salt_pair(
-			key=vault_key,
-			salt=salt
-		)
-		settings.set_key_salt_pair(
-			key=auth_key,
-			salt=salt
-		)
+			vault_key		= self._derive_vault_key(master_key)
+			auth_key		= self._derive_auth_key(master_key)
 
-		try:
-			self.sync(
-				pwd_manager=pwd_manager,
-				settings=settings
-			)
-		except Exception as e:
-			log(
-				message="Something went wrong while trying to sync with the new key.",
-				error=e
-			)
-
-			# Restore old values
-			self._set_salt_and_keys(old_salt, old_vault_key, old_auth_key)
+			self._set_salt_and_keys(salt, vault_key, auth_key)
 			pwd_manager.set_key_salt_pair(
-				key=old_vault_key,
-				salt=old_salt
+				key=vault_key,
+				salt=salt
 			)
 			settings.set_key_salt_pair(
-				key=old_auth_key,
-				salt=old_salt
+				key=auth_key,
+				salt=salt
 			)
 
-			raise
+			try:
+				self.sync(
+					pwd_manager=pwd_manager,
+					settings=settings
+				)
+			except Exception as e:
+				log(
+					message="Something went wrong while trying to sync with the new key.",
+					error=e
+				)
+
+				# Restore old values
+				self._set_salt_and_keys(old_salt, old_vault_key, old_auth_key)
+				pwd_manager.set_key_salt_pair(
+					key=old_vault_key,
+					salt=old_salt
+				)
+				settings.set_key_salt_pair(
+					key=old_auth_key,
+					salt=old_salt
+				)
+				raise
 
 
 	"""
@@ -150,29 +156,34 @@ class VaultSession:
 			- OSError
 	"""
 	def get_pwd_manager(self) -> PwdManager:
-		try:
-			self.json = self.read_json()
-		except FileNotFoundError:
-			raise NoVaultFileError
-		except InvalidJSONError:
-			raise InvalidVaultFile
-		except OSError as e:
-			log(
-				message=f"Failed to open vault file {self.vault_path}",
-				error=e
-			)
-			raise
+		with self.lock:
+			try:
+				self.json = self.read_json()
 
-		if not "Vault" in self.json.keys():
-			raise InvalidVaultFile
+			except FileNotFoundError:
+				raise NoVaultFileError
+			except InvalidJSONError:
+				raise InvalidVaultFile
+			except OSError as e:
+				log(
+					message=f"Failed to open vault file {self.vault_path}",
+					error=e
+				)
+				raise
 
-		vault = self.json["Vault"]
+			if not "Vault" in self.json.keys():
+				raise InvalidVaultFile
+
+			vault		= self.json["Vault"]
+			vault_key	= self.vault_key
+			salt		= self.salt
 
 		return PwdManager.from_encrypted_file_key(
 			vault=vault,
-			key=self.vault_key,
-			salt=self.salt,
-			sync_callback=self.sync_vault
+			key=vault_key,
+			salt=salt,
+			sync_callback=self.sync_vault,
+			lock=self.lock,
 		)
 
 	"""
@@ -182,10 +193,15 @@ class VaultSession:
 			- OSError
 	"""
 	def create_pwd_manager(self) -> PwdManager:
+		with self.lock:
+			vault_key	= self.vault_key
+			salt		= self.salt
+
 		return PwdManager.pwd_manager_from_key(
-			key=self.vault_key,
-			salt=self.salt,
-			sync_callback=self.sync_vault
+			key=vault_key,
+			salt=salt,
+			sync_callback=self.sync_vault,
+			lock=self.lock,
 		)
 
 	"""
@@ -196,29 +212,33 @@ class VaultSession:
 			- OSError
 	"""
 	def get_settings(self) -> Settings:
-		try:
-			self.json = self.read_json()
-		except FileNotFoundError:
-			raise NoVaultFileError
-		except InvalidJSONError:
-			raise InvalidVaultFile
-		except OSError as e:
-			log(
-				message=f"Failed to open vault file {self.vault_path}",
-				error=e
-			)
-			raise
+		with self.lock:
+			try:
+				self.json = self.read_json()
+			except FileNotFoundError:
+				raise NoVaultFileError
+			except InvalidJSONError:
+				raise InvalidVaultFile
+			except OSError as e:
+				log(
+					message=f"Failed to open vault file {self.vault_path}",
+					error=e
+				)
+				raise
 
-		if not "Settings" in self.json.keys():
-			raise InvalidVaultFile
+			if not "Settings" in self.json.keys():
+				raise InvalidVaultFile
 
-		settings = self.json["Settings"]
+			settings	= self.json["Settings"]
+			auth_key	= self.auth_key
+			salt		= self.salt
 
 		return Settings.load_settings(
 			settings=settings,
-			key=self.auth_key,
-			salt=self.salt,
-			sync_callback=self.sync_settings
+			key=auth_key,
+			salt=salt,
+			sync_callback=self.sync_settings,
+			lock=self.lock,
 		)
 
 	"""
@@ -231,22 +251,23 @@ class VaultSession:
 		self,
 		settings: dict[str, dict]	# hashed dict
 	):
-		try:
-			self.json = self.read_json()
-		except FileNotFoundError:
-			raise NoVaultFileError
-		except InvalidJSONError:
-			raise InvalidVaultFile
-		except OSError as e:
-			log(
-				message=f"Failed to open vault file {self.vault_path}",
-				error=e
-			)
-			raise
+		with self.lock:
+			try:
+				self.json = self.read_json()
+			except FileNotFoundError:
+				raise NoVaultFileError
+			except InvalidJSONError:
+				raise InvalidVaultFile
+			except OSError as e:
+				log(
+					message=f"Failed to open vault file {self.vault_path}",
+					error=e
+				)
+				raise
 
-		self.json["Settings"] = settings
+			self.json["Settings"] = settings
 
-		atomic_write(self.json, Path(self.vault_path), indent=4)
+			atomic_write(self.json, Path(self.vault_path), indent=4)
 
 	"""
 		@raises:
@@ -258,35 +279,37 @@ class VaultSession:
 		self,
 		vault: dict[str, str]	# encrypted dict
 	):
-		try:
-			self.json = self.read_json()
-		except FileNotFoundError:
-			raise NoVaultFileError
-		except InvalidJSONError:
-			raise InvalidVaultFile
-		except OSError as e:
-			log(
-				message=f"Failed to open vault file {self.vault_path}",
-				error=e
-			)
-			raise
+		with self.lock:
+			try:
+				self.json = self.read_json()
+			except FileNotFoundError:
+				raise NoVaultFileError
+			except InvalidJSONError:
+				raise InvalidVaultFile
+			except OSError as e:
+				log(
+					message=f"Failed to open vault file {self.vault_path}",
+					error=e
+				)
+				raise
 
-		self.json["Vault"] = vault
+			self.json["Vault"] = vault
 
-		atomic_write(self.json, Path(self.vault_path), indent=4)
+			atomic_write(self.json, Path(self.vault_path), indent=4)
 
 	def sync(
 		self,
 		pwd_manager	: PwdManager,
 		settings	: Settings
 	):
-		encrypted_vault = pwd_manager.get_encrypted_vault()
-		hashed_settings = settings.get_hashed_settings()
+		with self.lock:
+			encrypted_vault = pwd_manager.get_encrypted_vault()
+			hashed_settings = settings.get_hashed_settings()
 
-		self.json["Vault"]		= encrypted_vault
-		self.json["Settings"]	= hashed_settings
+			self.json["Vault"]		= encrypted_vault
+			self.json["Settings"]	= hashed_settings
 
-		atomic_write(self.json, Path(self.vault_path), indent=4)
+			atomic_write(self.json, Path(self.vault_path), indent=4)
 
 	"""
 		@raises:
@@ -297,6 +320,9 @@ class VaultSession:
 	def read_json(self) -> dict[str, dict]:
 		return io.load_json(self.vault_path)
 
+	"""
+		Assumes self.lock is acquired
+	"""
 	def _set_salt_and_keys(
 		self,
 		salt		: bytes,
@@ -313,10 +339,15 @@ class VaultSession:
 			- OSError
 	"""
 	def create_settings(self) -> Settings:
+		with self.lock:
+			auth_key	= self.auth_key
+			salt		= self.salt
+
 		return Settings.from_key(
-			key=self.auth_key,
-			salt=self.salt,
+			key=auth_key,
+			salt=salt,
 			sync_callback=self.sync_settings,
+			lock=self.lock,
 		)
 
 	@staticmethod

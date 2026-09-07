@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import copy
 from collections.abc import Callable
+from threading import RLock
 
 import storage.io as io
 from core.authenticate import generate_tag, is_authentic, encode_data
@@ -33,12 +34,14 @@ class Settings:
 		sync_callback	: Callable[[dict[str, dict]], None],
 		settings		: dict[str, dict],
 		key				: bytes,
-		salt			: bytes
+		salt			: bytes,
+		lock			: RLock		# Guards _key/_salt attributes
 	):
 		self.sync_callback	= sync_callback
 		self.settings		= settings
 		self._key			= key
 		self._salt			= salt
+		self._lock			= lock
 
 	"""
 		Does not sync to file, synchronization should be done explicitly
@@ -65,8 +68,9 @@ class Settings:
 		key:	bytes,
 		salt:	bytes
 	):
-		self._key	= key
-		self._salt	= salt
+		with self._lock:
+			self._key	= key
+			self._salt	= salt
 
 	def get_pwd_gen_config(self) -> dict[str, config_t]:
 		return self.settings["Password Generation"]
@@ -83,9 +87,14 @@ class Settings:
 		if not self._key_is_set():
 			raise SettingsKeyNotSetError
 
-		settings = self.get_hashed_settings()
-		return self.sync_callback(settings)
+		with self._lock:
+			settings = self.get_hashed_settings()
+			return self.sync_callback(settings)
 
+
+	"""
+		Assumes self._lock is acquired
+	"""
 	def get_hashed_settings(self) -> dict[str, dict]:
 		settings = copy.deepcopy(self.settings)
 		data = encode_data(settings)
@@ -118,7 +127,8 @@ class Settings:
 		self.sync_to_file()
 
 	def _key_is_set(self) -> bool:
-		return len(self._key) != 0 and len(self._salt) != 0
+		with self._lock:
+			return len(self._key) != 0 and len(self._salt) != 0
 
 	"""
 		@raises:
@@ -130,7 +140,8 @@ class Settings:
 		settings		: dict[str, dict],
 		key				: bytes,
 		salt			: bytes,
-		sync_callback	: Callable[[dict[str, dict]], None]
+		sync_callback	: Callable[[dict[str, dict]], None],
+		lock			: RLock
 	) -> Settings:
 		if not Settings.settings_dict_is_valid(settings):
 			raise InvalidVaultFile
@@ -146,7 +157,8 @@ class Settings:
 			settings=settings,
 			key=key,
 			salt=salt,
-			sync_callback=sync_callback
+			sync_callback=sync_callback,
+			lock=lock
 		)
 
 	"""
@@ -159,13 +171,15 @@ class Settings:
 		key				: bytes,
 		salt			: bytes,
 		sync_callback	: Callable[[dict[str, dict]], None],
+		lock			: RLock,
 		settings		: dict[str, dict] = DEFAULT_SETTINGS,
 	) -> Settings:
 		settings_obj = Settings(
 			settings=settings,
 			key=key,
 			salt=salt,
-			sync_callback=sync_callback
+			sync_callback=sync_callback,
+			lock=lock
 		)
 
 		settings_obj.sync_to_file()

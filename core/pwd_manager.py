@@ -4,6 +4,7 @@ from pyotp import TOTP
 from hashlib import sha1
 from copy import deepcopy
 from collections.abc import Callable
+from threading import RLock
 
 from core.encrypt import (
 	encrypt_data,
@@ -52,6 +53,7 @@ class PwdManager:
 		PwdManager.sync_callback is a function that writes the encrypted version of the vault to file.
 		PwdManager._key is the encryption/decryption key.
 		PwdManager._salt is the salt used with the master pwd to create the encryption/decryption key.
+		PwdManager._lock is the RLock that guards the private _key attribute (passed by VaultSession)
 		PwdManager._totp is the TOTP object associated with this account
 	"""
 	def __init__(
@@ -59,11 +61,13 @@ class PwdManager:
 		key				: bytes,
 		salt			: bytes,
 		sync_callback	: Callable[[dict[str, str]], None],
+		lock			: RLock,	
 	):
 		self.entries		: dict[Entry, dict[str, str]]		= {}
 		self.sync_callback	: Callable[[dict[str, str]], None]	= sync_callback
 		self._key			: bytes								= key
 		self._salt			: bytes								= salt
+		self._lock			: RLock								= lock
 
 		# Default config
 		self.special_chars	: list[str]						= SPECIAL_CHARS
@@ -90,24 +94,33 @@ class PwdManager:
 			- OSError
 	"""
 	def encrypt(self: PwdManager) -> None:
-		record = self.get_encrypted_vault()
-		self.sync_callback(record)
+		with self._lock:
+			record = self.get_encrypted_vault()
+			self.sync_callback(record)
 
 
 	"""
 		Returns a carbon copy of the current password manager
 	"""
 	def get_snapshot(self) -> PwdManager:
+		with self._lock:
+			key		= self._key
+			salt	= self._salt
+
 		pwd_manager_copy = PwdManager(
-			key=self._key,
-			salt=self._salt,
-			sync_callback=self.sync_callback
+			key=key,
+			salt=salt,
+			sync_callback=self.sync_callback,
+			lock=self._lock
 		)
 
 		pwd_manager_copy.entries = deepcopy(self.entries)
 
 		return pwd_manager_copy
 
+	"""
+		Assumes that self._lock is acquired
+	"""
 	def get_encrypted_vault(self) -> dict[str, str]:
 		data = {
 			f"{entry.get_website()}, {entry.get_username()}, {entry.get_description()}":
@@ -155,8 +168,9 @@ class PwdManager:
 		key:	bytes,
 		salt:	bytes
 	):
-		self._key	= key
-		self._salt	= salt
+		with self._lock:
+			self._key	= key
+			self._salt	= salt
 
 	def generate_random_pwd(self):
 		chars = self._get_char_list()
@@ -626,12 +640,14 @@ class PwdManager:
 		vault			: dict[str, str],
 		key				: bytes,
 		salt			: bytes,
-		sync_callback	: Callable[[dict[str, str]], None]
+		sync_callback	: Callable[[dict[str, str]], None],
+		lock			: RLock,
 	) -> PwdManager:
 		pwd_manager = PwdManager(
 			key=key,
 			salt=salt,
-			sync_callback=sync_callback
+			sync_callback=sync_callback,
+			lock=lock
 		)
 
 		data = decrypt_data(
@@ -700,12 +716,14 @@ class PwdManager:
 	def pwd_manager_from_key(
 		key				: bytes,
 		salt			: bytes,
-		sync_callback	: Callable[[dict[str, str]], None]
+		sync_callback	: Callable[[dict[str, str]], None],
+		lock			: RLock,
 	) -> PwdManager:
 		pwd_manager = PwdManager(
 			key=key,
 			salt=salt,
-			sync_callback=sync_callback
+			sync_callback=sync_callback,
+			lock=lock
 		)
 
 		pwd_manager.encrypt()
