@@ -93,12 +93,12 @@ class VaultScreen(MDScreen):
 		self.change_version = 0
 		self.synced_version = 0
 
-		app = MDApp.get_running_app()
-		assert app is not None
+		self.app = MDApp.get_running_app()
+		assert self.app is not None
 
 		super().__init__(
 			name="vault",
-			md_bg_color=app.theme_cls.secondaryContainerColor,
+			md_bg_color=self.app.theme_cls.secondaryContainerColor,
 			*args,
 			**kwargs
 		)
@@ -122,7 +122,9 @@ class VaultScreen(MDScreen):
 		Called on pre_enter
 	"""
 	def refresh(self):
-		dialog: MDDialog = self.login_dialog
+		# Apply theme
+		other_settings = self.settings.get_other_config()
+		self.app.apply_theme(other_settings["theme"])
 
 		search_bar = SearchBar(
 			view_root=self.phone_screen,
@@ -145,6 +147,7 @@ class VaultScreen(MDScreen):
 
 		self.force_exit_vault = False
 
+		dialog: MDDialog = self.login_dialog
 		self.load_accounts(dialog=dialog)
 
 	def on_back(self):

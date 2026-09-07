@@ -17,9 +17,10 @@ class SettingsMenu(MDScrollView):
 	def __init__(
 		self,
 		settings				: dict,
+		change_callback			: Callable[[str, config_t], None],
+		theme_callback			: Callable[[str], None],
 		allowed_special_chars	: list[str],
 		numeric_ranges			: dict[str, tuple[int, int]],
-		change_callback			: Callable[[str, config_t], None] | None = None,
 		**kwargs
 	):
 		super().__init__(
@@ -29,8 +30,9 @@ class SettingsMenu(MDScrollView):
 		)
 
 		self.settings				= settings
-		self.numeric_ranges			= numeric_ranges
 		self.change_callback		= change_callback
+		self.theme_callback			= theme_callback
+		self.numeric_ranges			= numeric_ranges
 		self.allowed_special_chars	= allowed_special_chars
 
 		self.content = MDBoxLayout(
@@ -168,6 +170,9 @@ class SettingsMenu(MDScrollView):
 		if self.change_callback is not None:
 			self.change_callback(key, value)
 
+		if key == "theme":
+			assert isinstance(value, str)
+			self.theme_callback(value)
 
 	def _get_clean_special_char_string(
 		self,

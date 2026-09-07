@@ -69,6 +69,7 @@ class SettingsScreen(MDScreen):
 				settings=self.settings_obj.settings,
 				numeric_ranges=NUMERIC_RANGES,
 				change_callback=self.update_settings,
+				theme_callback=self.apply_theme,
 				allowed_special_chars=SPECIAL_CHARS
 			)
 		)
@@ -79,6 +80,13 @@ class SettingsScreen(MDScreen):
 		value: config_t
 	):
 		self.settings_obj.set_settings_value(key, value)
+
+	def apply_theme(
+		self,
+		theme: str
+	):
+		self.app.apply_theme(theme)
+		
 
 	def on_leave(self, *args):
 		self.settings_obj.sync_to_file()

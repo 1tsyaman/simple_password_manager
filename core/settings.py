@@ -78,6 +78,9 @@ class Settings:
 	def get_security_config(self) -> dict[str, config_t]:
 		return self.settings["Security"]
 
+	def get_other_config(self) -> dict[str, str]:
+		return self.settings["Others"]
+
 	"""
 		@raises:
 			- SettingsKeyNotSetError

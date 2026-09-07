@@ -102,6 +102,12 @@ class SimplePasswordManagerApp(MDApp):
 
 			stack.extend(widget.children)
 
+	def apply_theme(
+		self,
+		theme: str
+	):
+		if theme in ["Light", "Dark"]:
+			self.theme_cls.theme_style = theme
 
 	def _on_keyboard(
 		self,
