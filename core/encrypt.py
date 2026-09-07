@@ -111,7 +111,8 @@ def get_salt_from_vault(
 	if not (
 		"Vault" in record.keys()				\
 		and isinstance(record["Vault"], dict)	\
-		and SALT in record["Vault"].keys()
+		and SALT in record["Vault"].keys()		\
+		and isinstance(record["Vault"][SALT], str)
 	):
 		raise VaultFormatError
 
@@ -217,7 +218,7 @@ def __decrypt_data(
 	@raises:
 		- OSError
 """
-def __atomic_write(
+def atomic_write(
 	data	: dict,
 	path	: Path,
 	indent	: int | None = None
