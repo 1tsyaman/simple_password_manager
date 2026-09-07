@@ -15,23 +15,22 @@ def format_prev_next_str(index: int, len: int) -> str:
 	return main_str
 
 def filter_list(ls: list[Entry], query: str) -> list[Entry]:
-	ans = []
-	query = query.lower()
+	keywords = query.lower().split()
 
-	#	filter descriptions
-	ans += [entry for entry in ls if query in entry.get_description().lower()]
-
-	ls = list_diff(ls, ans)		# remove added elements from the list to avoid duplications
-
-	#	filter website
-	ans += [entry for entry in ls if query in entry.get_website().lower()]
-
-	ls = list_diff(ls, ans)
-
-	#	filter username
-	ans += [entry for entry in ls if query in entry.get_username().lower()]
-
-	return ans
+	return [
+		entry for entry in ls 
+		if all(
+			any(
+				keyword in value.lower()
+				for value in (
+					entry.get_description(),
+					entry.get_website(),
+					entry.get_username()
+				)
+			)
+			for keyword in keywords
+		)
+	]
 
 def list_diff(ls1: list, ls2: list) -> list:
 	return [element for element in ls1 if element not in ls2]
