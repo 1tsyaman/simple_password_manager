@@ -93,12 +93,12 @@ class VaultScreen(MDScreen):
 		self.change_version = 0
 		self.synced_version = 0
 
-		self.app = MDApp.get_running_app()
-		assert self.app is not None
+		app = MDApp.get_running_app()
+		assert app is not None
 
 		super().__init__(
 			name="vault",
-			md_bg_color=self.app.theme_cls.secondaryContainerColor,
+			md_bg_color=app.theme_cls.secondaryContainerColor,
 			*args,
 			**kwargs
 		)
@@ -124,7 +124,10 @@ class VaultScreen(MDScreen):
 	def refresh(self):
 		# Apply theme
 		other_settings = self.settings.get_other_config()
-		self.app.apply_theme(other_settings["theme"])
+
+		app = MDApp.get_running_app()
+		assert app is not None
+		app.apply_theme(other_settings["theme"])
 
 		search_bar = SearchBar(
 			view_root=self.phone_screen,
