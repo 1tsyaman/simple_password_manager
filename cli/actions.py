@@ -1,5 +1,6 @@
 from time import sleep
 from core.pwd_manager import PwdManager
+from core.settings import Settings
 from core.vault_loader import VaultSession
 from core.constants import MIN_PWD_LENGTH
 from core.passwords import password_satisfies_explicit_conditions
@@ -137,7 +138,7 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 
 def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 	modified = False
-	
+
 	while True:
 		clear_screen()
 
@@ -170,7 +171,8 @@ def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 
 def modify_master_password(
 	vault_session	: VaultSession,
-	pwd_manager		: PwdManager
+	pwd_manager		: PwdManager,
+	settings		: Settings,
 ) -> bool:
 	clear_screen()
 
@@ -188,7 +190,8 @@ def modify_master_password(
 			try:
 				vault_session.modify_master_password(
 					password=pwd,
-					pwd_manager=pwd_manager
+					pwd_manager=pwd_manager,
+					settings=settings
 				)
 
 			except FileNotFoundError as e:

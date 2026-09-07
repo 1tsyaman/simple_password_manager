@@ -108,20 +108,15 @@ def get_salt_from_vault(
 	if not isinstance(record, dict):
 		raise VaultFormatError
 
-	if any(
-		dict_key not in record
-			for dict_key in RECORD_KEYS
-		):
-		raise VaultFormatError
-
-	if any(
-		not isinstance(record[dict_key], str)
-			for dict_key in RECORD_KEYS
-		):
+	if not (
+		"Vault" in record.keys()				\
+		and isinstance(record["Vault"], dict)	\
+		and SALT in record["Vault"].keys()
+	):
 		raise VaultFormatError
 
 	try:
-		salt = bytes.fromhex(record[SALT])
+		salt = bytes.fromhex(record["Vault"][SALT])
 
 	except ValueError as e:
 		raise VaultFormatError from e

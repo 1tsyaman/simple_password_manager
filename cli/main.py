@@ -10,6 +10,7 @@ from typing import Never
 import cli.actions as act
 
 from core.pwd_manager import PwdManager
+from core.settings import Settings
 from core.vault_loader import VaultSession
 from core.entry import Entry
 from cli.input import get_key, poll_for_with_backspace
@@ -31,7 +32,7 @@ from core.errors import (
 
 GENERAL_ERROR	= "Something went wrong. Exiting..."
 
-def _init(argv: list[str]) -> tuple[VaultSession, PwdManager] | int:
+def _init(argv: list[str]) -> tuple[VaultSession, PwdManager, Settings] | int:
 	parser = argparse.ArgumentParser(
 		description="Simple Password Manager CLI"
 	)
@@ -62,6 +63,7 @@ def _init(argv: list[str]) -> tuple[VaultSession, PwdManager] | int:
 				password=pwd
 			)
 			pwd_manager = vault_session.get_pwd_manager()
+			settings	= vault_session.get_settings()
 		except PasswordError:
 			print("Vault loading failed: Password incorrect")
 			return -1
@@ -117,6 +119,7 @@ def _init(argv: list[str]) -> tuple[VaultSession, PwdManager] | int:
 				new_vault=True
 			)
 			pwd_manager = vault_session.create_pwd_manager()
+			settings	= vault_session.create_settings()
 		except KeyLengthError:
 			print("Vault creation failed: Key length is unexpected")
 			return -1
@@ -132,11 +135,12 @@ def _init(argv: list[str]) -> tuple[VaultSession, PwdManager] | int:
 			sleep(100)
 			return -1
 
-	return vault_session, pwd_manager
+	return vault_session, pwd_manager, settings
 
 def _main_loop(
 	vault_session	: VaultSession,
-	pwd_manager		: PwdManager
+	pwd_manager		: PwdManager,
+	settings		: Settings,
 ):
 	index = 0
 	modified = False
@@ -146,7 +150,7 @@ def _main_loop(
 
 		n = pwd_manager.get_entry_list_len()
 		options = display_list(pwd_manager.get_website_and_username_string_list(), index)
-		
+
 		print_footer()
 
 		main_str = ""
@@ -180,7 +184,7 @@ def _main_loop(
 						act.gen_rand_password(pwd_manager)
 						break
 					case "m":
-						modified |= act.modify_master_password(vault_session, pwd_manager)
+						modified |= act.modify_master_password(vault_session, pwd_manager, settings)
 						break
 					case "f":
 						entry = act.search_entries(pwd_manager)
@@ -205,7 +209,7 @@ def _sub_loop(pwd_manager: PwdManager, key: str, index: int) -> bool:
 
 	if not is_valid_index(key, index, pwd_manager.get_entry_list_len()):
 		return False
-	
+
 	i = (10 * index) + int(key)
 
 	entry = pwd_manager.get_entry_by_index(i)
@@ -242,7 +246,7 @@ def _specific_entry_options(pwd_manager: PwdManager, entry: Entry) -> bool:
 				return False
 
 		clear_screen()
-		
+
 def cleanup() -> None:
 	clear_screen(header=False)
 	cancel_watchdog()
@@ -267,11 +271,12 @@ def main(argv):
 
 		sleep(1)	# show success before clearing the screen
 
-		vault_session, pwd_manager = res
+		vault_session, pwd_manager, settings = res
 
 		_main_loop(
 			vault_session=vault_session,
-			pwd_manager=pwd_manager
+			pwd_manager=pwd_manager,
+			settings=settings
 		)
 		quit_program(exit_code=0, message="Goodbye")
 

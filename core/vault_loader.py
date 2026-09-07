@@ -50,11 +50,18 @@ class VaultSession:
 			else:
 				raise PasswordError
 
+		self.json = {
+			"Vault":	{},
+			"Settings":	{},
+		}
+
 		self.vault_path	= os.path.join(app_data_path, vault_name + VAULT_ENDING)
 
 		if new_vault:
-			self.salt = get_random_salt()
+			# Initialize file
 			io.create_path(self.vault_path)
+			__atomic_write(self.json, Path(self.vault_path), indent=4)
+			self.salt = get_random_salt()
 		else:
 			self.salt = get_salt_from_vault(self.vault_path)
 
@@ -67,10 +74,6 @@ class VaultSession:
 		self.vault_key	= self._derive_vault_key(master_key)
 		self.auth_key 	= self._derive_auth_key(master_key)
 
-		self.json = {
-			"Vault":	{},
-			"Settings":	{}
-		}
 
 	"""
 		@raises:
