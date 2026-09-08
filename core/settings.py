@@ -50,7 +50,7 @@ class Settings:
 	def set_settings_value(
 		self,
 		key:	str,
-		value:	object
+		value:	config_t
 	):
 		if key in PWD_GEN_SUBSECTIONS:
 			section = "Password Generation"
@@ -71,6 +71,25 @@ class Settings:
 		with self._lock:
 			self._key	= key
 			self._salt	= salt
+
+	"""
+		@raises:
+			KeyError
+	"""
+	def get_settings_value(
+		self,
+		key:	str
+	) -> config_t:
+		if key in PWD_GEN_SUBSECTIONS:
+			section = "Password Generation"
+		elif key in SECURITY_SUBSECTIONS:
+			section = "Security"
+		elif key in OTHERS_SUBSECTIONS:
+			section = "Others"
+		else:
+			raise KeyError
+
+		return self.settings[section][key]
 
 	def get_pwd_gen_config(self) -> dict[str, config_t]:
 		return self.settings["Password Generation"]

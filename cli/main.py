@@ -13,11 +13,30 @@ from core.pwd_manager import PwdManager
 from core.settings import Settings
 from core.vault_loader import VaultSession
 from core.entry import Entry
-from cli.input import get_key, poll_for_with_backspace
-from cli.display import display_list, clear_screen, print_footer
-from cli.util import format_prev_next_str, is_valid_index
-from storage.io import vault_exists, delete_file, get_dir_path_and_vault_name
-from cli.watchdog import init_watchdog, cancel_watchdog, timeout_occurred
+from cli.input import (
+	get_key,
+	poll_for_with_backspace
+)
+from cli.display import (
+	display_list,
+	clear_screen,
+	print_footer
+)
+from cli.util import (
+	format_prev_next_str,
+	is_valid_index
+)
+from storage.io import (
+	vault_exists,
+	delete_file,
+	get_dir_path_and_vault_name
+)
+from cli.watchdog import (
+	init_watchdog,
+	cancel_watchdog,
+	timeout_occurred,
+	update_timeout_duration
+)
 
 from core.errors import (
 	KeyLengthError,
@@ -135,6 +154,16 @@ def _init(argv: list[str]) -> tuple[VaultSession, PwdManager, Settings] | int:
 			sleep(100)
 			return -1
 
+	# Initialize settings
+
+	config = settings.get_pwd_gen_config()
+	pwd_manager.set_pwd_gen_config(config)
+
+	security = settings.get_security_config()
+	duration = security["timeout_duration"]
+	assert isinstance(duration, int)
+	update_timeout_duration(duration)
+
 	return vault_session, pwd_manager, settings
 
 def _main_loop(
@@ -160,7 +189,7 @@ def _main_loop(
 			print(f"Showing entries {actual_index}..{actual_index + int(options[-1])} out of {n}")
 			main_str = format_prev_next_str(index, len=n)
 
-		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [f] to search entries, [s] to save current changes or [q] to exit"
+		main_str += "[a] to add entry, [g] to generate a random password, [m] to modify master password, [c] to open settings, [f] to search entries, [s] to save current changes or [q] to exit"
 
 		print(f"Press {main_str}\n")
 
@@ -174,7 +203,7 @@ def _main_loop(
 				match ans:
 					case "q":
 						if modified and pwd_manager is not None:
-							act.save_changes(pwd_manager)
+							act.save_changes(vault_session, pwd_manager, settings)
 							sleep(1)
 						return
 					case "a":
@@ -186,6 +215,9 @@ def _main_loop(
 					case "m":
 						modified |= act.modify_master_password(vault_session, pwd_manager, settings)
 						break
+					case "c":
+						modified |= act.open_settings(pwd_manager, settings)
+						break
 					case "f":
 						entry = act.search_entries(pwd_manager)
 						if entry is not None:
@@ -193,7 +225,7 @@ def _main_loop(
 							modified |= _specific_entry_options(pwd_manager, entry)
 						break
 					case "s":
-						modified &= not act.save_changes(pwd_manager)	# upon success, we reset modified to False
+						modified &= not act.save_changes(vault_session, pwd_manager, settings)	# upon success, we reset modified to False
 						break
 					case "p":
 						if index != 0:

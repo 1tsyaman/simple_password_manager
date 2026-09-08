@@ -7,9 +7,10 @@ from cli.display import clear_screen
 
 TIMEOUT_SECONDS = 60
 
-_watchdog       			= None	# global Timer object
+_watchdog       						= None	# global Timer object
+_timeout_duration						= TIMEOUT_SECONDS
 _exit_func: Callable[..., None] | None	= None
-_timed_out				= False
+_timed_out								= False
 
 P = ParamSpec("P")	# generic parameter types
 R = TypeVar("R")	# generic return type
@@ -36,12 +37,12 @@ def _exit_func_wrapper(*args, **kwargs) -> None:
 		_exit_func(*args, **kwargs)
 
 def reset_timer() -> None:
-	global _watchdog
+	global _watchdog, _timeout_duration
 
 	if _watchdog is not None:
 		_watchdog.cancel()
 
-	_watchdog = Timer(TIMEOUT_SECONDS, _exit_func_wrapper)
+	_watchdog = Timer(_timeout_duration, _exit_func_wrapper)
 	_watchdog.start()
 
 def cancel_watchdog() -> None:
@@ -56,6 +57,12 @@ def cancel_watchdog() -> None:
 
 def timeout_occurred() -> bool:
 	return _timed_out
+
+def update_timeout_duration(duration: int):
+	global _timeout_duration
+	_timeout_duration = duration
+
+	reset_timer()
 
 
 def reset_on_call(calling_func: Callable[P, R]) -> Callable[P, R]:

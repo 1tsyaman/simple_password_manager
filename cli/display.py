@@ -1,4 +1,5 @@
 import os
+from core.types import config_t
 
 HEADER		= f"{15*"-"} Password Manager {15*"-"}"
 FOOTER		= 48*"-"
@@ -9,6 +10,12 @@ YELLOW = "\033[33m"
 BLUE = "\033[34m"
 RESET = "\033[0m"
 
+"""
+	Alignment operatios with column size 20:
+		f"{value:<20}"   # left aligned
+		f"{value:>20}"   # right aligned
+		f"{value:^20}"   # centered
+"""
 
 """
 	- displays a list with up to 10 options
@@ -63,6 +70,35 @@ def clear_screen(header=True):
 
 def print_footer():
 	print(FOOTER)
+
+"""
+	Expects dicts of the following shape:
+		pwd_gen: 
+		{
+			"special_chars": "!\"#$%&'()*+,-./:<=>?@[\\]^_`{|}~",
+			"password_length": 24,
+			"use_uppercase": true,
+			"use_digits": true,
+			"use_special": true
+		}
+		security:
+		{
+			"timeout_duration": 60,
+		}
+"""
+def print_settings(
+	pwd_gen:	dict[str, config_t],
+	security:	dict[str, config_t]
+):
+	string = ""
+	string += f"{'Special Characters:':<32}{pwd_gen['special_chars']}\n"
+	string += f"{'Password Length:':<32}{pwd_gen['password_length']}\n"
+	string += f"{'Use Uppercase:':<32}{pwd_gen['use_uppercase']}\n"
+	string += f"{'Use Digits:':<32}{pwd_gen['use_digits']}\n"
+	string += f"{'Use Special Characters:':<32}{pwd_gen['use_special']}\n"
+	string += f"{'Inactivity Timeout Duration:':<32}{security['timeout_duration']}\n"
+
+	print(string)
 
 def display_password_rejection_reason(reason: str, min_len: int):
 	message = ''

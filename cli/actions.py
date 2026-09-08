@@ -2,7 +2,11 @@ from time import sleep
 from core.pwd_manager import PwdManager
 from core.settings import Settings
 from core.vault_loader import VaultSession
-from core.constants import MIN_PWD_LENGTH
+from core.constants import (
+	MIN_PWD_LENGTH,
+	SPECIAL_CHARS,
+	DIGITS
+)
 from core.passwords import password_satisfies_explicit_conditions
 from core.entry import Entry
 from core.errors import (
@@ -14,9 +18,31 @@ from core.errors import (
 	EntryHasNoTotp,
 	TotpUriError,
 )
-from cli.input import safe_copy, get_key, poll_y_n_backspace, poll_for_with_backspace, is_backspace, _handle_keystroke, get_input, input_password
-from cli.display import clear_screen, print_footer, display_list, display_list_str, str_color, display_password_rejection_reason
-from cli.util import filter_list, list_diff, format_prev_next_str
+from cli.input import (
+	safe_copy,
+	get_key,
+	poll_y_n_backspace,
+	poll_for_with_backspace,
+	is_backspace,
+	_handle_keystroke,
+	get_input,
+	input_password,
+	prompt_user
+)
+from cli.display import (
+	clear_screen,
+	print_footer,
+	display_list,
+	display_list_str,
+	str_color,
+	display_password_rejection_reason,
+	print_settings,
+)
+from cli.util import (
+	filter_list,
+	format_prev_next_str
+)
+from cli.watchdog import update_timeout_duration
 
 NO_SUCH_ENTRY_MESSAGE	= "No such entry."
 NO_SUCH_TOTP_MESSAGE	= "There is no TOTP config associated with this entry"
@@ -134,7 +160,55 @@ def get_totp_code(pwd_manager: PwdManager, entry: Entry) -> None:
 
 	sleep(1)
 
+def open_settings(
+	pwd_manager:	PwdManager,
+	settings:		Settings
+) -> bool:
+	modified = False
 
+	while True:
+		pwd_gen		= settings.get_pwd_gen_config()
+		security	= settings.get_security_config()
+
+		clear_screen()
+
+		print_settings(pwd_gen, security)
+		print_footer()
+		print("Modify [s]pecial characters, password [l]ength or inactivity [t]imeout duration. Toggle [u]ppercase, [d]igits, special [c]haracters usage, or press [backspace] to go back")
+
+		while True:
+			key = get_key()
+			match key:
+				case 's':
+					modified |= _modify_special_char(settings)
+					break
+				case 'l':
+					modified |= _modify_password_length(settings)
+					break
+				case 'u':
+					modified |= _toggle_uppercase(settings)
+					break
+				case 'd':
+					modified |= _toggle_digits(settings)
+					break
+				case 'c':
+					modified |= _toggle_special_chars(settings)
+					break
+				case 't':
+					modified |= _modify_timeout_duration(settings)
+					break
+				case _:
+					if is_backspace(key):
+						if modified:
+							pwd_gen = settings.get_pwd_gen_config()
+							pwd_manager.set_pwd_gen_config(pwd_gen)
+
+							security = settings.get_security_config()
+							duration = security["timeout_duration"]
+							assert isinstance(duration, int)
+							update_timeout_duration(duration)
+
+						return modified
 
 def modify_entry(pwd_manager: PwdManager, entry: Entry) -> bool:
 	modified = False
@@ -225,9 +299,13 @@ def modify_master_password(
 
 		return False
 
-def save_changes(pwd_manager: PwdManager) -> bool:
+def save_changes(
+	vault_session:	VaultSession,
+	pwd_manager:	PwdManager,
+	settings:		Settings,
+) -> bool:
 	try:
-		pwd_manager.encrypt()
+		vault_session.sync(pwd_manager, settings)
 	except FileNotFoundError as e:
 		print(f"Saving failed: Vault file path is incorrect: {e}")
 		return False
@@ -429,8 +507,120 @@ def _modify_totp(pwd_manager: PwdManager, entry: Entry) -> bool:
 			print("Could not set TOTP, URI is invalid!")
 		sleep(2)
 		return False
-	
+
 	return True
+
+def _modify_special_char(
+	settings: Settings
+) -> bool:
+	key = "special_chars"
+	special_chars = settings.get_settings_value(key)
+	assert isinstance(special_chars, str)
+
+	print(f"Allowed characters: {SPECIAL_CHARS}")
+	print("Add/remove special characters to the input. Press [enter] to submit.")
+	value = prompt_user(
+		default=special_chars,
+		allowed_chars=SPECIAL_CHARS,
+		allow_dups=False
+	)
+
+	settings.set_settings_value(key, value)
+	return True
+
+def _modify_password_length(
+	settings: Settings
+) -> bool:
+	key = "password_length"
+	length = settings.get_settings_value(key)
+	assert isinstance(length, int)
+
+	print("Choose a length between 8 and 128 characters:")
+
+	value = prompt_user(
+		default=str(length),
+		allowed_chars=DIGITS
+	)
+
+	if not value or not 8 <= int(value) <= 128:
+		print("Invalid input")
+
+		sleep(2)
+		return False
+
+	settings.set_settings_value(key, int(value))
+	return True
+
+def _toggle_setting(
+	settings:	Settings,
+	key:		str
+):
+	value = settings.get_settings_value(key)
+	assert isinstance(value, bool)
+	settings.set_settings_value(key, not value)
+	return True
+
+def _toggle_uppercase(
+	settings: Settings
+) -> bool:
+	key = "use_uppercase"
+	try:
+		_toggle_setting(settings, key)
+	except KeyError as e:
+		print(f"Something went wrong: {e}")
+		sleep(5)
+		return False
+
+	return True
+
+def _toggle_digits(
+	settings: Settings
+) -> bool:
+	key = "use_digits"
+	try:
+		_toggle_setting(settings, key)
+	except KeyError as e:
+		print(f"Something went wrong: {e}")
+		sleep(5)
+		return False
+
+	return True
+
+def _toggle_special_chars(
+	settings: Settings
+) -> bool:
+	key = "use_special"
+	try:
+		_toggle_setting(settings, key)
+	except KeyError as e:
+		print(f"Something went wrong: {e}")
+		sleep(5)
+		return False
+
+	return True
+
+def _modify_timeout_duration(
+	settings: Settings
+) -> bool:
+	key = "timeout_duration"
+	timeout = settings.get_settings_value(key)
+	assert isinstance(timeout, int)
+
+	print("Choose a duration between 10 and 300 seconds:")
+
+	value = prompt_user(
+		default=str(timeout),
+		allowed_chars=DIGITS
+	)
+
+	if not value or not 10 <= int(value) <= 300:
+		print("Invalid input")
+		sleep(2)
+		return False
+
+	settings.set_settings_value(key, int(value))
+	return True
+
 
 def gen_rand_password(pwd_manager: PwdManager) -> None:
 	clear_screen()

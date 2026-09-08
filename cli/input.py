@@ -4,9 +4,13 @@ import subprocess
 
 from pyperclip import copy, PyperclipException
 from getpass import getpass
+from prompt_toolkit import prompt
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.keys import Keys
+
 
 from core.pwd_manager import DIGITS, LETTERS_LOWER, SPECIAL_CHARS
-from cli.watchdog import reset_on_call
+from cli.watchdog import reset_on_call, reset_timer
 
 CTRL_C		= ['\x03']
 ENTER		= ['\r']
@@ -102,6 +106,35 @@ def poll_for_with_backspace(ls: list[str]) -> str:
 		key = get_key()
 	
 	return key
+
+@reset_on_call
+def prompt_user(
+	default: str,
+	allowed_chars: list[str],
+	allow_dups: bool = True
+) -> str:
+	bindings = KeyBindings()
+
+	@bindings.add(Keys.Any)
+	def _filter_input(event):
+		reset_timer()	# Reset watchdog
+
+		char = event.data
+		buffer = event.current_buffer
+
+		if char not in allowed_chars:
+			return
+
+		if not allow_dups and char in buffer.text:
+			return
+
+		buffer.insert_text(char)
+
+	return prompt(
+		"> ",
+		default=default,
+		key_bindings=bindings
+	)
 
 """
 	supports copying mechanism windows, linux (at least ubuntu) and Termux
