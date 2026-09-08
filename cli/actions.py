@@ -517,7 +517,7 @@ def _modify_special_char(
 	special_chars = settings.get_settings_value(key)
 	assert isinstance(special_chars, str)
 
-	print(f"Allowed characters: {SPECIAL_CHARS}")
+	print(f"Allowed characters: {''.join(SPECIAL_CHARS)}")
 	print("Add/remove special characters to the input. Press [enter] to submit.")
 	value = prompt_user(
 		default=special_chars,
