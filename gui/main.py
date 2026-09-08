@@ -24,6 +24,10 @@ class SimplePasswordManagerApp(MDApp):
 		self.inactivity_timeout_duration = INACTIVITY_TIMEOUT_DURATION
 		self.lock_on_minimize = True
 
+		# Used by disable/enable lockdown to store old value
+		self.old_lock_on_minimize = True
+		self.watchdog_enabled = True
+
 		super().__init__(**kwargs)
 
 
@@ -50,11 +54,12 @@ class SimplePasswordManagerApp(MDApp):
 		return super().on_pause()
 
 	def on_resume(self):
-		if time() >= self.watchdog_deadline:
+		if self.watchdog_enabled and time() >= self.watchdog_deadline:
 			# Call the watchdog function
 			self.cancel_watchdog_if_scheduled()
 			self.lock_vault()
 
+		self.enable_lockdown()
 		return super().on_resume()
 
 	def schedule_watchdog(self):
@@ -68,6 +73,7 @@ class SimplePasswordManagerApp(MDApp):
 	def cancel_watchdog_if_scheduled(self):
 		if self.watchdog_thread is not None:
 			self.watchdog_thread.cancel()
+			self.watchdog_thread = None
 
 	def reset_watchdog(self):
 		self.cancel_watchdog_if_scheduled()
@@ -101,6 +107,22 @@ class SimplePasswordManagerApp(MDApp):
 				widget.dismiss()
 
 			stack.extend(widget.children)
+
+	"""
+		Disables lock_on_minimize and watchdog for a maximum of
+			one minimization, that is, until enable_lockdown
+			or on_resume is invoked
+	"""
+	def disable_lockdown(self):
+		self.old_lock_on_minimize = self.lock_on_minimize
+		self.lock_on_minimize = False
+		self.watchdog_enabled = False
+		self.cancel_watchdog_if_scheduled()
+
+	def enable_lockdown(self):
+		self.lock_on_minimize = self.old_lock_on_minimize
+		self.watchdog_enabled = True
+		self.reset_watchdog()
 
 	def apply_theme(
 		self,

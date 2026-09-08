@@ -54,6 +54,7 @@ class AppScreenManager(MDScreenManager):
 			screen_manager=self
 		)
 		self.vault_screen = VaultScreen(
+			app=app,
 			app_data_path=self.app_data_path,
 			phone_screen=phone_screen,
 			screen_manager=self,

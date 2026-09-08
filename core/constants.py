@@ -72,7 +72,7 @@ DEFAULT_SETTINGS = {
 
 	"Security":	{
 		"timeout_duration":		60,
-		"lock_on_minimize":		False,
+		"lock_on_minimize":		True,
 	},
 
 	"Others": {

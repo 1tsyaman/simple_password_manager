@@ -7,7 +7,6 @@ from kivy.clock import Clock
 from kivy.utils import platform
 from kivy.uix.widget import Widget
 
-from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.dialog import MDDialog
@@ -51,6 +50,7 @@ BATCH_SIZE = 100
 # to avoid cicular import issues
 if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
+	from gui.main import SimplePasswordManagerApp
 
 class VaultScreen(MDScreen):
 	vault_session	: VaultSession	# Set by screen_manager
@@ -58,12 +58,14 @@ class VaultScreen(MDScreen):
 	pwd_manager		: PwdManager 	# Set by screen_manager
 	def __init__(
 		self,
+		app				: "SimplePasswordManagerApp",
 		app_data_path	: str,
 		phone_screen	: MDScreen,
 		screen_manager	: "AppScreenManager",	# forward reference for type checking
 		*args,
 		**kwargs
 	):
+		self.app			= app
 		self.app_data_path	= app_data_path
 		self.phone_screen	= phone_screen
 		self.screen_manager	= screen_manager
@@ -99,12 +101,9 @@ class VaultScreen(MDScreen):
 		self.change_version = 0
 		self.synced_version = 0
 
-		app = MDApp.get_running_app()
-		assert app is not None
-
 		super().__init__(
 			name="vault",
-			md_bg_color=app.theme_cls.secondaryContainerColor,
+			md_bg_color=self.app.theme_cls.secondaryContainerColor,
 			*args,
 			**kwargs
 		)
@@ -131,9 +130,7 @@ class VaultScreen(MDScreen):
 		# Apply theme
 		other_settings = self.settings.get_other_config()
 
-		app = MDApp.get_running_app()
-		assert app is not None
-		app.apply_theme(other_settings["theme"])
+		self.app.apply_theme(other_settings["theme"])
 
 		search_bar = SearchBar(
 			view_root=self.phone_screen,
@@ -730,6 +727,9 @@ class VaultScreen(MDScreen):
 		self,
 		details_dialog: AccountDetailsDialog,
 	):
+		# Temporarily disable lock down mechanisms
+		self.app.disable_lockdown()
+
 		if platform == "android":
 			read_qr_code_from_camera(
 				callback=lambda uri: self._process_qr_code_uri(
