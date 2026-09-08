@@ -83,7 +83,6 @@ class VaultSession:
 	"""
 		@raises:
 			- PasswordRequirementsError(reason)
-			- FileNotFoundError(path) [OSError]
 			- KeyLengthError
 			- KeyDerivationError
 			- OverflowError
@@ -96,7 +95,7 @@ class VaultSession:
 		settings	: Settings
 	):
 		satisfies, reason = password_satisfies_explicit_conditions(password)
-		
+
 		if not satisfies:
 			raise PasswordRequirementsError(
 				reason=reason
