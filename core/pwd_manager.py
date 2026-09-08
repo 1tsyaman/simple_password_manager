@@ -39,9 +39,6 @@ from core.constants import (
 	PWD_LENGTH
 )
 
-from storage.qr_reader import read_qr_code
-
-
 class PwdManager:
 	"""
 		PwdManager.entries are a dictionary: 
@@ -577,6 +574,7 @@ class PwdManager:
 	"""
 	@staticmethod
 	def get_uri_from_qr_code(image_path: str) -> str:
+		from storage.qr_reader import read_qr_code
 		try:
 			return read_qr_code(image_path)
 		except (ImageOpenError, QRDecodeError):
