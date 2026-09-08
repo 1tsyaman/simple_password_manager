@@ -51,6 +51,8 @@ class ChoiceSetting(MDBoxLayout):
 
 		self.menu = ChoiceMenu(
 			caller=button,
+			ver_growth="up",
+			hor_growth="left",
 			items=[
 				{
 					"text": option,
