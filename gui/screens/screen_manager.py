@@ -93,12 +93,14 @@ class AppScreenManager(MDScreenManager):
 	"""
 	def open_new_vault(
 		self,
-		dialog		: NewVaultDialog,
-		vault_name	: str,
-		pwd_manager	: PwdManager,
-		settings	: Settings,
+		dialog			: NewVaultDialog,
+		vault_name		: str,
+		vault_session	: VaultSession,
+		pwd_manager		: PwdManager,
+		settings		: Settings,
 	):
 		self.vault_screen.login_dialog	= dialog
+		self.vault_screen.vault_session = vault_session
 		self.vault_screen.pwd_manager	= pwd_manager
 		self.vault_screen.settings		= settings
 		self.switch_screen(
@@ -134,6 +136,7 @@ class AppScreenManager(MDScreenManager):
 			pwd_gen_config = settings.get_pwd_gen_config()
 			pwd_manager.set_pwd_gen_config(pwd_gen_config)
 
+			self.vault_screen.vault_session = vault_session
 			self.vault_screen.settings		= settings
 			self.vault_screen.pwd_manager	= pwd_manager
 			self.vault_screen.login_dialog	= dialog

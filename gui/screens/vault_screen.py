@@ -15,6 +15,7 @@ from kivymd.uix.dialog import MDDialog
 from gui.dialogs.yes_no_dialog import YesNoDialog
 from gui.dialogs.vault_screen.new_account_dialog import NewAccountDialog
 from gui.dialogs.vault_screen.account_details_dialog import AccountDetailsDialog
+from gui.dialogs.vault_screen.change_password_dialog import ChangePasswordDialog
 from gui.widgets.vault_screen.account_list import AccountEntry, AccountList
 from gui.widgets.vault_screen.vault_context_menu import VaultContextMenu
 from gui.widgets.vault_screen.export_picker import ExportFilePicker
@@ -23,8 +24,10 @@ from gui.widgets.vault_screen.search_bar import SearchBar
 from gui.widgets.welcome_screen.import_picker import ImportFilePicker
 from gui.widgets.labels import NoAccountsLabel
 from gui.widgets.plus_button import PlusButton
+from gui.widgets.input_field import InputField
 from gui.utils.clipboard import copy_text
 
+from core.vault_loader import VaultSession
 from core.pwd_manager import PwdManager
 from core.settings import Settings
 from core.errors import (
@@ -34,6 +37,8 @@ from core.errors import (
 	EntryHasNoTotp,
 	TotpQRCodeError,
 	TotpUriError,
+	PasswordRequirementsError,
+	KeyDerivationError,
 	log
 )
 
@@ -48,8 +53,9 @@ if TYPE_CHECKING:
 	from gui.screens.screen_manager import AppScreenManager
 
 class VaultScreen(MDScreen):
-	settings	: Settings		# Set by screen_manager
-	pwd_manager	: PwdManager 	# Set by screen_manager
+	vault_session	: VaultSession	# Set by screen_manager
+	settings		: Settings		# Set by screen_manager
+	pwd_manager		: PwdManager 	# Set by screen_manager
 	def __init__(
 		self,
 		app_data_path	: str,
@@ -518,6 +524,54 @@ class VaultScreen(MDScreen):
 				error_message="Failed to rename vault, check log"
 			)
 
+	def change_vault_password(
+		self,
+		dialog: ChangePasswordDialog,
+		password: str,
+		conf_password: str
+	):
+		password_field			: InputField = dialog.password_field
+		confirm_password_field	: InputField = dialog.confirm_password_field
+
+		if password != conf_password:
+			confirm_password_field.error_widget.text = "Password does not match"
+			confirm_password_field.error = True
+			return
+
+		try:
+			self.vault_session.modify_master_password(
+				password=password,
+				pwd_manager=self.pwd_manager,
+				settings=self.settings
+			)
+
+			dialog.dismiss()
+
+		except PasswordRequirementsError as e:
+			password_field.error_widget.text = f"Password {e.reason}"
+			password_field.error = True
+		except KeyLengthError:
+			password_field.error_widget.text = "Password did not produce correct key length, contact developer"
+			password_field.error = True
+		except KeyDerivationError:
+			password_field.error_widget.text = "Key derivation failed."
+			password_field.error = True
+		except (OverflowError, OSError) as e:
+			if isinstance(e, OverflowError):
+				message = "Encryption failed"
+			else:
+				message = "Something went wrong, check log"
+
+			self.screen_manager.show_error_dialog(
+				error_title="Error:",
+				error_message=message
+			)
+
+			log(
+				message="Something went wrong while changing vault password",
+				error=e
+			)
+
 	def delete_vault(self):
 		try:
 			io.delete_vault_for_gui(
@@ -617,6 +671,7 @@ class VaultScreen(MDScreen):
 									),
 			export_callback=lambda: self.show_export_vault_dialog(),
 			rename_callback=lambda: self.show_rename_vault_dialog(),
+			change_password_callback=lambda: self.show_change_master_password_dialog(),
 			delete_callback=lambda: self.show_delete_vault_dialog(),
 			caller=button
 		).open()
@@ -664,6 +719,11 @@ class VaultScreen(MDScreen):
 			no_text="Dismiss",
 			red_option="",
 			icon="qrcode" 
+		).open()
+
+	def show_change_master_password_dialog(self):
+		ChangePasswordDialog(
+			change_password_callback=self.change_vault_password
 		).open()
 
 	def open_qr_code_importer(

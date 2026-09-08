@@ -171,6 +171,7 @@ class WelcomeScreen(MDScreen):
 			self.screen_manager.open_new_vault(
 				dialog=dialog,
 				vault_name=name,
+				vault_session=vault_session,
 				pwd_manager=pwd_manager,
 				settings=settings
 			)
@@ -179,7 +180,7 @@ class WelcomeScreen(MDScreen):
 			name_field.error_widget.text = "Could not create vault file"
 			name_field.error = True
 		except PasswordRequirementsError as e:
-			password_field.error_widget.text = f"Password does not meet the minimum requirements. Reason: {e.reason}"
+			password_field.error_widget.text = f"Password {e.reason}"
 			password_field.error = True
 		except KeyLengthError:
 			password_field.error_widget.text = "Password did not produce correct key length, contact developer"

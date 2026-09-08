@@ -6,17 +6,19 @@ from kivymd.uix.menu import MDDropdownMenu
 class VaultContextMenu(MDDropdownMenu):
 	def __init__(
 		self,
-		settings_callback	: Callable,
-		export_callback		: Callable,
-		rename_callback		: Callable,
-		delete_callback		: Callable,
+		settings_callback			: Callable,
+		export_callback				: Callable,
+		rename_callback				: Callable,
+		change_password_callback	: Callable,
+		delete_callback				: Callable,
 		caller: Widget,
 		**kwargs
 	):
-		self.settings_callback	= settings_callback
-		self.export_callback	= export_callback
-		self.rename_callback	= rename_callback
-		self.delete_callback	= delete_callback
+		self.settings_callback			= settings_callback
+		self.export_callback			= export_callback
+		self.rename_callback			= rename_callback
+		self.change_password_callback	= change_password_callback
+		self.delete_callback			= delete_callback
 
 		settings = {
 			"text":			"Settings",
@@ -30,6 +32,10 @@ class VaultContextMenu(MDDropdownMenu):
 			"text":			"Rename",
 			"on_release":	lambda *_: self._rename_callback(),
 		}
+		change_password = {
+			"text":			"Change Password",
+			"on_release":	lambda *_:self._change_password_callback(),
+		}
 		delete = {
 			"text":			"Delete",
 			"on_release":	lambda *_: self._delete_callback(),
@@ -37,7 +43,7 @@ class VaultContextMenu(MDDropdownMenu):
 
 		super().__init__(
 			caller=caller,
-			items=[settings, rename, export, delete],
+			items=[settings, rename, change_password, export, delete],
 			hor_growth="left",		# horizontal growth in relation to the caller
 			ver_growth="down",		# vertical grwoth in relation to the caller
 			**kwargs
@@ -65,3 +71,7 @@ class VaultContextMenu(MDDropdownMenu):
 	def _delete_callback(self):
 		self.dismiss()
 		self.delete_callback()
+
+	def _change_password_callback(self):
+		self.dismiss()
+		self.change_password_callback()
