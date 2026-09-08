@@ -293,13 +293,16 @@ def timeout_exit() -> None:
 	os.kill(os.getpid(), signal.SIGINT)		# sends a ctrl+c interrupt to kill the process
 
 def main(argv):
-	pwd_manager: PwdManager | int = -1
+	vault_session:	VaultSession 	| None = None
+	pwd_manager: 	PwdManager 		| None = None
+	settings:		Settings 		| None = None
+
 	try:
 		res = _init(argv)
 
 		if isinstance(res, int):	# returns int if it fails
 			sleep(2)
-			quit_program(exit_code=pwd_manager, message="Failed to initalize PwdManager object.")
+			quit_program(exit_code=res, message="Failed to initalize PwdManager object.")
 
 		sleep(1)	# show success before clearing the screen
 
@@ -322,8 +325,11 @@ def main(argv):
 		print("Save before quitting? Y/n")
 
 		try:
-			if get_key() == "y" and isinstance(pwd_manager, PwdManager):
-				pwd_manager.encrypt()
+			if get_key() == "y"								\
+				and isinstance(vault_session, VaultSession)	\
+				and isinstance(pwd_manager, PwdManager)		\
+				and isinstance(settings, Settings):
+				vault_session.sync(pwd_manager, settings)
 		except KeyboardInterrupt:				# in case CTRL+C is pressed again, we just quit without saving
 			pass
 		except FileNotFoundError as e:

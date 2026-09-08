@@ -2,7 +2,7 @@ from __future__ import annotations
 import random as rand
 from pyotp import TOTP
 from hashlib import sha1
-from copy import deepcopy
+from copy import copy, deepcopy
 from collections.abc import Callable
 from threading import RLock
 
@@ -31,12 +31,12 @@ from core.passwords import (
 	LETTERS_UPPER,
 	DIGITS,
 	SPECIAL_CHARS,
-	PWD_LENGTH
 )
 from core.constants import (
 	PWD,
 	TOTP_SECRET,
-	TOTP_URI
+	TOTP_URI,
+	PWD_LENGTH
 )
 
 from storage.qr_reader import read_qr_code
@@ -503,7 +503,7 @@ class PwdManager:
 ####	Private methods		####
 
 	def _get_char_list(self) -> list[str]:
-		chars = LETTERS_LOWER
+		chars = copy(LETTERS_LOWER)
 		if self.use_uppercase:
 			chars.extend(LETTERS_UPPER)
 		if self.use_digits:

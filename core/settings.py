@@ -12,7 +12,6 @@ from core.errors import (
 	InvalidVaultFile,
 	SettingsFileModifiedError,
 	SettingsKeyNotSetError,
-	log
 )
 from core.constants import (
 	RELATIVE_CONFIG_PATH,
@@ -60,6 +59,13 @@ class Settings:
 			section = "Others"
 		else:
 			return
+
+		if key == "special_chars" and value == "":
+			self.settings[section]["use_special"] = False	# since we have none
+		elif key == "use_special"	\
+			and value == True		\
+			and self.settings[section]["special_chars"] == "":
+			value = False	# Keep it False, since no special_chars
 
 		self.settings[section][key] = value
 
@@ -194,8 +200,11 @@ class Settings:
 		salt			: bytes,
 		sync_callback	: Callable[[dict[str, dict]], None],
 		lock			: RLock,
-		settings		: dict[str, dict] = DEFAULT_SETTINGS,
+		settings		: dict[str, dict] = {},
 	) -> Settings:
+		if len(settings.keys()) == 0:
+			settings = copy.copy(DEFAULT_SETTINGS)
+
 		settings_obj = Settings(
 			settings=settings,
 			key=key,

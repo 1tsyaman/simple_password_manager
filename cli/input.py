@@ -115,20 +115,27 @@ def prompt_user(
 ) -> str:
 	bindings = KeyBindings()
 
-	@bindings.add(Keys.Any)
-	def _filter_input(event):
-		reset_timer()	# Reset watchdog
-
-		char = event.data
+	def _insert_text(event, text: str):
 		buffer = event.current_buffer
 
-		if char not in allowed_chars:
-			return
+		for char in text:
+			if char not in allowed_chars:
+				continue
 
-		if not allow_dups and char in buffer.text:
-			return
+			if not allow_dups and char in buffer.text:
+				continue
 
-		buffer.insert_text(char)
+			buffer.insert_text(char)
+
+	@bindings.add(Keys.Any)
+	def _filter_input(event):
+		reset_timer()
+		_insert_text(event, event.data)
+
+	@bindings.add(Keys.BracketedPaste)
+	def _filter_paste(event):
+		reset_timer()
+		_insert_text(event, event.data)
 
 	return prompt(
 		"> ",

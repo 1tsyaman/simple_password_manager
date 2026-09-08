@@ -1,4 +1,4 @@
-import random as rand
+import secrets
 
 from core.constants import (
 	LETTERS_LOWER,
@@ -6,7 +6,6 @@ from core.constants import (
 	DIGITS,
 	SPECIAL_CHARS,
 	MIN_PWD_LENGTH,
-	PWD_LENGTH
 )
 
 def generate_random_password(
@@ -20,7 +19,7 @@ def generate_random_password(
 		password = ""
 
 		for _ in range(password_length):
-			password += rand.choice(chars)
+			password += secrets.choice(chars)
 
 		satisfies, _ = password_satisfies_explicit_conditions(
 			password=password,
