@@ -203,7 +203,7 @@ class Settings:
 		settings		: dict[str, dict] = {},
 	) -> Settings:
 		if len(settings.keys()) == 0:
-			settings = copy.copy(DEFAULT_SETTINGS)
+			settings = copy.deepcopy(DEFAULT_SETTINGS)
 
 		settings_obj = Settings(
 			settings=settings,
