@@ -107,6 +107,25 @@ class Settings:
 		return self.settings["Others"]
 
 	"""
+		Returns a carbon copy of the current settings object (except for the lock)
+	"""
+	def get_snapshot(self) -> Settings:
+		with self._lock:
+			key				= self._key
+			salt			= self._salt
+
+		sync_callback	= self.sync_callback
+		settings		= copy.deepcopy(self.settings)
+
+		return Settings(
+			sync_callback=sync_callback,
+			settings=settings,
+			key=key,
+			salt=salt,
+			lock=RLock()
+		)
+
+	"""
 		@raises:
 			- SettingsKeyNotSetError
 			- OSError

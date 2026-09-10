@@ -62,6 +62,7 @@ class VaultScreen(MDScreen):
 		app_data_path	: str,
 		phone_screen	: MDScreen,
 		screen_manager	: "AppScreenManager",	# forward reference for type checking
+		vault_lock		: Lock,
 		*args,
 		**kwargs
 	):
@@ -73,12 +74,7 @@ class VaultScreen(MDScreen):
 
 		self.main_container = MDBoxLayout()		# contains the account_list widget
 
-		"""
-			Guards self.pwd_manager from being modified concurrently
-				- Used by self.sync_pwd_manager to create a sound copy of the password manager
-					for encryption
-		"""
-		self.pwd_manager_lock = Lock()
+		self.vault_lock = vault_lock
 
 		"""
 			Guards self.sync_pwd_manager() calls
@@ -270,7 +266,7 @@ class VaultScreen(MDScreen):
 		):
 		try:
 			# Lock the pwd_manager before modifying it
-			with self.pwd_manager_lock:
+			with self.vault_lock:
 				self.pwd_manager.add_entry(
 					website=website,
 					username=username,
@@ -307,7 +303,7 @@ class VaultScreen(MDScreen):
 			self.change_version += 1
 
 		Thread(
-			target=self.sync_pwd_manager,
+			target=self.sync_vault,
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
 		).start()
@@ -379,7 +375,7 @@ class VaultScreen(MDScreen):
 		new_totp_uri	: str | None,
 	) -> bool:
 		try:
-			with self.pwd_manager_lock:
+			with self.vault_lock:
 				self.pwd_manager.update_entry(
 					website=website,
 					username=username,
@@ -426,7 +422,7 @@ class VaultScreen(MDScreen):
 			self.change_version += 1
 
 		Thread(
-			target=self.sync_pwd_manager,
+			target=self.sync_vault,
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
 		).start()
@@ -442,7 +438,7 @@ class VaultScreen(MDScreen):
 		username: str,
 		account_entry: AccountEntry,
 	):
-		with self.pwd_manager_lock:
+		with self.vault_lock:
 			self.pwd_manager.remove_entry(
 				website=website,
 				username=username
@@ -462,7 +458,7 @@ class VaultScreen(MDScreen):
 			self.change_version += 1
 
 		Thread(
-			target=self.sync_pwd_manager,
+			target=self.sync_vault,
 			kwargs={"on_exit": False},
 			daemon=False	# daemon=False -> program will not exit until thread returns
 		).start()
@@ -592,7 +588,7 @@ class VaultScreen(MDScreen):
 		Creates a snapshot of the current state of self.pwd_manager and encrypts it.
 			- Acquires self.sync_lock.
 	"""
-	def sync_pwd_manager(
+	def sync_vault(
 		self,
 		on_exit: bool = False,
 		error_dialog: bool = True,
@@ -605,13 +601,12 @@ class VaultScreen(MDScreen):
 
 				version = self.change_version
 
-			# Create a snap shot of the current state
-			with self.pwd_manager_lock:
-				pwd_manager = self.pwd_manager.get_snapshot()
-
 			try:
-				# Encrypt the snapshot
-				pwd_manager.encrypt()
+				with self.vault_lock:
+					self.vault_session.sync_snapshot(
+						pwd_manager=self.pwd_manager,
+						settings=self.settings
+					)
 
 				# Update the synced version
 				with self.change_lock:

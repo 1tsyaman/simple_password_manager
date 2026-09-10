@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from threading import Lock
 
 from kivymd.uix.widget import Widget
 from kivymd.uix.dialog import MDDialog
@@ -52,6 +53,13 @@ class AppScreenManager(MDScreenManager):
 		self.app_data_path = str(io.get_app_data_path())
 		self.top_container = top_container
 
+		"""
+			Guards pwd_manager and settings objects from being modified concurrently
+				- Used by self.vault_screen.sync_vault to create a sound copy of the 
+					password manager and settings objects for encryption
+		"""
+		self.vault_lock = Lock()
+
 		self.welcome_screen = WelcomeScreen(
 			app_data_path=self.app_data_path,
 			app_name=self.app_name,
@@ -62,11 +70,13 @@ class AppScreenManager(MDScreenManager):
 			app_data_path=self.app_data_path,
 			phone_screen=phone_screen,
 			screen_manager=self,
+			vault_lock=self.vault_lock
 		)
 		self.settings_screen = SettingsScreen(
 			app_data_path=self.app_data_path,
 			screen_manager=self,
 			app=self.app,
+			vault_lock=self.vault_lock
 		)
 
 		# Signal that this is the first time we queue the selection screen
@@ -208,7 +218,7 @@ class AppScreenManager(MDScreenManager):
 		vault_screen = self.vault_screen
 
 		return vault_screen.force_exit_vault \
-				or (vault_screen.sync_pwd_manager(on_exit=True))
+				or (vault_screen.sync_vault(on_exit=True))
 
 	def force_exist_vault_screen(self, dialog: ErrorDialog):
 		dialog.dismiss()
@@ -300,6 +310,7 @@ class AppScreenManager(MDScreenManager):
 		if screen == "settings":
 			screen_object.pwd_manager	= pwd_manager
 			screen_object.settings_obj	= settings
+			screen_object.sync_callback	= self.vault_screen.sync_vault
 
 		if self.current == "vault":
 			self.app.close_all_dialogs()

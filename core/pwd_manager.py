@@ -97,7 +97,7 @@ class PwdManager:
 
 
 	"""
-		Returns a carbon copy of the current password manager
+		Returns a carbon copy of the current password manager (except for the lock)
 	"""
 	def get_snapshot(self) -> PwdManager:
 		with self._lock:
@@ -108,7 +108,7 @@ class PwdManager:
 			key=key,
 			salt=salt,
 			sync_callback=self.sync_callback,
-			lock=self._lock
+			lock=RLock()
 		)
 
 		pwd_manager_copy.entries = deepcopy(self.entries)
