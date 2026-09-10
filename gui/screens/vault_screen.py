@@ -143,10 +143,6 @@ class VaultScreen(MDScreen):
 			padding="2dp"
 		)
 
-		with self.change_lock:
-			self.change_version = 0
-			self.synced_version = 0
-
 		self.force_exit_vault = False
 
 		dialog: MDDialog = self.login_dialog
@@ -493,11 +489,12 @@ class VaultScreen(MDScreen):
 		new_name: str
 	):
 		try:
-			io.rename_vault(
-				path=self.app_data_path,
-				vault_name=old_name,
-				new_vault_name=new_name
-			)
+			with self.sync_lock:
+				io.rename_vault(
+					path=self.app_data_path,
+					vault_name=old_name,
+					new_vault_name=new_name
+				)
 
 			self.refresh()
 
@@ -531,11 +528,12 @@ class VaultScreen(MDScreen):
 			return
 
 		try:
-			self.vault_session.modify_master_password(
-				password=password,
-				pwd_manager=self.pwd_manager,
-				settings=self.settings
-			)
+			with self.sync_lock:
+				self.vault_session.modify_master_password(
+					password=password,
+					pwd_manager=self.pwd_manager,
+					settings=self.settings
+				)
 
 			dialog.dismiss()
 
@@ -566,10 +564,12 @@ class VaultScreen(MDScreen):
 
 	def delete_vault(self):
 		try:
-			io.delete_vault_for_gui(
-				app_data_path=self.app_data_path,
-				vault_name=self.vault_name
-			)
+			# Wait for old syncs to finish, since we don't store sync thread references
+			with self.sync_lock:
+				io.delete_vault_for_gui(
+					app_data_path=self.app_data_path,
+					vault_name=self.vault_name
+				)
 			self.on_back()
 		except OSError as e:
 			self.screen_manager.show_error_dialog(

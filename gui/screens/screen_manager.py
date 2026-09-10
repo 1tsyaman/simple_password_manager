@@ -243,12 +243,19 @@ class AppScreenManager(MDScreenManager):
 
 	def lock_vault(self):
 		# Sync any changes before locking the vault
-		self.vault_screen.sync_vault(
+		sync_success = self.vault_screen.sync_vault(
 			on_exit=False,
 			error_dialog=False
 		)
 
 		self._switch_screen("welcome")
+
+		if not sync_success:
+			self.show_error_dialog(
+				error_title="Synchronization Failed",
+				error_message="Failed to synchronize vault during emergency lockdown"
+			)
+
 
 	def exit_app(self):
 		self.app.stop()
