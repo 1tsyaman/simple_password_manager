@@ -296,23 +296,6 @@ class VaultSession:
 
 			atomic_write(self.json, Path(self.vault_path), indent=4)
 
-	"""
-		Creates a snapshot of the password manager and settigns objectes
-			and syncs this to file
-		
-		Well-fitted for asynchronous sync jobs
-	"""
-	def sync_snapshot(
-		self,
-		pwd_manager	: PwdManager,
-		settings	: Settings
-	):
-		with self.lock:
-			pwd_manager_copy	= pwd_manager.get_snapshot()
-			settings_copy		= settings.get_snapshot()
-
-			self.sync(pwd_manager_copy, settings_copy)
-
 	def sync(
 		self,
 		pwd_manager	: PwdManager,

@@ -125,6 +125,9 @@ class Settings:
 			lock=RLock()
 		)
 
+	def get_settings_dict_copy(self) -> dict:
+		return copy.deepcopy(self.settings)
+
 	"""
 		@raises:
 			- SettingsKeyNotSetError

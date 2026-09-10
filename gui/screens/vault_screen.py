@@ -299,8 +299,8 @@ class VaultScreen(MDScreen):
 			self.main_container.clear_widgets()
 			self.main_container.add_widget(self.account_list_widget)
 
-		with self.change_lock:
-			self.change_version += 1
+		self.increment_change_version()
+
 
 		Thread(
 			target=self.sync_vault,
@@ -418,8 +418,8 @@ class VaultScreen(MDScreen):
 				entry["username"]		= new_username
 				entry["description"]	= new_description
 
-		with self.change_lock:
-			self.change_version += 1
+		self.increment_change_version()
+
 
 		Thread(
 			target=self.sync_vault,
@@ -454,8 +454,7 @@ class VaultScreen(MDScreen):
 			if 	entry["website"] == website and	entry["username"] == username:
 				self.account_list.pop(index)
 
-		with self.change_lock:
-			self.change_version += 1
+		self.increment_change_version()
 
 		Thread(
 			target=self.sync_vault,
@@ -603,10 +602,10 @@ class VaultScreen(MDScreen):
 
 			try:
 				with self.vault_lock:
-					self.vault_session.sync_snapshot(
-						pwd_manager=self.pwd_manager,
-						settings=self.settings
-					)
+					pwd_manager_copy	= self.pwd_manager.get_snapshot()
+					settings_copy		= self.settings.get_snapshot()
+
+				self.vault_session.sync(pwd_manager_copy, settings_copy)
 
 				# Update the synced version
 				with self.change_lock:
@@ -747,6 +746,10 @@ class VaultScreen(MDScreen):
 			type="picture",
 			image_prefix=prefix
 		).open()
+
+	def increment_change_version(self):
+		with self.change_lock:
+			self.change_version += 1
 
 	"""
 		Assumes that there is a single picture

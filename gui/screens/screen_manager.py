@@ -242,6 +242,12 @@ class AppScreenManager(MDScreenManager):
 		return
 
 	def lock_vault(self):
+		# Sync any changes before locking the vault
+		self.vault_screen.sync_vault(
+			on_exit=False,
+			error_dialog=False
+		)
+
 		self._switch_screen("welcome")
 
 	def exit_app(self):
@@ -308,9 +314,10 @@ class AppScreenManager(MDScreenManager):
 			screen_object.vault_name = vault_name
 
 		if screen == "settings":
-			screen_object.pwd_manager	= pwd_manager
-			screen_object.settings_obj	= settings
-			screen_object.sync_callback	= self.vault_screen.sync_vault
+			screen_object.pwd_manager					= pwd_manager
+			screen_object.settings_obj					= settings
+			screen_object.sync_callback					= self.vault_screen.sync_vault
+			screen_object.increment_version_callback	= self.vault_screen.increment_change_version
 
 		if self.current == "vault":
 			self.app.close_all_dialogs()

@@ -23,9 +23,10 @@ NUMERIC_RANGES = {
 }
 
 class SettingsScreen(MDScreen):
-	settings_obj	: Settings		# Set by screen_manager
-	pwd_manager		: PwdManager 	# Set by screen_manager
-	sync_callback	: Callable		# Set by screen_manager
+	settings_obj				: Settings		# Set by screen_manager
+	pwd_manager					: PwdManager 	# Set by screen_manager
+	sync_callback				: Callable		# Set by screen_manager
+	increment_version_callback	: Callable		# Set by screen_manager
 
 	def __init__(
 		self,
@@ -69,9 +70,13 @@ class SettingsScreen(MDScreen):
 		self.screen_manager.switch_top_bar(top_bar)
 
 		self.main_container.clear_widgets()
+
+		with self.vault_lock:
+			settings_copy = self.settings_obj.get_settings_dict_copy()
+
 		self.main_container.add_widget(
 			SettingsMenu(
-				settings=self.settings_obj.settings,
+				settings=settings_copy,
 				numeric_ranges=NUMERIC_RANGES,
 				change_callback=self.update_settings,
 				theme_callback=self.apply_theme,
@@ -86,6 +91,8 @@ class SettingsScreen(MDScreen):
 	):
 		with self.vault_lock:
 			self.settings_obj.set_settings_value(key, value)
+
+		self.increment_version_callback()
 
 	def apply_theme(
 		self,
