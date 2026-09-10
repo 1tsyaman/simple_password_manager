@@ -609,7 +609,7 @@ class PwdManager:
 			interval=totp_config.period
 		).now()
 
-		return totp_code
+		return f"{totp_code[:3]} {totp_code[3:6]}"
 
 	"""
 		decrypted_data has the following form:

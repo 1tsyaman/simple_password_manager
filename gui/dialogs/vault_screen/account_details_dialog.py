@@ -245,7 +245,7 @@ class AccountDetailsDialog(MDDialog):
 		YesNoDialog(
 			headline="Are you sure?",
 			message="Deleted accounts cannot be restored",
-			yes_callback=lambda _:self._delete(),
+			yes_callback=self._delete,
 			icon="alert-circle" 
 		).open()
 
