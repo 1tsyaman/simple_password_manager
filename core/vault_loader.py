@@ -144,6 +144,16 @@ class VaultSession:
 				)
 				raise
 
+	def set_vault_name(
+		self,
+		vault_name: str
+	):
+		with self.lock:
+			app_data_path = os.path.dirname(self.vault_path)
+			self.vault_path = os.path.join(
+				app_data_path,
+				vault_name + VAULT_ENDING
+			)
 
 	"""
 		@raises:

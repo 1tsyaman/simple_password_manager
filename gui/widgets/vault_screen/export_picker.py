@@ -26,6 +26,8 @@ class ExportFilePicker(FilePicker):
 		self,
 		app_data_path: str,
 		vault_name: str,
+		sync_lock,
+		sync_callback,
 		*args,
 		**kwargs
 	):
@@ -34,6 +36,8 @@ class ExportFilePicker(FilePicker):
 		)
 
 		self._vault_name = vault_name
+		self._sync_lock = sync_lock
+		self._sync_callback = sync_callback
 
 		# Only create the MDFileManager instance if we're not on Android
 		if platform != "android":
@@ -55,31 +59,36 @@ class ExportFilePicker(FilePicker):
 		vault_name: str,
 		dst: object
 	):
-		vault_name = os.path.basename(vault_name + VAULT_ENDING)
+		# Prevent the vault from changing between the final sync
+		# and completion of the export.
+		with self._sync_lock:
+			if not self._sync_callback():
+				return
 
-		src = os.path.join(
-			self.app_data_path,
-			vault_name
-		)
+			vault_name = os.path.basename(vault_name + VAULT_ENDING)
+			src = os.path.join(
+				self.app_data_path,
+				vault_name
+			)
 
-		if not os.path.isfile(src):
-			self._emit_error(
-				message=f"Vault '{vault_name}' does not exist"
-			)
-			return
+			if not os.path.isfile(src):
+				self._emit_error(
+					message=f"Vault '{vault_name}' does not exist"
+				)
+				return
 
-		if platform == "android":
-			self._export_android(
-				src=src,
-				vault_name=vault_name,
-				dst=dst
-			)
-		else:
-			self._export_desktop(
-				src=src,
-				vault_name=vault_name,
-				dst=str(dst)
-			)
+			if platform == "android":
+				self._export_android(
+					src=src,
+					vault_name=vault_name,
+					dst=dst
+				)
+			else:
+				self._export_desktop(
+					src=src,
+					vault_name=vault_name,
+					dst=str(dst)
+				)
 
 	def _export_desktop(
 		self,

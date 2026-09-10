@@ -1,6 +1,6 @@
 import random as rand
 
-from threading import Thread, Lock
+from threading import Thread, RLock, Lock
 from typing import TYPE_CHECKING, Any
 
 from kivy.clock import Clock
@@ -79,8 +79,10 @@ class VaultScreen(MDScreen):
 		"""
 			Guards self.sync_pwd_manager() calls
 			- Prevents two sync threads from creating an inconsistent vault state
+			- RLock works here because different worker threads cannot acquire it concurrecntly, however,
+				it allows the same thread to acquire it twice
 		"""
-		self.sync_lock = Lock()
+		self.sync_lock = RLock()
 
 		"""
 			Locking mechanism to prevent changes made while an asynchronous
@@ -496,6 +498,10 @@ class VaultScreen(MDScreen):
 					new_vault_name=new_name
 				)
 
+				# Keep the active session consistent with the renamed file
+				self.vault_name = new_name
+				self.vault_session.set_vault_name(new_name)
+
 			self.refresh()
 
 		except (
@@ -570,7 +576,13 @@ class VaultScreen(MDScreen):
 					app_data_path=self.app_data_path,
 					vault_name=self.vault_name
 				)
+
+				# Prevent already queued sync threads from recreating the deleted vault
+				with self.change_lock:
+					self.synced_version = self.change_version
+
 			self.on_back()
+
 		except OSError as e:
 			self.screen_manager.show_error_dialog(
 				error_title="Deletion Error:",
@@ -676,11 +688,11 @@ class VaultScreen(MDScreen):
 		).open()
 
 	def show_export_vault_dialog(self):
-		vault_name = self.vault_name
-
 		ExportFilePicker(
 			app_data_path=self.app_data_path,
-			vault_name=vault_name
+			vault_name=self.vault_name,
+			sync_lock=self.sync_lock,
+			sync_callback=self.sync_vault
 		).open()
 
 	def show_delete_vault_dialog(self):
