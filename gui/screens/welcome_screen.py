@@ -103,6 +103,8 @@ class WelcomeScreen(MDScreen):
 			)
 		)
 
+		self.screen_manager.set_theme_from_vault_file(vault)
+
 		if self.prompt_login:
 			self.prompt_login = False	# never true again while running
 			Clock.schedule_once(

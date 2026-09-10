@@ -232,5 +232,14 @@ class Settings:
 
 		return path
 
+	@staticmethod
+	def get_theme_from_json(
+		json: dict[str, dict]
+	) -> str:
+		try:
+			return json["Settings"]["Others"]["theme"]
+		except:
+			raise InvalidVaultFile
+
 def _is_sublist(ls1: list, ls2: list):
 	return all(elem in ls2 for elem in ls1)

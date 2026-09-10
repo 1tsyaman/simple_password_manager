@@ -317,7 +317,7 @@ class VaultSession:
 			- OSError
 	"""
 	def read_json(self) -> dict[str, dict]:
-		return io.load_json(self.vault_path)
+		return self._read_json(self.vault_path)
 
 	"""
 		Assumes self.lock is acquired
@@ -349,6 +349,24 @@ class VaultSession:
 			lock=self.lock,
 		)
 
+	"""
+		@raises:
+			- InvalidVaultFile
+	"""
+	@staticmethod
+	def get_theme_from_vault_file(
+		app_data_path	: str,
+		vault_name		: str
+	) -> str:
+		vault_path	= os.path.join(app_data_path, vault_name + VAULT_ENDING)
+		try:
+			json = VaultSession._read_json(vault_path)
+			return Settings.get_theme_from_json(json)
+		except:
+			raise InvalidVaultFile
+
+
+
 	@staticmethod
 	def _derive_vault_key(master_key: bytes) -> bytes:
 		return derive_subkey(
@@ -362,3 +380,13 @@ class VaultSession:
 			master_key=master_key,
 			purpose="settings-auth"
 		)
+
+	"""
+		@raises:
+			- FileNotFoundError
+			- InvalidJSONError
+			- OSError
+	"""
+	@staticmethod
+	def _read_json(path: str) -> dict[str, dict]:
+		return io.load_json(path)

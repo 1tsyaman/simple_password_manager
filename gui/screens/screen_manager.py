@@ -1,4 +1,5 @@
-from kivymd.app import MDApp
+from typing import TYPE_CHECKING
+
 from kivymd.uix.widget import Widget
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.screen import MDScreen
@@ -33,10 +34,13 @@ from core.errors import (
 
 import storage.io as io
 
+if TYPE_CHECKING:
+	from gui.main import SimplePasswordManagerApp
+
 class AppScreenManager(MDScreenManager):
 	def __init__(
 		self,
-		app: MDApp,
+		app: "SimplePasswordManagerApp",
 		app_name: str,
 		phone_screen: MDScreen,
 		top_container: MDBoxLayout,
@@ -87,6 +91,17 @@ class AppScreenManager(MDScreenManager):
 			*args,
 			**kwargs
 		)
+
+	def set_theme_from_vault_file(
+		self,
+		vault_name: str
+	):
+		theme = VaultSession.get_theme_from_vault_file(
+			app_data_path=self.app_data_path,
+			vault_name=vault_name
+		)
+
+		self.app.apply_theme(theme)
 
 	"""
 		Opens the vault and triggers screen change on success.
