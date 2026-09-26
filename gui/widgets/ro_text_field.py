@@ -100,23 +100,18 @@ class PasswordReadOnlyText(ReadOnlyTextField):
 		self.field.trailing_callback	= self.toggle_password_mask
 
 	def set_read_only(self):
-		self.field.password = True
+		self.field.set_password_masked(True)
 
 		return super().set_read_only()
 
 	def set_read_write(self):
-		self.field.password	= False
+		self.field.set_password_masked(False)
 
 		return super().set_read_write()
 
 	def toggle_password_mask(self):
 		self.field.toggle_password_mask()
 
-		# Toggle the icon
-		if self.field.password_mask_is_set():
-			self.field.trailing_icon = "eye"
-		else:
-			self.field.trailing_icon ="eye-off"
 
 class TotpReadOnlyTextField(ReadOnlyTextField):
 	def __init__(

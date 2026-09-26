@@ -11,7 +11,7 @@ from kivymd.uix.dialog import (
 	MDDialogButtonContainer
 )
 
-from gui.widgets.input_field import InputField
+from gui.widgets.input_field import InputField, PasswordInputField
 
 class LoginDialog(MDDialog):
 	def __init__(
@@ -21,12 +21,8 @@ class LoginDialog(MDDialog):
 		*args,
 		**kwargs
 	):
-		self.password_field = InputField(
-			title="Password",
-			icon="lock",
-			password=True,
-			trailing_icon="eye",
-			trailing_callback=self.toggle_password_mask
+		self.password_field = PasswordInputField(
+			title="Password"
 		)
 		self.vault = vault
 		self.login_callback = login_callback
@@ -88,8 +84,3 @@ class LoginDialog(MDDialog):
 
 	def toggle_password_mask(self):
 		self.password_field.toggle_password_mask()
-		# Toggle the icon
-		if self.password_field.password_mask_is_set():
-			self.password_field.trailing_icon = "eye"
-		else:
-			self.password_field.trailing_icon = "eye-off"

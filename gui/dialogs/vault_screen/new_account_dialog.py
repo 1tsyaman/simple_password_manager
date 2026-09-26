@@ -11,7 +11,7 @@ from kivymd.uix.dialog import (
 	MDDialogButtonContainer
 )
 
-from gui.widgets.input_field import InputField
+from gui.widgets.input_field import InputField, PasswordInputField
 
 from core.pwd_manager import PwdManager
 
@@ -31,7 +31,7 @@ class NewAccountDialog(MDDialog):
 			title="Username",
 			icon="account"
 		)
-		self.password_field				= InputField(
+		self.password_field				= PasswordInputField(
 			title="Password",
 			icon="key",
 			trailing_icon="auto-fix",

@@ -11,7 +11,7 @@ from kivymd.uix.dialog import (
 	MDDialogButtonContainer
 )
 
-from gui.widgets.input_field import InputField
+from gui.widgets.input_field import InputField, PasswordInputField
 
 class NewVaultDialog(MDDialog):
 	def __init__(
@@ -24,15 +24,11 @@ class NewVaultDialog(MDDialog):
 			title="Name",
 			icon="label"
 		)
-		self.password_field			= InputField(
-			title="Password",
-			password=True,
-			icon="lock"
+		self.password_field			= PasswordInputField(
+			title="Password"
 		)
-		self.confirm_password_field	= InputField(
-			title="Confirm Password",
-			password=True,
-			icon="lock"
+		self.confirm_password_field	= PasswordInputField(
+			title="Confirm Password"
 		)
 		self.create_vault_callback 	= create_vault_callback
 

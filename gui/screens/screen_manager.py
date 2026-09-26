@@ -14,7 +14,7 @@ from gui.screens.settings_screen import SettingsScreen
 from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.selection_screen.new_vault_dialog import NewVaultDialog
 from gui.dialogs.error_dialog import ErrorDialog
-from gui.widgets.input_field import InputField
+from gui.widgets.input_field import PasswordInputField
 from gui.widgets.vault_screen.search_bar import SearchBar
 
 from core.pwd_manager import PwdManager
@@ -144,7 +144,7 @@ class AppScreenManager(MDScreenManager):
 		vault_name: str,
 		password: str
 	):
-		password_field : InputField = dialog.password_field 
+		password_field : PasswordInputField = dialog.password_field 
 		error_widget = password_field.error_widget
 		error_message = ""
 

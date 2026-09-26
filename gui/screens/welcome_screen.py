@@ -10,13 +10,12 @@ from gui.dialogs.selection_screen.login_dialog import LoginDialog
 from gui.dialogs.selection_screen.new_vault_dialog import NewVaultDialog
 
 from gui.widgets.top_bar import TopBar
-from gui.widgets.input_field import InputField
+from gui.widgets.input_field import InputField, PasswordInputField
 from gui.widgets.welcome_screen.import_picker import ImportFilePicker
 from gui.widgets.welcome_screen.card_widgets import NoVaultWidget, OpenVaultWidget
 
 import storage.io as io
 
-from core.settings import Settings
 from core.vault_loader import VaultSession
 from core.errors import (
 	PasswordRequirementsError,
@@ -132,8 +131,8 @@ class WelcomeScreen(MDScreen):
 		conf_password: str
 	):
 		name_field 				: InputField = dialog.name_field
-		password_field			: InputField = dialog.password_field
-		confirm_password_field	: InputField = dialog.confirm_password_field
+		password_field			: PasswordInputField = dialog.password_field
+		confirm_password_field	: PasswordInputField = dialog.confirm_password_field
 
 		app_data_path = self.app_data_path
 

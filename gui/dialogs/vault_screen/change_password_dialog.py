@@ -11,7 +11,7 @@ from kivymd.uix.dialog import (
 	MDDialogButtonContainer
 )
 
-from gui.widgets.input_field import InputField
+from gui.widgets.input_field import InputField, PasswordInputField
 
 class ChangePasswordDialog(MDDialog):
 	def __init__(
@@ -20,15 +20,11 @@ class ChangePasswordDialog(MDDialog):
 		*args,
 		**kwargs
 	):
-		self.password_field				= InputField(
-			title="New Password",
-			icon="lock",
-			password=True
+		self.password_field				= PasswordInputField(
+			title="New Password"
 		)
-		self.confirm_password_field		= InputField(
-			title="Confirm New Password",
-			icon="lock",
-			password=True
+		self.confirm_password_field		= PasswordInputField(
+			title="Confirm New Password"
 		)
 		self.change_password_callback 	= change_password_callback
 

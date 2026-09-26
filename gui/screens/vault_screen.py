@@ -23,7 +23,7 @@ from gui.widgets.vault_screen.search_bar import SearchBar
 from gui.widgets.welcome_screen.import_picker import ImportFilePicker
 from gui.widgets.labels import NoAccountsLabel
 from gui.widgets.plus_button import PlusButton
-from gui.widgets.input_field import InputField
+from gui.widgets.input_field import PasswordInputField
 from gui.utils.clipboard import copy_text
 
 from core.vault_loader import VaultSession
@@ -525,8 +525,8 @@ class VaultScreen(MDScreen):
 		password: str,
 		conf_password: str
 	):
-		password_field			: InputField = dialog.password_field
-		confirm_password_field	: InputField = dialog.confirm_password_field
+		password_field			: PasswordInputField = dialog.password_field
+		confirm_password_field	: PasswordInputField = dialog.confirm_password_field
 
 		if password != conf_password:
 			confirm_password_field.error_widget.text = "Password does not match"

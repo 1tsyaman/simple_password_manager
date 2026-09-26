@@ -142,11 +142,15 @@ class FocusableTextField(MDTextField, AndroidFocusBehaviour):
 		):
 		self._trailing_icon_widget.icon = value
 
-	def toggle_password_mask(self):
-		self.password = not self.password
+	def set_password_masked(
+		self,
+		masked: bool
+	):
+		self.password = masked
+		self.trailing_icon = "eye" if masked else "eye-off"
 
-	def password_mask_is_set(self):
-		return self.password
+	def toggle_password_mask(self):
+		self.set_password_masked(not self.password)
 
 	"""
 		Workaround to make the icon behave like a clickable button

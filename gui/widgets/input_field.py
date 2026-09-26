@@ -63,3 +63,21 @@ class InputField(FocusableTextField):
 			*args,
 			**kwargs
 		)
+
+class PasswordInputField(InputField):
+    def __init__(
+        self,
+        *args,
+        title: str,
+        icon: str = "lock",
+        **kwargs
+    ):
+        super().__init__(
+            *args,
+            title=title,
+            icon=icon,
+            password=True,
+            trailing_icon="eye",
+            trailing_callback=self.toggle_password_mask,
+            **kwargs
+        )
