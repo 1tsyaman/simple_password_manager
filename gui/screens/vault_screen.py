@@ -248,7 +248,7 @@ class VaultScreen(MDScreen):
 	def show_add_account_dialog(self):
 		NewAccountDialog(
 			add_account_callback=self.add_account,
-			random_pwd_callback=self.pwd_manager.generate_random_pwd
+			random_pwd_callback=self.generate_and_copy_random_password
 		).open()
 
 	"""
@@ -762,6 +762,12 @@ class VaultScreen(MDScreen):
 	def increment_change_version(self):
 		with self.change_lock:
 			self.change_version += 1
+
+	def generate_and_copy_random_password(self):
+		password = self.pwd_manager.generate_random_pwd()
+		copy_text(password)
+
+		return password
 
 	"""
 		Assumes that there is a single picture
