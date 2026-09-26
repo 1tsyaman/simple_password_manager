@@ -20,8 +20,16 @@ class ChangePasswordDialog(MDDialog):
 		*args,
 		**kwargs
 	):
-		self.password_field				= InputField(title="New Password", password=True)
-		self.confirm_password_field		= InputField(title="Confirm New Password", password=True)
+		self.password_field				= InputField(
+			title="New Password",
+			icon="lock",
+			password=True
+		)
+		self.confirm_password_field		= InputField(
+			title="Confirm New Password",
+			icon="lock",
+			password=True
+		)
 		self.change_password_callback 	= change_password_callback
 
 		super().__init__(

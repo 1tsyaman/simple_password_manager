@@ -1,0 +1,1 @@
+PASSWORD_MASK = "\u2022" # "●"

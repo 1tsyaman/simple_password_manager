@@ -7,6 +7,7 @@ from kivymd.uix.textfield import (
 )
 
 from gui.widgets.focusable_text_field import FocusableTextField
+from gui.constants import PASSWORD_MASK
 
 """
 	To communicate incorrect input:
@@ -57,7 +58,7 @@ class InputField(FocusableTextField):
 			line_color_normal="mediumaquamarine",
 			line_color_focus="tan",
 			password=password,
-			password_mask="\u2022", # "●"
+			password_mask=PASSWORD_MASK,
 
 			*args,
 			**kwargs

@@ -20,9 +20,20 @@ class NewVaultDialog(MDDialog):
 		*args,
 		**kwargs
 	):
-		self.name_field				= InputField(title="Name")
-		self.password_field			= InputField(title="Password", password=True)
-		self.confirm_password_field	= InputField(title="Confirm Password", password=True)
+		self.name_field				= InputField(
+			title="Name",
+			icon="label"
+		)
+		self.password_field			= InputField(
+			title="Password",
+			password=True,
+			icon="lock"
+		)
+		self.confirm_password_field	= InputField(
+			title="Confirm Password",
+			password=True,
+			icon="lock"
+		)
 		self.create_vault_callback 	= create_vault_callback
 
 		super().__init__(

@@ -8,6 +8,7 @@ from kivymd.uix.textfield import (
 )
 
 from gui.widgets.focusable_text_field import FocusableTextField
+from gui.constants import PASSWORD_MASK
 
 class ReadOnlyTextField(MDBoxLayout):
 	def __init__(
@@ -94,7 +95,7 @@ class PasswordReadOnlyText(ReadOnlyTextField):
 		)
 
 		self.field.password				= True
-		self.field.password_mask		= "\u2022" # "●"
+		self.field.password_mask		= PASSWORD_MASK
 		self.field.trailing_icon		= "eye"
 		self.field.trailing_callback	= self.toggle_password_mask
 
