@@ -5,7 +5,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
 
-from core.keys import (
+from core.password_manager.keys import (
 	derive_master_key,
 	KEY_LEN,
 	SALT_LEN

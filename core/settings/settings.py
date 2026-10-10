@@ -6,12 +6,9 @@ from collections.abc import Callable
 from threading import RLock
 
 import storage.io as io
-from core.etc.authenticate import generate_tag, is_authentic, encode_data
 from core.etc.types import config_t
 from core.etc.errors import (
 	InvalidVaultFile,
-	SettingsFileModifiedError,
-	SettingsKeyNotSetError,
 )
 from core.etc.constants import (
 	RELATIVE_CONFIG_PATH,
@@ -32,15 +29,10 @@ class Settings:
 		self,
 		sync_callback	: Callable[[dict[str, dict]], None],
 		settings		: dict[str, dict],
-		key				: bytes,
-		salt			: bytes,
-		lock			: RLock		# Guards _key/_salt attributes
 	):
 		self.sync_callback	= sync_callback
 		self.settings		= settings
-		self._key			= key
-		self._salt			= salt
-		self._lock			= lock
+		self._lock			= RLock()		# Guards self.settings dict
 
 	"""
 		Does not sync to file, synchronization should be done explicitly
@@ -67,16 +59,8 @@ class Settings:
 			and self.settings[section]["special_chars"] == "":
 			value = False	# Keep it False, since no special_chars
 
-		self.settings[section][key] = value
-
-	def set_key_salt_pair(
-		self,
-		key:	bytes,
-		salt:	bytes
-	):
 		with self._lock:
-			self._key	= key
-			self._salt	= salt
+			self.settings[section][key] = value
 
 	"""
 		@raises:
@@ -95,38 +79,32 @@ class Settings:
 		else:
 			raise KeyError
 
-		return self.settings[section][key]
+		with self._lock:
+			return self.settings[section][key]
 
 	def get_pwd_gen_config(self) -> dict[str, config_t]:
-		return self.settings["Password Generation"]
+		with self._lock:
+			return self.settings["Password Generation"]
 
 	def get_security_config(self) -> dict[str, config_t]:
-		return self.settings["Security"]
+		with self._lock:
+			return self.settings["Security"]
 
 	def get_other_config(self) -> dict[str, str]:
-		return self.settings["Others"]
+		with self._lock:
+			return self.settings["Others"]
 
 	"""
 		Returns a carbon copy of the current settings object (except for the lock)
 	"""
 	def get_snapshot(self) -> Settings:
-		with self._lock:
-			key				= self._key
-			salt			= self._salt
-
-		sync_callback	= self.sync_callback
-		settings		= copy.deepcopy(self.settings)
+		sync_callback = self.sync_callback
+		settings = self.get_settings_dict_copy()
 
 		return Settings(
 			sync_callback=sync_callback,
-			settings=settings,
-			key=key,
-			salt=salt,
-			lock=RLock()
+			settings=settings
 		)
-
-	def get_settings_dict_copy(self) -> dict:
-		return copy.deepcopy(self.settings)
 
 	"""
 		@raises:
@@ -134,32 +112,13 @@ class Settings:
 			- OSError
 	"""
 	def sync_to_file(self):
-		if not self._key_is_set():
-			raise SettingsKeyNotSetError
+		settings = self.get_settings_dict_copy()
+		return self.sync_callback(settings)
 
+
+	def get_settings_dict_copy(self) -> dict[str, dict]:
 		with self._lock:
-			settings = self.get_hashed_settings()
-			return self.sync_callback(settings)
-
-
-	"""
-		Assumes self._lock is acquired
-	"""
-	def get_hashed_settings(self) -> dict[str, dict]:
-		settings = copy.deepcopy(self.settings)
-		data = encode_data(settings)
-
-		hash = generate_tag(
-			data=data,
-			key=self._key
-		)
-
-		settings["HMAC"] = {
-			"Salt": 	f"{bytes.hex(self._salt)}",
-			"Hash":		f"{bytes.hex(hash)}"
-		}
-
-		return settings
+			return copy.deepcopy(self.settings)
 
 	"""
 		Overwrites the ./config/settings.json file with an authenticated
@@ -170,45 +129,27 @@ class Settings:
 			- OSError
 	"""
 	def reset_to_default_settings(self):
-		if not self._key_is_set():
-			raise SettingsKeyNotSetError
-
-		self.settings = DEFAULT_SETTINGS
-		self.sync_to_file()
-
-	def _key_is_set(self) -> bool:
 		with self._lock:
-			return len(self._key) != 0 and len(self._salt) != 0
+			self.settings = DEFAULT_SETTINGS
+
+		self.sync_to_file()
 
 	"""
 		@raises:
 			- InvalidVaultFile
-			- SettingsFileModifiedError
+			- SettingsFieldModifiedError
 	"""
 	@staticmethod
 	def load_settings(
 		settings		: dict[str, dict],
-		key				: bytes,
-		salt			: bytes,
 		sync_callback	: Callable[[dict[str, dict]], None],
-		lock			: RLock
 	) -> Settings:
 		if not Settings.settings_dict_is_valid(settings):
 			raise InvalidVaultFile
 
-		hmac = settings.pop("HMAC")
-		hash = bytes.fromhex(hmac["Hash"])
-		data = encode_data(settings)
-
-		if not is_authentic(data, key, hash):
-			raise SettingsFileModifiedError
-
 		return Settings(
 			settings=settings,
-			key=key,
-			salt=salt,
 			sync_callback=sync_callback,
-			lock=lock
 		)
 
 	"""
@@ -217,11 +158,8 @@ class Settings:
 			- OSError
 	"""
 	@staticmethod
-	def from_key(
-		key				: bytes,
-		salt			: bytes,
+	def create(
 		sync_callback	: Callable[[dict[str, dict]], None],
-		lock			: RLock,
 		settings		: dict[str, dict] = {},
 	) -> Settings:
 		if len(settings.keys()) == 0:
@@ -229,10 +167,7 @@ class Settings:
 
 		settings_obj = Settings(
 			settings=settings,
-			key=key,
-			salt=salt,
-			sync_callback=sync_callback,
-			lock=lock
+			sync_callback=sync_callback
 		)
 
 		settings_obj.sync_to_file()

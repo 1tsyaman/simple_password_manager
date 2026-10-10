@@ -28,7 +28,7 @@ from core.etc.errors import (
 	CorruptedVaultError,
 	NoVaultFileError,
 	InvalidVaultFile,
-	SettingsFileModifiedError,
+	SettingsFieldModifiedError,
 	SettingsLoadError,
 	log
 )
@@ -355,7 +355,7 @@ class AppScreenManager(MDScreenManager):
 			error_message = "Settings file was not found."
 		except InvalidVaultFile:
 			error_message = "Settings file is invalid."
-		except SettingsFileModifiedError:
+		except SettingsFieldModifiedError:
 			error_message = "Settings file was illegally modified."
 		except OSError:
 			self.show_error_dialog(

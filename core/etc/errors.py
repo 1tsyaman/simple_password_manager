@@ -58,7 +58,7 @@ class InvalidJSONError(Exception):
 class InvalidVaultFile(Exception):
 	pass
 
-class SettingsFileModifiedError(Exception):
+class SettingsFieldModifiedError(Exception):
 	pass
 
 class SettingsKeyNotSetError(Exception):
