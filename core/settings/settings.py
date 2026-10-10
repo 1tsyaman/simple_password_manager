@@ -16,7 +16,6 @@ from core.etc.constants import (
 	PWD_GEN_SUBSECTIONS,
 	SECURITY_SUBSECTIONS,
 	OTHERS_SUBSECTIONS,
-	HMAC_SUBSECTIONS,
 	DEFAULT_SETTINGS
 )
 
@@ -179,7 +178,6 @@ class Settings:
 			and	_is_sublist(PWD_GEN_SUBSECTIONS,	list(settings["Password Generation"].keys()))	\
 			and _is_sublist(SECURITY_SUBSECTIONS,	list(settings["Security"].keys()))				\
 			and _is_sublist(OTHERS_SUBSECTIONS,		list(settings["Others"].keys()))				\
-			and _is_sublist(HMAC_SUBSECTIONS,		list(settings["HMAC"].keys()))
 
 	@staticmethod
 	def get_config_path(app_data_path: str) -> str:

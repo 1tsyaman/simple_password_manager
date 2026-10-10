@@ -38,8 +38,7 @@ RELATIVE_CONFIG_PATH = "config/settings.json"
 SETTINGS_DICT_SECTIONS	= [
 	"Password Generation",
 	"Security",
-	"Others",
-	"HMAC"
+	"Others"
 ]
 
 PWD_GEN_SUBSECTIONS		= [
@@ -55,10 +54,6 @@ SECURITY_SUBSECTIONS	= [
 ]
 OTHERS_SUBSECTIONS		= [
 	"theme"
-]
-HMAC_SUBSECTIONS		= [
-	"Salt",
-	"Hash"
 ]
 
 DEFAULT_SETTINGS = {

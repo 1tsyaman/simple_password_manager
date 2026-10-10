@@ -94,6 +94,15 @@ class VaultSession:
 
 		self.vault_path	= os.path.join(app_data_path, vault_name + VAULT_ENDING)
 
+		self.json = {
+			"Vault"		: {},
+			"Settings"	: {},
+			"HMAC"		: {
+				"Salt"			: bytes(0).hex(),
+				"Settings Hash"	: bytes(0).hex()
+			},
+		}
+
 		if new_vault:
 			# Initialize file
 			io.create_path(self.vault_path)
@@ -105,6 +114,8 @@ class VaultSession:
 
 			self.salt = get_salt_from_vault(self.vault_path)
 
+		self.json["HMAC"]["Salt"] = self.salt.hex()
+
 		# derrive master key
 		_, master_key = derive_master_key(
 			pwd=password,
@@ -114,16 +125,6 @@ class VaultSession:
 		self.vault_key	= self._derive_vault_key(master_key)
 		self.auth_key 	= self._derive_auth_key(master_key)
 		self.lock 		= RLock()
-
-		self.json = {
-			"Vault"		: {},
-			"Settings"	: {},
-			"HMAC"		: {
-				"Salt"			: self.salt.hex(),
-				"Settings Hash"	: bytes(0).hex()
-			},
-		}
-
 
 	"""
 		@raises:
@@ -345,7 +346,9 @@ class VaultSession:
 				)
 				raise
 
-			self.json["Vault"] = vault
+			self.json["Vault"]		= vault
+			hmac					= self.json["HMAC"]
+			hmac["Salt"]			= self.salt.hex()
 
 			atomic_write(self.json, Path(self.vault_path), indent=4)
 
@@ -434,12 +437,29 @@ class VaultSession:
 		Checks if vault has old format (pre google-drive feature)
 
 		@raises:
-			- FileNotFoundError
-			- OSError
-			- InvalidJSONError
+			- InvalidVaultFile
 	"""
 	def _vault_has_old_format(self) -> bool:
-		vault_file = io.load_json(self.vault_path)
+		try:
+			vault_file = self._read_json(self.vault_path)
+		except (
+			FileNotFoundError,
+			OSError,
+			InvalidJSONError
+		) as e:
+			if isinstance(e, FileNotFoundError):
+				error_message = "Vault file does not exist."
+			elif isinstance(e, InvalidJSONError):
+				error_message = "Vault file is not a valid JSON"
+			else:
+				error_message = "Loading the vault caused an OSError."
+		
+			log(
+				message=f"Failed while checking vault format: {error_message}",
+				error=e
+			)
+			raise InvalidVaultFile
+		
 		keys = set(vault_file.keys())
 
 		return keys == {"Vault", "Settings"}
@@ -449,13 +469,29 @@ class VaultSession:
 		Moves hmac out of the settings field
 
 		@raises:
-			- FileNotFoundError
-			- OSError
-			- InvalidJSONError
+			- InvalidVaultFile
 			- KeyError
 	"""
 	def _convert_vault_to_new_format(self):
-		vault_file = io.load_json(self.vault_path)
+		try:
+			vault_file = self._read_json(self.vault_path)
+		except (
+			FileNotFoundError,
+			OSError,
+			InvalidJSONError
+		) as e:
+			if isinstance(e, FileNotFoundError):
+				error_message = "Vault file does not exist."
+			elif isinstance(e, InvalidJSONError):
+				error_message = "Vault file is not a valid JSON"
+			else:
+				error_message = "Loading the vault caused an OSError."
+		
+			log(
+				message=f"Failed while reading vault file: {error_message}",
+				error=e
+			)
+			raise InvalidVaultFile
 
 		settings				= vault_file["Settings"]
 		hmac : dict[str, str]	= settings.pop("HMAC")
@@ -469,7 +505,7 @@ class VaultSession:
 		}
 		self.json = new_vault
 
-		atomic_write(new_vault, Path(self.vault_path))
+		atomic_write(new_vault, Path(self.vault_path), indent=4)
 
 	"""
 		@raises:

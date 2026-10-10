@@ -106,10 +106,13 @@ class AppScreenManager(MDScreenManager):
 		self,
 		vault_name: str
 	):
-		theme = VaultSession.get_theme_from_vault_file(
-			app_data_path=self.app_data_path,
-			vault_name=vault_name
-		)
+		try:
+			theme = VaultSession.get_theme_from_vault_file(
+				app_data_path=self.app_data_path,
+				vault_name=vault_name
+			)
+		except InvalidVaultFile:
+			theme = "Light"
 
 		self.app.apply_theme(theme)
 
@@ -176,7 +179,8 @@ class AppScreenManager(MDScreenManager):
 		except SettingsLoadError:
 			# This is handled by self._load_settings
 			return
-
+		except InvalidVaultFile:	# TODO: in this case, maybe have backup options from cloud?
+			error_message = "Vault file is invalid"
 		except PasswordError:
 			error_message = "Incorrect Password"
 		except FileNotFoundError:
@@ -363,6 +367,8 @@ class AppScreenManager(MDScreenManager):
 				error_message="Failed to load settings, check log."
 			)
 			raise SettingsLoadError
+
+		log("Debug")
 
 		self.show_error_dialog(
 			error_title="Error",
