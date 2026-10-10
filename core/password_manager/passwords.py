@@ -1,6 +1,6 @@
 import secrets
 
-from core.constants import (
+from core.etc.constants import (
 	LETTERS_LOWER,
 	LETTERS_UPPER,
 	DIGITS,

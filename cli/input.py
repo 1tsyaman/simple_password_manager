@@ -9,7 +9,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 
 
-from core.pwd_manager import DIGITS, LETTERS_LOWER, SPECIAL_CHARS
+from core.password_manager.pwd_manager import DIGITS, LETTERS_LOWER, SPECIAL_CHARS
 from cli.watchdog import reset_on_call, reset_timer
 
 CTRL_C		= ['\x03']

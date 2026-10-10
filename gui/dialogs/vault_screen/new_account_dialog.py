@@ -13,7 +13,7 @@ from kivymd.uix.dialog import (
 
 from gui.widgets.input_field import InputField, PasswordInputField
 
-from core.pwd_manager import PwdManager
+from core.password_manager.pwd_manager import PwdManager
 
 class NewAccountDialog(MDDialog):
 	def __init__(

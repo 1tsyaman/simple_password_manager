@@ -1,6 +1,6 @@
 from __future__ import annotations
-from core.totp import TOTP_Config
-from core.errors import (
+from core.password_manager.totp import TOTP_Config
+from core.etc.errors import (
 	EntryHasNoTotp,
 	InvalidEntryJSON
 )

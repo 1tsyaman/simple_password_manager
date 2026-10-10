@@ -3,12 +3,12 @@ from pathlib import Path
 from threading import RLock	# Allows the thread that acquired it first to aquire it again
 
 from storage.constants import VAULT_ENDING
-from core.encrypt import get_salt_from_vault, atomic_write
-from core.keys import derive_master_key, derive_subkey, get_random_salt
-from core.pwd_manager import PwdManager
-from core.settings import Settings
-from core.passwords import password_satisfies_explicit_conditions
-from core.errors import (
+from core.password_manager.encrypt import get_salt_from_vault, atomic_write
+from core.password_manager.keys import derive_master_key, derive_subkey, get_random_salt
+from core.password_manager.pwd_manager import PwdManager
+from core.settings.settings import Settings
+from core.password_manager.passwords import password_satisfies_explicit_conditions
+from core.etc.errors import (
 	PasswordError,
 	PasswordRequirementsError,
 	InvalidVaultFile,

@@ -1,5 +1,5 @@
 import os
-from core.types import config_t
+from core.etc.types import config_t
 
 HEADER		= f"{15*"-"} Password Manager {15*"-"}"
 FOOTER		= 48*"-"

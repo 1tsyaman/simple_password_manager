@@ -3,7 +3,7 @@ from pathlib import Path
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
-from sync.backend import RemoteFile, SyncBackend
+from core.sync.backend import RemoteFile, SyncBackend
 
 class GoogleDriveBackend(SyncBackend):
 

@@ -1,15 +1,15 @@
 from time import sleep
-from core.pwd_manager import PwdManager
-from core.settings import Settings
+from core.password_manager.pwd_manager import PwdManager
+from core.settings.settings import Settings
 from core.vault_loader import VaultSession
-from core.constants import (
+from core.etc.constants import (
 	MIN_PWD_LENGTH,
 	SPECIAL_CHARS,
 	DIGITS
 )
-from core.passwords import password_satisfies_explicit_conditions
-from core.entry import Entry
-from core.errors import (
+from core.password_manager.passwords import password_satisfies_explicit_conditions
+from core.password_manager.entry import Entry
+from core.etc.errors import (
 	KeyLengthError,
 	KeyDerivationError,
 	PasswordRequirementsError,

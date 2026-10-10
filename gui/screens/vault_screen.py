@@ -27,9 +27,9 @@ from gui.widgets.input_field import PasswordInputField
 from gui.utils.clipboard import copy_text
 
 from core.vault_loader import VaultSession
-from core.pwd_manager import PwdManager
-from core.settings import Settings
-from core.errors import (
+from core.password_manager.pwd_manager import PwdManager
+from core.settings.settings import Settings
+from core.etc.errors import (
 	EntryExistsError,
 	KeyLengthError,
 	NoSuchEntryError,

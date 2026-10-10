@@ -10,12 +10,12 @@ from core.keys import (
 	KEY_LEN,
 	SALT_LEN
 )
-from core.errors import (
+from core.etc.errors import (
 	KeyLengthError,
 	VaultFormatError,
 	CorruptedVaultError
 )
-from core.constants import (
+from core.etc.constants import (
 	NONCE,
 	CIPHERTEXT,
 	ASSOCIATED_DATA,

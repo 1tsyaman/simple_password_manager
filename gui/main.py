@@ -12,7 +12,7 @@ from kivymd.uix.screen import MDScreen
 
 from gui.screens.screen_manager import AppScreenManager
 
-from core.pwd_manager import PwdManager
+from core.password_manager.pwd_manager import PwdManager
 
 APP_NAME = "Simple Password Manager"
 INACTIVITY_TIMEOUT_DURATION = 60	# seconds

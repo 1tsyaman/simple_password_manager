@@ -11,8 +11,8 @@ SCOPES = [
 
 
 def get_credentials(
-	client_credentials_path	: Path,
-	token_path				: Path,
+	client_credentials_path	: Path,	# identifies the *application* to Google
+	token_path				: Path,	# user access token (created if path doesn't exist)
 ) -> Credentials:
 
 	credentials = None

@@ -8,9 +8,9 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from gui.widgets.top_bar import SettingsScreenTopBar
 from gui.widgets.settings_screen.settings_menu import SettingsMenu
 
-from core.pwd_manager import PwdManager, SPECIAL_CHARS
-from core.settings import Settings
-from core.types import config_t
+from core.password_manager.pwd_manager import PwdManager, SPECIAL_CHARS
+from core.settings.settings import Settings
+from core.etc.types import config_t
 
 # to avoid cicular import issues
 if TYPE_CHECKING:

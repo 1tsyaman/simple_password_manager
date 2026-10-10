@@ -4,8 +4,8 @@ from argon2.exceptions import HashingError
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from core.errors import KeyDerivationError
-from core.constants import (
+from core.etc.errors import KeyDerivationError
+from core.etc.constants import (
 	KEY_LEN,
 	SALT_LEN,
 	ARGON2_TIME_COST,

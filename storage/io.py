@@ -4,7 +4,7 @@ import json
 import importlib
 from pathlib import Path
 
-from core.errors import (
+from core.etc.errors import (
 	InvalidJSONError,
 )
 from storage.constants import (

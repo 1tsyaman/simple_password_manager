@@ -6,14 +6,14 @@ from collections.abc import Callable
 from threading import RLock
 
 import storage.io as io
-from core.authenticate import generate_tag, is_authentic, encode_data
-from core.types import config_t
-from core.errors import (
+from core.etc.authenticate import generate_tag, is_authentic, encode_data
+from core.etc.types import config_t
+from core.etc.errors import (
 	InvalidVaultFile,
 	SettingsFileModifiedError,
 	SettingsKeyNotSetError,
 )
-from core.constants import (
+from core.etc.constants import (
 	RELATIVE_CONFIG_PATH,
 	SETTINGS_DICT_SECTIONS,
 	PWD_GEN_SUBSECTIONS,

@@ -3,7 +3,7 @@ from collections.abc import Callable
 from kivy.clock import Clock
 from kivy.utils import platform
 
-from core.errors import (
+from core.etc.errors import (
 	ImageOpenError,
 	QRDecodeError,
 	log

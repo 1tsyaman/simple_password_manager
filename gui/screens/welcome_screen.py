@@ -17,7 +17,7 @@ from gui.widgets.welcome_screen.card_widgets import NoVaultWidget, OpenVaultWidg
 import storage.io as io
 
 from core.vault_loader import VaultSession
-from core.errors import (
+from core.etc.errors import (
 	PasswordRequirementsError,
 	KeyLengthError,
 	KeyDerivationError,

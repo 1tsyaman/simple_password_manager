@@ -6,14 +6,14 @@ from copy import copy, deepcopy
 from collections.abc import Callable
 from threading import RLock
 
-from core.encrypt import (
+from core.password_manager.encrypt import (
 	encrypt_data,
 	decrypt_data,
 )
-from core.entry import Entry
-from core.totp import TOTP_Config
-from core.types import config_t
-from core.errors import (
+from core.password_manager.entry import Entry
+from core.password_manager.totp import TOTP_Config
+from core.etc.types import config_t
+from core.etc.errors import (
 	EntryExistsError,
 	NoSuchEntryError,
 	TotpUriError,
@@ -24,7 +24,7 @@ from core.errors import (
 	QRDecodeError,
 	log
 )
-from core.passwords import (
+from core.password_manager.passwords import (
 	password_satisfies_explicit_conditions,
 	generate_random_password,
 	LETTERS_LOWER,
@@ -32,7 +32,7 @@ from core.passwords import (
 	DIGITS,
 	SPECIAL_CHARS,
 )
-from core.constants import (
+from core.etc.constants import (
 	PWD,
 	TOTP_SECRET,
 	TOTP_URI,

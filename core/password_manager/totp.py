@@ -10,7 +10,7 @@ from urllib.parse import (
 	unquote
 )
 
-from core.errors import TotpUriError
+from core.etc.errors import TotpUriError
 
 """
 	Example URI: otpauth://totp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&algorithm=SHA1&digits=6&period=30

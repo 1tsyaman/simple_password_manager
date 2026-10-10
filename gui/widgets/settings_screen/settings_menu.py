@@ -11,7 +11,7 @@ from gui.widgets.settings_screen.section import SettingSection
 from gui.widgets.settings_screen.switch import SwitchSetting
 from gui.widgets.settings_screen.text import TextSetting
 
-from core.types import config_t
+from core.etc.types import config_t
 
 class SettingsMenu(MDScrollView):
 	def __init__(

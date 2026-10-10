@@ -9,10 +9,10 @@ from typing import Never
 
 import cli.actions as act
 
-from core.pwd_manager import PwdManager
-from core.settings import Settings
+from core.password_manager.pwd_manager import PwdManager
+from core.settings.settings import Settings
 from core.vault_loader import VaultSession
-from core.entry import Entry
+from core.password_manager.entry import Entry
 from cli.input import (
 	get_key,
 	poll_for_with_backspace
@@ -38,7 +38,7 @@ from cli.watchdog import (
 	update_timeout_duration
 )
 
-from core.errors import (
+from core.etc.errors import (
 	KeyLengthError,
 	KeyDerivationError,
 	PasswordError,

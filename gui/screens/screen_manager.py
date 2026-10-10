@@ -17,10 +17,10 @@ from gui.dialogs.error_dialog import ErrorDialog
 from gui.widgets.input_field import PasswordInputField
 from gui.widgets.vault_screen.search_bar import SearchBar
 
-from core.pwd_manager import PwdManager
-from core.settings import Settings
+from core.password_manager.pwd_manager import PwdManager
+from core.settings.settings import Settings
 from core.vault_loader import VaultSession
-from core.errors import (
+from core.etc.errors import (
 	PasswordError,
 	KeyLengthError,
 	KeyDerivationError,

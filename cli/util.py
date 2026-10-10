@@ -1,5 +1,5 @@
-from core.pwd_manager import DIGITS
-from core.entry import Entry
+from core.password_manager.pwd_manager import DIGITS
+from core.password_manager.entry import Entry
 
 def is_valid_index(key: str, index: int, bound: int) -> bool:
 	return key in DIGITS and (10 * index) + int(key) < bound
