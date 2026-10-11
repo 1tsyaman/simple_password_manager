@@ -2,14 +2,23 @@ from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, WSGITimeoutError
+from oauthlib.oauth2.rfc6749.errors import AccessDeniedError
 
+from core.etc.errors import (
+	AuthDeniedError,
+	AuthTimeoutError,
+)
 
 SCOPES = [
 	"https://www.googleapis.com/auth/drive.appdata"
 ]
 
-
+"""
+	@raises:
+		- AuthDeniedError
+		- AuthTimeoutError
+"""
 def get_credentials(
 	client_credentials_path	: Path,	# identifies the *application* to Google
 	token_path				: Path,	# user access token (created if path doesn't exist)
@@ -42,7 +51,15 @@ def get_credentials(
 				scopes=SCOPES,
 			)
 
-			credentials = flow.run_local_server(port=0)
+			try:
+				credentials = flow.run_local_server(
+					port=0,
+					timeout_seconds=120
+				)
+			except AccessDeniedError:
+				raise AuthDeniedError
+			except WSGITimeoutError:
+				raise AuthTimeoutError
 
 		# Create the file along with parent directories
 		token_path.parent.mkdir(

@@ -51,9 +51,16 @@ import storage.io as io
 			}
 		},
 
+		"Metadata": {
+			"id"				: hex,
+			"version"			: hex,
+			"last_modified"		: unix timestamp
+		},
+
 		"HMAC": {
 			"Salt"				: hex,
-			"Settings Hash"		: hex
+			"Settings Hash"		: hex,
+			"Metadata Hash"		: hex
 		}
 	}
 """

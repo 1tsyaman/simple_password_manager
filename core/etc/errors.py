@@ -67,6 +67,18 @@ class SettingsKeyNotSetError(Exception):
 class SettingsLoadError(Exception):
 	pass
 
+class ClientCredentialsNotFoundError(Exception):
+	pass
+
+class AuthDeniedError(Exception):
+	pass
+
+class AuthTimeoutError(Exception):
+	pass
+
+class SyncBackendError(Exception):
+	pass
+
 """
 	Raised whenever some impossible incosistency occures.
 	

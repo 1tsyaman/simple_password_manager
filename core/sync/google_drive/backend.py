@@ -1,19 +1,29 @@
 from pathlib import Path
 
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build, MutualTLSChannelError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from core.sync.backend import RemoteFile, SyncBackend
+from core.etc.errors import (
+	SyncBackendError
+)
 
 class GoogleDriveBackend(SyncBackend):
 
+	"""
+		@raises:
+			- SyncBackendError
+	"""
 	def __init__(self, credentials):
 		# _drive has dynamic type googleapiclient.discovery.Resource
-		self._drive = build(
-			"drive",
-			"v3",
-			credentials=credentials,
-		)
+		try:
+			self._drive = build(
+				"drive",
+				"v3",
+				credentials=credentials,
+			)
+		except MutualTLSChannelError:
+			raise SyncBackendError
 
 	def list_files(self) -> list[RemoteFile]:
 		response = self._drive.files().list(
