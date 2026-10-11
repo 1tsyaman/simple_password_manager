@@ -3,8 +3,8 @@ from pathlib import Path
 from googleapiclient.discovery import build, MutualTLSChannelError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
-from core.sync.backend import RemoteFile, SyncBackend
-from core.etc.errors import (
+from core.sync.backend import RemoteVault, SyncBackend
+from core.sync.errors import (
 	SyncBackendError
 )
 
@@ -25,14 +25,14 @@ class GoogleDriveBackend(SyncBackend):
 		except MutualTLSChannelError:
 			raise SyncBackendError
 
-	def list_files(self) -> list[RemoteFile]:
+	def list_files(self) -> list[RemoteVault]:
 		response = self._drive.files().list(
 						spaces="appDataFolder",
 						fields="files(id, name, modifiedTime)",
 					).execute()
 
 		return [
-			RemoteFile(
+			RemoteVault(
 				id=file["id"],
 				name=file["name"],
 				modified_time=file.get("modifiedTime")
@@ -43,7 +43,7 @@ class GoogleDriveBackend(SyncBackend):
 	def find_file(
 		self,
 		name: str,
-	) -> RemoteFile | None:
+	) -> RemoteVault | None:
 		files = self.list_files()
 
 		matches = [file for file in files
@@ -60,7 +60,7 @@ class GoogleDriveBackend(SyncBackend):
 	def upload_file(
 		self,
 	    path: Path
-	) -> RemoteFile:
+	) -> RemoteVault:
 		metadata = {
 			"name": path.name,
 			"parents": ["appDataFolder"],
@@ -85,7 +85,7 @@ class GoogleDriveBackend(SyncBackend):
 			fields="id, name, modifiedTime",
 		).execute()
 
-		return RemoteFile(
+		return RemoteVault(
 			id=result["id"],
 			name=result["name"],
 			modified_time=result.get("modifiedTime")
@@ -115,7 +115,7 @@ class GoogleDriveBackend(SyncBackend):
 		self,
 		file_id	: str,
 		path	: Path,
-	) -> RemoteFile:
+	) -> RemoteVault:
 		media = MediaFileUpload(
 			path,
 			resumable=False,
@@ -127,7 +127,7 @@ class GoogleDriveBackend(SyncBackend):
 			fields="id, name, modifiedTime",
 		).execute()
 
-		return RemoteFile(
+		return RemoteVault(
 			id=result["id"],
 			name=result["name"],
 			modified_time=result.get("modifiedTime")

@@ -5,7 +5,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow, WSGITimeoutError
 from oauthlib.oauth2.rfc6749.errors import AccessDeniedError
 
-from core.etc.errors import (
+from core.sync.errors import (
 	AuthDeniedError,
 	AuthTimeoutError,
 )
