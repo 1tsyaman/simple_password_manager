@@ -3,12 +3,13 @@ from pathlib import Path
 from googleapiclient.discovery import build, MutualTLSChannelError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
-from core.sync.backend import RemoteVault, SyncBackend
+from core.sync.backend import RemoteFile, RemoteFolder, SyncBackend
 from core.sync.errors import (
 	SyncBackendError
 )
-
 class GoogleDriveBackend(SyncBackend):
+	APPDATA = "appDataFolder"
+	FILE_FIELDS = "id, name, modifiedTime"
 
 	"""
 		@raises:
@@ -25,25 +26,56 @@ class GoogleDriveBackend(SyncBackend):
 		except MutualTLSChannelError:
 			raise SyncBackendError
 
-	def list_files(self) -> list[RemoteVault]:
-		response = self._drive.files().list(
-						spaces="appDataFolder",
-						fields="files(id, name, modifiedTime)",
-					).execute()
+	"""
+		Documentation for
+			- files().list: https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
+			- Queries: https://developers.google.com/workspace/drive/api/guides/ref-search-terms
+			- Mime Types: https://developers.google.com/workspace/drive/api/guides/mime-types
+	"""
+	def list_files(
+		self,
+		parent: RemoteFolder | None = None
+	) -> list[RemoteFile]:
+		if parent is None:
+			query = "'appDataFolder' in parents"
+		else:
+			query = f"'{parent.remote_id}' in parents"
 
-		return [
-			RemoteVault(
-				id=file["id"],
-				name=file["name"],
-				modified_time=file.get("modifiedTime")
+		query += " and mimeType != 'application/vnd.google-apps.folder'"
+		query += " and trashed = false"
+
+		next_page_token = None
+		files = []
+
+		while True:
+			response = self._drive.files().list(
+							spaces=self.APPDATA,
+							q=query,
+							fields=f"nextPageToken,files({self.FILE_FIELDS})",
+							orderBy="name_natural",
+							pageToken=next_page_token
+						).execute()
+
+			files.extend(
+					RemoteFile(
+						remote_id=file["id"],
+						name=file["name"],
+						modified_time=file.get("modifiedTime")
+					)
+						for file in response.get("files", [])
 			)
-				for file in response.get("files", [])
-		]
+
+			next_page_token = response.get("nextPageToken")
+
+			if next_page_token is None:
+				break
+
+		return files
 
 	def find_file(
 		self,
 		name: str,
-	) -> RemoteVault | None:
+	) -> RemoteFile | None:
 		files = self.list_files()
 
 		matches = [file for file in files
@@ -60,7 +92,7 @@ class GoogleDriveBackend(SyncBackend):
 	def upload_file(
 		self,
 	    path: Path
-	) -> RemoteVault:
+	) -> RemoteFile:
 		metadata = {
 			"name": path.name,
 			"parents": ["appDataFolder"],
@@ -85,7 +117,7 @@ class GoogleDriveBackend(SyncBackend):
 			fields="id, name, modifiedTime",
 		).execute()
 
-		return RemoteVault(
+		return RemoteFile(
 			id=result["id"],
 			name=result["name"],
 			modified_time=result.get("modifiedTime")
@@ -115,7 +147,7 @@ class GoogleDriveBackend(SyncBackend):
 		self,
 		file_id	: str,
 		path	: Path,
-	) -> RemoteVault:
+	) -> RemoteFile:
 		media = MediaFileUpload(
 			path,
 			resumable=False,
@@ -127,7 +159,7 @@ class GoogleDriveBackend(SyncBackend):
 			fields="id, name, modifiedTime",
 		).execute()
 
-		return RemoteVault(
+		return RemoteFile(
 			id=result["id"],
 			name=result["name"],
 			modified_time=result.get("modifiedTime")

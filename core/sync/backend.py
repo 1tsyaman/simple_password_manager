@@ -4,51 +4,117 @@ from pathlib import Path
 
 
 # dataclass provides methods such as __init__ and __repr__.
-@dataclass(frozen=True)
-class RemoteVault:
+@dataclass(frozen=True, kw_only=True)
+class RemoteFile:
 	remote_id		: str
-	vault_id		: str
 	name			: str
 	modified_time	: str | None = None
+
+@dataclass(frozen=True, kw_only=True)
+class RemoteFolder:
+	name			: str
+	remote_id		: str
 
 
 # ABC uses ABCMeta to enforce implementation of abstract methods.
 class SyncBackend(ABC):
 
 	@abstractmethod
-	def list_vaults(self) -> list[RemoteVault]:
-		pass
-
-	@abstractmethod
-	def find_vault_by_name(
+	def list_files(
 		self,
-		name: str,
-	) -> RemoteVault | None:
+		parent: RemoteFolder | None = None
+	) -> list[RemoteFile]:
+		"""
+			If parent is None, returns the list of files in appData
+		"""
 		pass
 
 	@abstractmethod
-	def find_vault_by_id(
+	def list_folders(
 		self,
-		id: str,
-	) -> RemoteVault | None:
+		parent: RemoteFolder | None = None
+	) -> list[RemoteFolder]:
+		"""
+			If parent is None, returns the list of folders in appData
+		"""
 		pass
 
 	@abstractmethod
-	def upload_vault(self, path: Path) -> RemoteVault:
-		pass
-
-	@abstractmethod
-	def download_vault(
+	def find_file_by_name(
 		self,
-		file_id: str,
-		destination: Path,
+		name		: str,
+		parent		: RemoteFolder | None = None
+	) -> RemoteFile | None:
+		pass
+
+	@abstractmethod
+	def find_folder_by_name(
+		self,
+		name	: str,
+		parent	: RemoteFolder | None = None
+	) -> RemoteFolder | None:
+		pass
+
+	@abstractmethod
+	def create_folder(
+		self,
+		name	: str,
+		parent	: RemoteFolder | None = None
+	) -> RemoteFolder:
+		pass
+
+	@abstractmethod
+	def upload_file(
+		self,
+		remote_name	: str,
+		path		: Path,
+		parent		: RemoteFolder | None = None
+	) -> RemoteFile:
+		"""
+			remote_name is the name the remote file will have
+		"""
+		pass
+
+	@abstractmethod
+	def download_file(
+		self,
+		file		: RemoteFile,
+		destination	: Path,
+		parent		: RemoteFolder | None = None
 	) -> None:
 		pass
 
 	@abstractmethod
-	def update_vault(
+	def overwrite_file(
 		self,
-		file_id: str,
-		path: Path,
-	) -> RemoteVault:
+		file	: RemoteFile,
+		path	: Path,
+		parent	: RemoteFolder | None = None
+	) -> RemoteFile:
+		pass
+
+	@abstractmethod
+	def delete_file(
+		self,
+		file	: RemoteFile,
+		parent	: RemoteFolder | None = None
+	) -> None:
+		pass
+
+	@abstractmethod
+	def delete_folder_recursive(
+		self,
+		folder	: RemoteFolder,
+		parent	: RemoteFolder | None = None
+	) -> None:
+		"""
+			Deletes the specified folder along with its content
+		"""
+		pass
+
+	@abstractmethod
+	def wipe_appData(self) -> None:
+		"""
+			Deletes the contents of appData
+		"""
 		pass
