@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from datetime import datetime
 
 
 # dataclass provides methods such as __init__ and __repr__.
@@ -8,12 +9,12 @@ from pathlib import Path
 class RemoteFile:
 	remote_id		: str
 	name			: str
-	modified_time	: str | None = None
+	modified_time	: datetime
 
 @dataclass(frozen=True, kw_only=True)
 class RemoteFolder:
-	name			: str
 	remote_id		: str
+	name			: str
 
 
 # ABC uses ABCMeta to enforce implementation of abstract methods.
@@ -61,17 +62,24 @@ class SyncBackend(ABC):
 		name	: str,
 		parent	: RemoteFolder | None = None
 	) -> RemoteFolder:
+		"""
+			Raises:
+				- HttpError(status)
+		"""
 		pass
 
 	@abstractmethod
 	def upload_file(
 		self,
 		remote_name	: str,
-		path		: Path,
+		source		: Path,
 		parent		: RemoteFolder | None = None
 	) -> RemoteFile:
 		"""
 			remote_name is the name the remote file will have
+
+			Raises:
+				- HttpError(status)
 		"""
 		pass
 
@@ -82,15 +90,28 @@ class SyncBackend(ABC):
 		destination	: Path,
 		parent		: RemoteFolder | None = None
 	) -> None:
+		"""
+			Raises:
+				- HttpError(status)
+				- IOError
+		"""
 		pass
 
 	@abstractmethod
-	def overwrite_file(
+	def update_file(
 		self,
 		file	: RemoteFile,
-		path	: Path,
+		source	: Path | None = None,
+		name	: str | None = None,
 		parent	: RemoteFolder | None = None
 	) -> RemoteFile:
+		"""
+			- If source is not None, remote file is overwritten with file from source.
+			- If name is not None, remote file is renamed to name.
+			
+			Raises:
+				IllegalArgumentError: if both 'source' and 'name' are None
+		"""
 		pass
 
 	@abstractmethod

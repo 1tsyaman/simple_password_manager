@@ -11,7 +11,10 @@ class AuthTimeoutError(Exception):
 
 
 class SyncBackendError(Exception):
-	"""Base error for backend operations, independent of the cloud provider."""
+	pass
+
+class HttpError(Exception):
+	pass
 
 
 class NoVaultSyncDataError(Exception):

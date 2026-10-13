@@ -76,6 +76,9 @@ class SettingsLoadError(Exception):
 class InconsistentVaultState(Exception):
 	pass
 
+class IllegalArgumentError(ValueError):
+    pass
+
 def log(
 	message: str,
 	error: Exception | None = None
