@@ -89,7 +89,7 @@ class GoogleDriveBackend(SyncBackend):
 	) -> RemoteFolder | None:
 		folder = self._find_file_by_name(
 			name=name,
-			is_folder=False,
+			is_folder=True,
 			parent=parent
 		)
 		assert not isinstance(folder, RemoteFile)
@@ -229,19 +229,23 @@ class GoogleDriveBackend(SyncBackend):
 	def delete_file(
 		self,
 		file	: RemoteFile,
-		parent	: RemoteFolder | None = None
+		parent	: RemoteFolder | None = None	# Not required for google-drive
 	) -> None:
-		raise NotImplementedError
+		self._delete_file(file)
 
 	def delete_folder_recursive(
 		self,
 		folder	: RemoteFolder,
-		parent	: RemoteFolder | None = None
+		parent	: RemoteFolder | None = None	# Not required for google-drive
 	) -> None:
-		raise NotImplementedError
+		self._delete_file(folder)
 
 	def wipe_appData(self) -> None:
-		raise NotImplementedError
+		ls = self.list_files() + self.list_folders()
+
+		for file in ls:
+			self._delete_file(file)
+
 
 	"""
 		Documentation for
@@ -279,41 +283,56 @@ class GoogleDriveBackend(SyncBackend):
 		ls : list[dict[str, str]] = []
 		next_page_token = None
 
-		while True:
-			response = self._drive.files().list(
-							spaces=self.APPDATA,
-							q=query,
-							fields=f"nextPageToken,files({self.FILE_FIELDS})",
-							orderBy="name_natural",
-							pageToken=next_page_token
-						).execute()
+		try:
+			while True:
+				response = self._drive.files().list(
+								spaces=self.APPDATA,
+								q=query,
+								fields=f"nextPageToken,files({self.FILE_FIELDS})",
+								orderBy="name_natural",
+								pageToken=next_page_token
+							).execute()
 
-			ls.extend(response.get("files", []))
+				ls.extend(response.get("files", []))
 
-			next_page_token = response.get("nextPageToken")
+				next_page_token = response.get("nextPageToken")
 
-			if next_page_token is None:
-				break
+				if next_page_token is None:
+					break
+
+		except googleErrors.HttpError as e:
+			raise HttpError(e)
 
 		return ls
 
 	def _find_file_by_name(
-			self,
-			name		: str,
-			is_folder	: bool,
-			parent		: RemoteFolder | None = None
-		) -> RemoteFile | RemoteFolder | None:
-			"""
-				is_folder flag determines if the target file is a folder.
-			"""
-			files = self.list_files(parent) if is_folder \
-				else self.list_folders(parent)
-	
-			for file in files:
-				if file.name.strip().lower() == name.strip().lower():
-					return file
+		self,
+		name		: str,
+		is_folder	: bool,
+		parent		: RemoteFolder | None = None
+	) -> RemoteFile | RemoteFolder | None:
+		"""
+			is_folder flag determines if the target file is a folder.
+		"""
+		files = self.list_folders(parent) if is_folder \
+			else self.list_files(parent)
 
-			return None
+		for file in files:
+			if file.name.strip().lower() == name.strip().lower():
+				return file
+
+		return None
+
+	def _delete_file(
+		self,
+		file : RemoteFile | RemoteFolder
+	) -> None:
+		try:
+			self._drive.files().delete(
+				fileId=file.remote_id
+			).execute()
+		except googleErrors.HttpError as e:
+			raise HttpError(e)
 
 	@staticmethod
 	def _format_time(time: str) -> datetime:

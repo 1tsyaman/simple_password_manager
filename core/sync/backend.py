@@ -27,6 +27,9 @@ class SyncBackend(ABC):
 	) -> list[RemoteFile]:
 		"""
 			If parent is None, returns the list of files in appData
+
+			Raises:
+				- HttpError(status)
 		"""
 		pass
 
@@ -37,6 +40,9 @@ class SyncBackend(ABC):
 	) -> list[RemoteFolder]:
 		"""
 			If parent is None, returns the list of folders in appData
+
+			Raises:
+				- HttpError(status)
 		"""
 		pass
 
@@ -46,6 +52,10 @@ class SyncBackend(ABC):
 		name		: str,
 		parent		: RemoteFolder | None = None
 	) -> RemoteFile | None:
+		"""
+			Raises:
+				- HttpError(status)
+		"""
 		pass
 
 	@abstractmethod
@@ -54,6 +64,10 @@ class SyncBackend(ABC):
 		name	: str,
 		parent	: RemoteFolder | None = None
 	) -> RemoteFolder | None:
+		"""
+			Raises:
+				- HttpError(status)
+		"""
 		pass
 
 	@abstractmethod
@@ -120,6 +134,10 @@ class SyncBackend(ABC):
 		file	: RemoteFile,
 		parent	: RemoteFolder | None = None
 	) -> None:
+		"""
+			Raises:
+				- HttpError(status)
+		"""
 		pass
 
 	@abstractmethod
@@ -130,6 +148,9 @@ class SyncBackend(ABC):
 	) -> None:
 		"""
 			Deletes the specified folder along with its content
+
+			Raises:
+				- HttpError(status)
 		"""
 		pass
 
@@ -137,5 +158,8 @@ class SyncBackend(ABC):
 	def wipe_appData(self) -> None:
 		"""
 			Deletes the contents of appData
+
+			Raises:
+				- HttpError(status)
 		"""
 		pass
