@@ -5,15 +5,15 @@ from googleapiclient.discovery import build, MutualTLSChannelError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 import googleapiclient.errors as googleErrors
 
-from core.sync.backend import RemoteFile, RemoteFolder, SyncBackend
+from core.sync.backend import RemoteFile, RemoteFolder, CloudBackend
 from core.sync.errors import (
-	SyncBackendError,
+	CloudBackendError,
 	HttpError,
 )
 from core.etc.errors import (
 	IllegalArgumentError,
 )
-class GoogleDriveBackend(SyncBackend):
+class GoogleDriveBackend(CloudBackend):
 	APPDATA				= "appDataFolder"
 	FILE_FIELDS			= "id, name, modifiedTime"
 	FOLDER_MIME_TYPE	= "application/vnd.google-apps.folder"
@@ -21,7 +21,7 @@ class GoogleDriveBackend(SyncBackend):
 	def __init__(self, credentials):
 		"""
 			Raises:
-				- SyncBackendError
+				- CloudBackendError
 		"""
 		# _drive has dynamic type googleapiclient.discovery.Resource
 		try:
@@ -31,7 +31,7 @@ class GoogleDriveBackend(SyncBackend):
 				credentials=credentials,
 			)
 		except MutualTLSChannelError:
-			raise SyncBackendError
+			raise CloudBackendError
 
 	def list_files(
 		self,

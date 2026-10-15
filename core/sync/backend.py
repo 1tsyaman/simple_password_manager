@@ -18,7 +18,7 @@ class RemoteFolder:
 
 
 # ABC uses ABCMeta to enforce implementation of abstract methods.
-class SyncBackend(ABC):
+class CloudBackend(ABC):
 
 	@abstractmethod
 	def list_files(

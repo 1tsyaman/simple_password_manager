@@ -10,7 +10,7 @@ class AuthTimeoutError(Exception):
 	pass
 
 
-class SyncBackendError(Exception):
+class CloudBackendError(Exception):
 	pass
 
 class HttpError(Exception):
