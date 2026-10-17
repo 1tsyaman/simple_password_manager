@@ -13,6 +13,7 @@ from core.sync.errors import (
 SCOPES = [
 	"https://www.googleapis.com/auth/drive.appdata"
 ]
+TIMEOUT = 120	# 120 seconds
 
 """
 	@raises:
@@ -54,7 +55,7 @@ def get_credentials(
 			try:
 				credentials = flow.run_local_server(
 					port=0,
-					timeout_seconds=120
+					timeout_seconds=TIMEOUT
 				)
 			except AccessDeniedError:
 				raise AuthDeniedError

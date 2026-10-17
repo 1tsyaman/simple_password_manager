@@ -16,6 +16,11 @@ class CloudBackendError(Exception):
 class HttpError(Exception):
 	pass
 
+class RemoteVaultNotFoundError(Exception):
+	pass
 
 class NoVaultSyncDataError(Exception):
+	pass
+
+class VaultSyncDataExistsError(Exception):
 	pass
