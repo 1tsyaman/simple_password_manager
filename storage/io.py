@@ -94,6 +94,16 @@ def delete_file(path: str) -> None:
 def delete_folder(path: str) -> None:
 	os.rmdir(path)
 
+def move_file(
+	src: str,
+	dst: str
+) -> None:
+	"""
+		Raises:
+			OSError
+	"""
+	os.replace(src, dst)
+
 """
 	@raises: 
 		- OSError

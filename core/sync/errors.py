@@ -25,5 +25,11 @@ class NoVaultSyncDataError(Exception):
 class VaultSyncDataExistsError(Exception):
 	pass
 
+class SyncConflictError(Exception):
+	"""Raised if both remote and local have changed"""
+
+class CloudVaultAuthenticityError(Exception):
+	"""Raised if latest cloud version fails the authenticity check"""
+
 class SyncRollbackError(Exception):
 	pass

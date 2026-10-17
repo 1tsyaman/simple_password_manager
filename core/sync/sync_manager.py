@@ -5,6 +5,7 @@ from pathlib import Path
 from collections.abc import Callable
 from uuid import uuid4, UUID
 
+import storage.io as io
 from core.sync.backend import CloudBackend, RemoteFile, RemoteFolder
 
 from core.sync.google_drive.backend import GoogleDriveBackend
@@ -19,6 +20,8 @@ from core.sync.errors import (
 	RemoteVaultNotFoundError,
 	VaultSyncDataExistsError,
 	SyncRollbackError,
+	SyncConflictError,
+	CloudVaultAuthenticityError,
 	HttpError,
 )
 from core.etc.errors import IllegalArgumentError
@@ -111,6 +114,7 @@ class SyncManager:
 		sync_data				: dict[str, VaultSyncData],
 		sync_data_writeback		: Callable[[sync_data_t], None],
 		local_version_getter	: Callable[[str], str],
+		vault_auth_checker		: Callable[[str], bool],
 		lock					: RLock
 	) -> None:
 		"""
@@ -120,6 +124,7 @@ class SyncManager:
 			sync_data:				Dictionary containing VaultSyncData.
 			sync_data_writeback: 	Callback for writing sync_data to disk.
 			local_version_getter:	Callback for getting the local vault version.
+			vault_auth_checker:		Callback for checking authenticity of downloaded vaults
 			lock:					Guards read/write and sync operations on the vault file.
 		"""
 		self.backend				= backend
@@ -127,6 +132,7 @@ class SyncManager:
 		self.sync_data				= sync_data
 		self._sync_data_writeback	= sync_data_writeback
 		self.local_version_getter	= local_version_getter
+		self.vault_auth_checker		= vault_auth_checker
 		self.lock					= lock
 
 	def pull_vault(
@@ -134,7 +140,70 @@ class SyncManager:
 		vault_id	: str,
 		vault_path	: str
 	):
-		pass
+		"""
+			Downloads newer remote vault file if available. Asserts authenticity, then stores it as vault_path
+
+			Args:
+				vault_id:	Vault's id
+				vault_path:	Path of the vault *file*
+
+			Raises:
+				IllegalArgumentError:			If vault_id is not associated with any sync data
+				RemoteVaultNotFoundError:		No synced vault file found in cloud
+				SyncConflictError:				If both remote and local have changed independently
+				CloudBackendError:				If the cloud requests did not succeed
+				CloudVaultAuthenticityError:	If cloud vault is not authentic
+				OSError:						If writing the downloaded vault to disk fails
+		"""
+		with self.lock:
+			local_version	= self.get_local_version(vault_id)
+
+			try:
+				last_synced = self.sync_data[vault_id].last_synced_version
+			except KeyError as e:
+				raise IllegalArgumentError from e
+
+			try:
+				latest_vault	= self.get_latest_remote_vault_file(vault_id)
+				remote_version	= _get_version_from_vault_name(latest_vault.name)
+			except NoVaultSyncDataError as e:
+				raise IllegalArgumentError from e
+
+			if local_version == remote_version:
+				# No changes, update local sync data if out of date and return
+				if self.sync_data[vault_id].last_synced_version != local_version:
+					self.sync_data[vault_id].last_synced_version = local_version
+					self.write_sync_data_to_disk()
+
+				return
+
+			if local_version != last_synced and remote_version != last_synced:
+				# Both local and remote have changed independently -> conflict!
+				raise SyncConflictError
+
+			if local_version == last_synced:
+				# Remote has changed -> pull
+				vault_name =  Path(vault_path).name
+				download_path = self.download_path.joinpath(vault_name)
+
+				try:
+					self.backend.download_file_atomic(
+						file=latest_vault,
+						destination=download_path
+					)
+
+				except HttpError as e:
+					raise CloudBackendError from e
+
+				if not self.vault_auth_checker(vault_id):
+					# Downloaded vault failed the authentication test
+					raise CloudVaultAuthenticityError
+
+				io.move_file(str(download_path), vault_path)
+
+				self.sync_data[vault_id].last_synced_version = remote_version
+				self.write_sync_data_to_disk()
+
 
 	def push_vault(
 		self,
@@ -238,11 +307,10 @@ class SyncManager:
 
 				raise CloudBackendError from deletion_error
 
-
-	def get_remote_version(
+	def get_latest_remote_vault_file(
 		self,
-		vault_id : str
-	) -> str:
+		vault_id: str	
+	) -> RemoteFile:
 		"""
 			Raises:
 				NoVaultSyncDataError:		No VaultSyncData object found for vault_id
@@ -267,10 +335,25 @@ class SyncManager:
 			if latest_vault is None:
 				raise RemoteVaultNotFoundError
 
-			return _get_version_from_vault_name(latest_vault.name)
+			return latest_vault
 
 		except HttpError:	# TODO: break down this based on http statuses
 			raise CloudBackendError
+
+	def get_remote_version(
+		self,
+		vault_id: str
+	) -> str:
+		"""
+			Raises:
+				NoVaultSyncDataError:		No VaultSyncData object found for vault_id
+				RemoteVaultNotFoundError:	No synced vault file found in cloud
+				CloudBackendError:			If the cloud requests do not succeed
+		"""
+		return _get_version_from_vault_name(
+			self.get_latest_remote_vault_file(vault_id).name
+		)
+
 
 	def get_local_version(
 		self,
@@ -354,6 +437,7 @@ class SyncManager:
 		sync_data				: sync_data_t,
 		sync_data_writeback		: Callable[[sync_data_t], None],
 		local_version_getter	: Callable[[str], str],
+		vault_auth_checker		: Callable[[str], bool],
 		sync_lock				: RLock,
 	) -> SyncManager:
 		"""
@@ -367,6 +451,7 @@ class SyncManager:
 													sync data
 				sync_data_writeback:			Callback for writing changes of sync_data to disk
 				local_version_getter:			Callback for getting the local vault version.
+				vault_auth_checker:				Callback for checking authenticity of downloaded vaults
 				sync_lock:						The lock that guards read/write and sync operations
 													on the vault file.
 			Raises:
@@ -408,6 +493,7 @@ class SyncManager:
 			sync_data=sync_data_dict,
 			sync_data_writeback=sync_data_writeback,
 			local_version_getter=local_version_getter,
+			vault_auth_checker=vault_auth_checker,
 			lock=sync_lock
 		)
 
