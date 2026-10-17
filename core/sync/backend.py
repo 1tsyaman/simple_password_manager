@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime
+import os
 
 
 # dataclass provides methods such as __init__ and __repr__.
@@ -110,6 +111,38 @@ class CloudBackend(ABC):
 				IOError
 		"""
 		pass
+
+	def download_file_atomic(
+		self,
+		file		: RemoteFile,
+		destination	: Path,
+		parent		: RemoteFolder | None = None
+	) -> None:
+		"""
+			Downloads and writes the file atomically
+
+			Raises:
+				HttpError(status)
+				IOError
+		"""
+		tmp_path = destination.with_name(destination.name + ".tmp")
+
+		try:
+			self.download_file(
+				file=file,
+				destination=tmp_path,
+				parent=parent
+			)
+
+			os.replace(tmp_path, destination)
+
+		except Exception:
+			try:
+				tmp_path.unlink(missing_ok=True)
+			except OSError:
+				pass
+
+			raise
 
 	@abstractmethod
 	def download_folder(
