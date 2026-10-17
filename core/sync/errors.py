@@ -24,3 +24,6 @@ class NoVaultSyncDataError(Exception):
 
 class VaultSyncDataExistsError(Exception):
 	pass
+
+class SyncRollbackError(Exception):
+	pass

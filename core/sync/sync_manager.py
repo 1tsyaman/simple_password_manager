@@ -18,6 +18,7 @@ from core.sync.errors import (
 	CloudBackendError,
 	RemoteVaultNotFoundError,
 	VaultSyncDataExistsError,
+	SyncRollbackError,
 	HttpError,
 )
 from core.etc.errors import IllegalArgumentError
@@ -183,7 +184,7 @@ class SyncManager:
 			)
 
 			try:
-				self.write_sync_data()
+				self.write_sync_data_to_disk()
 			except OSError:
 				self._cleanup_vault_init(
 					vault_id=vault_id,
@@ -231,7 +232,7 @@ class SyncManager:
 	) -> str:
 		return self.local_version_getter(vault_id)
 
-	def write_sync_data(self) -> None:
+	def write_sync_data_to_disk(self) -> None:
 		"""
 			Writes self.sync_data to disk. Holds self.lock
 
@@ -280,6 +281,49 @@ class SyncManager:
 				- Removes vault data from self.sync_data, if added
 		"""
 		pass
+
+	def delete_remote_vault(
+		self,
+		vault_id : str
+	) -> None:
+		"""
+			Raises:
+				IllegalArgumentError:	If vault_id is not associated with any sync data
+				CloudBackendError:		If the backend fails to delete the remote folder
+				SyncRollbackError:		If remote folder deletion fails, but rolling back
+											on-disk sync data also fails
+				OSError:				If writing sync_data to disk fails
+		"""
+		with self.lock:
+			try:
+				vault_sync_data = self.sync_data.pop(vault_id)
+			except KeyError:
+				raise IllegalArgumentError
+
+			try:
+				self.write_sync_data_to_disk()
+			except OSError:
+				self.sync_data[vault_id] = vault_sync_data
+				raise
+
+			try:
+				remote_folder = RemoteFolder(
+					remote_id=vault_sync_data.remote_folder_id,
+					name=vault_id
+				)
+				self.backend.delete_folder_recursive(
+					remote_folder
+				)
+			except HttpError as deletion_error:
+				self.sync_data[vault_id] = vault_sync_data
+
+				try:
+					self.write_sync_data_to_disk()
+				except OSError as rollback_error:
+					raise SyncRollbackError from rollback_error
+
+				raise CloudBackendError from deletion_error
+
 
 	@staticmethod
 	def get_fresh_version() -> str:
