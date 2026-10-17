@@ -29,7 +29,7 @@ class CloudBackend(ABC):
 			If parent is None, returns the list of files in appData
 
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass
 
@@ -42,7 +42,7 @@ class CloudBackend(ABC):
 			If parent is None, returns the list of folders in appData
 
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass
 
@@ -54,7 +54,7 @@ class CloudBackend(ABC):
 	) -> RemoteFile | None:
 		"""
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass
 
@@ -66,7 +66,7 @@ class CloudBackend(ABC):
 	) -> RemoteFolder | None:
 		"""
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass
 
@@ -78,7 +78,7 @@ class CloudBackend(ABC):
 	) -> RemoteFolder:
 		"""
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass
 
@@ -93,7 +93,7 @@ class CloudBackend(ABC):
 			remote_name is the name the remote file will have
 
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass
 
@@ -106,10 +106,26 @@ class CloudBackend(ABC):
 	) -> None:
 		"""
 			Raises:
-				- HttpError(status)
-				- IOError
+				HttpError(status)
+				IOError
 		"""
 		pass
+
+	@abstractmethod
+	def download_folder(
+		self,
+		folder		: RemoteFolder,
+		destination	: Path,
+		parent		: RemoteFolder | None = None
+	) -> None:
+		"""
+			Downloads the files in the folder and stores them in 'destination'/folder.name/
+			Does not clean up upon failure
+
+			Raises:
+				HttpError(status)
+				IOError
+		"""
 
 	@abstractmethod
 	def update_file(
@@ -136,7 +152,7 @@ class CloudBackend(ABC):
 	) -> None:
 		"""
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass
 
@@ -150,7 +166,7 @@ class CloudBackend(ABC):
 			Deletes the specified folder along with its content
 
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass
 
@@ -160,6 +176,6 @@ class CloudBackend(ABC):
 			Deletes the contents of appData
 
 			Raises:
-				- HttpError(status)
+				HttpError(status)
 		"""
 		pass

@@ -91,6 +91,9 @@ def vault_exists_for_gui(app_data_path: str, vault_name: str):
 def delete_file(path: str) -> None:
 	os.remove(Path(path))
 
+def delete_folder(path: str) -> None:
+	os.rmdir(path)
+
 """
 	@raises: 
 		- OSError

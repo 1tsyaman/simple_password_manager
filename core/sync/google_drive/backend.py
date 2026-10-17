@@ -5,6 +5,7 @@ from googleapiclient.discovery import build, MutualTLSChannelError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 import googleapiclient.errors as googleErrors
 
+import storage.io as io
 from core.sync.backend import RemoteFile, RemoteFolder, CloudBackend
 from core.sync.errors import (
 	CloudBackendError,
@@ -185,6 +186,37 @@ class GoogleDriveBackend(CloudBackend):
 
 		except googleErrors.HttpError as e:
 			raise HttpError(e)
+
+	def download_folder(
+		self,
+		folder		: RemoteFolder,
+		destination	: Path,
+		parent		: RemoteFolder | None = None
+	) -> None:
+		stack : list[tuple[RemoteFile | RemoteFolder, Path]] = [
+			(folder, destination)
+		]
+
+		while stack:
+			curr, dest = stack.pop()
+
+			if not isinstance(curr, RemoteFolder):
+				self.download_file(
+					file=curr,
+					destination=dest
+				)
+
+				continue
+
+			dest = dest.joinpath(curr.name)
+			dest.mkdir(parents=True, exist_ok=True)
+
+			stack.extend(
+				[
+					(file, dest) 
+						for file in self.list_files(parent=curr) + self.list_folders(parent=curr)
+				]
+			)
 
 	def update_file(
 		self,
