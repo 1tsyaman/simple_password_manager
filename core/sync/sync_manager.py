@@ -183,26 +183,12 @@ class SyncManager:
 
 			if local_version == last_synced:
 				# Remote has changed -> pull
-				vault_name =  Path(vault_path).name
-				download_path = self.download_path.joinpath(vault_name)
-
-				try:
-					self.backend.download_file_atomic(
-						file=latest_vault,
-						destination=download_path
-					)
-
-				except HttpError as e:
-					raise CloudBackendError from e
-
-				if not self.vault_auth_checker(vault_id):
-					# Downloaded vault failed the authentication test
-					raise CloudVaultAuthenticityError
-
-				io.move_file(str(download_path), vault_path)
-
-				self.sync_data[vault_id].last_synced_version = remote_version
-				self.write_sync_data_to_disk()
+				self._pull_vault(
+					vault_id=vault_id,
+					vault_path=vault_path,
+					vault_file=latest_vault,
+					remote_version=remote_version
+				)
 
 
 	def push_vault(
@@ -424,6 +410,41 @@ class SyncManager:
 		except HttpError as deletion_error:
 			raise CloudBackendError from deletion_error
 
+	def _pull_vault(
+		self,
+		vault_id		: str,
+		vault_path		: str,
+		vault_file		: RemoteFile,
+		remote_version	: str
+	):
+		"""
+			Raises:
+				IllegalArgumentError:			If vault_id is not associated with any sync data
+				RemoteVaultNotFoundError:		No synced vault file found in cloud
+				CloudBackendError:				If the cloud requests did not succeed
+				CloudVaultAuthenticityError:	If cloud vault is not authentic
+				OSError:						If writing the downloaded vault to disk fails
+		"""
+		vault_name =  Path(vault_path).name
+		download_path = self.download_path.joinpath(vault_name)
+
+		try:
+			self.backend.download_file_atomic(
+				file=vault_file,
+				destination=download_path
+			)
+
+		except HttpError as e:
+			raise CloudBackendError from e
+
+		if not self.vault_auth_checker(vault_id):
+			# Downloaded vault failed the authentication test
+			raise CloudVaultAuthenticityError
+
+		io.move_file(str(download_path), vault_path)
+
+		self.sync_data[vault_id].last_synced_version = remote_version
+		self.write_sync_data_to_disk()
 
 	@staticmethod
 	def get_fresh_version() -> str:
