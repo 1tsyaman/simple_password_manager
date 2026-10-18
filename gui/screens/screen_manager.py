@@ -29,6 +29,7 @@ from core.etc.errors import (
 	NoVaultFileError,
 	InvalidVaultFile,
 	SettingsFieldModifiedError,
+	MetadataFieldModifiedError,
 	SettingsLoadError,
 	log
 )
@@ -193,6 +194,8 @@ class AppScreenManager(MDScreenManager):
 			error_message = "Vault format incorrect"
 		except CorruptedVaultError:
 			error_message = "Incorrect password or corrupted vault"
+		except MetadataFieldModifiedError as e:
+			error_message = "Vault metadata were modified"	# TODO: Fallback?
 		except Exception as e:
 			error_message = "Something went wrong, check log"
 			log(

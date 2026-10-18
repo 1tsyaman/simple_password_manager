@@ -3,6 +3,7 @@ from pathlib import Path
 from threading import RLock	# Allows the thread that acquired it first to aquire it again
 from typing import Any
 from datetime import datetime, timezone
+from copy import deepcopy
 
 from storage.constants import VAULT_ENDING
 from core.password_manager.encrypt import get_salt_from_vault, atomic_write
@@ -20,6 +21,7 @@ from core.etc.errors import (
 	NoVaultFileError,
 	InvalidJSONError,
 	SettingsFieldModifiedError,
+	MetadataFieldModifiedError,
 	log,
 )
 
@@ -55,9 +57,9 @@ import storage.io as io
 		},
 
 		"Metadata": {
-			"id"				: hex,
-			"version"			: hex,
-			"last_modified"		: unix timestamp
+			"id"				: uuid,
+			"version"			: uuid,
+			"last_modified"		: datetime
 		},
 
 		"HMAC": {
@@ -85,6 +87,7 @@ class VaultSession:
 			- VaultFormatError
 			- PasswordRequirementsError
 			- PasswordError
+			- MetadataFieldModifiedError
 			- OSError
 	"""
 	def __init__(
@@ -137,9 +140,22 @@ class VaultSession:
 		self.auth_key 	= self._derive_auth_key(master_key)
 		self.lock 		= RLock()
 
-		# Defered until auth_key is derived
-		if not new_vault and self._vault_has_old_format():
-			self._convert_vault_to_new_format()
+		if not new_vault:
+			# Defered until auth_key is derived
+			if self._vault_has_old_format():
+				self._convert_vault_to_new_format()
+
+			# Metadata hash check
+			self.json = self.read_json()
+
+			metadata	= deepcopy(self.json["Metadata"])
+			hmac		= self.json["HMAC"]["Metadata Hash"]
+
+			if not self._dict_is_authentic(
+				dict_obj=metadata,
+				recorded_hmac=hmac
+			):
+				raise MetadataFieldModifiedError
 
 	"""
 		@raises:
@@ -292,11 +308,11 @@ class VaultSession:
 				raise InvalidVaultFile
 
 			settings	= self.json["Settings"]
-			hmac		= self.json["HMAC"]
+			hmac		= self.json["HMAC"]["Settings Hash"]
 
-			if not self._settings_are_authentic(
-				settings=settings,
-				hmac=hmac
+			if not self._dict_is_authentic(
+				dict_obj=settings,
+				recorded_hmac=hmac
 			):
 				raise SettingsFieldModifiedError
 
@@ -335,6 +351,8 @@ class VaultSession:
 			hmac					= self.json["HMAC"]
 			hmac["Settings Hash"]	= settings_hash.hex()
 
+			self._update_and_hash_metadata()
+
 			atomic_write(self.json, Path(self.vault_path), indent=4)
 
 	"""
@@ -365,6 +383,8 @@ class VaultSession:
 			hmac					= self.json["HMAC"]
 			hmac["Salt"]			= self.salt.hex()
 
+			self._update_and_hash_metadata()
+
 			atomic_write(self.json, Path(self.vault_path), indent=4)
 
 	def sync(
@@ -383,6 +403,8 @@ class VaultSession:
 			hmac					= self.json["HMAC"]
 			hmac["Salt"]			= self.salt.hex()
 			hmac["Settings Hash"]	= settings_hash.hex()
+
+			self._update_and_hash_metadata()
 
 			atomic_write(self.json, Path(self.vault_path), indent=4)
 
@@ -422,18 +444,22 @@ class VaultSession:
 			key=auth_key
 		)
 
-	def _settings_are_authentic(
+	def _dict_is_authentic(
 		self,
-		settings	: dict[str, str],
-		hmac		: dict[str, str],
+		dict_obj		: dict[str, str],
+		recorded_hmac	: str
 	) -> bool:
-		hash = bytes.fromhex(hmac["Settings Hash"])
-		data = encode_data(settings)
-		
-		with self.lock:
-			auth_key = self.auth_key
+		"""
+			Requires self.lock be acquired **before** getting recorded tag (and throughout this call)
+		"""
+		auth_key = self.auth_key
+		data_bytes = encode_data(dict_obj)
 
-		return is_authentic(data, auth_key, hash)
+		return is_authentic(
+			data=data_bytes,
+			key=auth_key,
+			tag=bytes.fromhex(recorded_hmac)
+		)
 
 	def _set_salt_and_keys(
 		self,
@@ -530,12 +556,26 @@ class VaultSession:
 
 		atomic_write(new_vault, Path(self.vault_path), indent=4)
 
+	def _get_fresh_id(self) -> str:
+		return SyncManager.get_fresh_version()
+
+	def _get_fresh_version(self) -> str:
+		return SyncManager.get_fresh_version()
+
 	def _get_fresh_metadata(self) -> dict[str, str]:
 		return {
-			"id"			: SyncManager.get_fresh_version(),
-			"version"		: SyncManager.get_fresh_version(),
-			"last_modified"	: self.get_current_time_str()
+			"id"			: self._get_fresh_id(),
+			"version"		: self._get_fresh_version(),
+			"last_modified"	: self._get_current_time_str()
 		}
+
+	def _update_and_hash_metadata(self) -> None:
+		with self.lock:
+			self.json["Metadata"]["version"]		= self._get_fresh_version()
+			self.json["Metadata"]["last_modified"]	= self._get_current_time_str()
+
+			metadata_copy							= deepcopy(self.json["Metadata"])
+			self.json["HMAC"]["Metadata Hash"]		= self.get_hash(metadata_copy).hex()
 
 	"""
 		@raises:
@@ -554,11 +594,11 @@ class VaultSession:
 			raise InvalidVaultFile
 
 	@staticmethod
-	def get_current_time_str() -> str:
+	def _get_current_time_str() -> str:
 		return datetime.now(timezone.utc).isoformat()
 
 	@staticmethod
-	def get_datetime_from_str(time: str) -> datetime:
+	def _get_datetime_from_str(time: str) -> datetime:
 		return datetime.fromisoformat(time)
 
 	@staticmethod

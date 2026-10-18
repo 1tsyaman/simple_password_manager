@@ -43,6 +43,7 @@ from core.etc.errors import (
 	KeyDerivationError,
 	PasswordError,
 	VaultFormatError,
+	MetadataFieldModifiedError,
 	CorruptedVaultError,
 	PasswordRequirementsError,
 	InconsistentVaultState,
@@ -97,6 +98,9 @@ def _init(argv: list[str]) -> tuple[VaultSession, PwdManager, Settings] | int:
 			return -1
 		except VaultFormatError:
 			print("Vault loading failed: Vault format is unexpected")
+			return -1
+		except MetadataFieldModifiedError:
+			print("Vault loading failed: Vault metadata were modified")
 			return -1
 		except CorruptedVaultError:
 			print("Vault loading failed: Incorrect password or corrupted vault")

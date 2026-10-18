@@ -61,6 +61,9 @@ class InvalidVaultFile(Exception):
 class SettingsFieldModifiedError(Exception):
 	pass
 
+class MetadataFieldModifiedError(Exception):
+	pass
+
 class SettingsKeyNotSetError(Exception):
 	pass
 
