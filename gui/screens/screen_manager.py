@@ -35,6 +35,7 @@ from core.etc.errors import (
 )
 
 import storage.io as io
+import storage.paths as paths
 
 if TYPE_CHECKING:
 	from gui.main import SimplePasswordManagerApp
@@ -51,7 +52,7 @@ class AppScreenManager(MDScreenManager):
 	):
 		self.app_name = app_name
 		self.app = app
-		self.app_data_path = str(io.get_app_data_path())
+		self.app_data_path = str(paths.get_app_data_path())
 		self.top_container = top_container
 
 		"""

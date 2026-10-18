@@ -1,3 +1,9 @@
+##			vault_loader.py		##
+DESKTOP_CRED_PATH	= "resources/desktop_credentials.json"
+USER_TOKEN_PATH		= "userdata/token.json"
+SYNC_DATA_PATH		= "userdata/sync_data.json"
+
+
 ##			encrypt.py			##
 NONCE			= "nonce"
 CIPHERTEXT		= "ciphertext"
