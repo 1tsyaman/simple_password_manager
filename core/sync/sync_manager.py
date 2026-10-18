@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from enum import Enum
 from threading import RLock
 from pathlib import Path
 from collections.abc import Callable
@@ -104,7 +105,11 @@ class VaultSyncData:
 			last_synced_version=last_synced_version
 		)
 
-
+class SyncActions(Enum):
+	PULL 		= 1
+	PUSH 		= 2
+	CONFLICT	= 3
+	NO_OP		= 4
 
 class SyncManager:
 	def __init__(
@@ -153,36 +158,24 @@ class SyncManager:
 				SyncConflictError:				If both remote and local have changed independently
 				CloudBackendError:				If the cloud requests did not succeed
 				CloudVaultAuthenticityError:	If cloud vault is not authentic
-				OSError:						If writing the downloaded vault to disk fails
+				OSError:						If writing the downloaded vault to disk fails or
+													if writing sync_data to disk fails
 		"""
 		with self.lock:
-			local_version	= self.get_local_version(vault_id)
-
-			try:
-				last_synced = self.sync_data[vault_id].last_synced_version
-			except KeyError as e:
-				raise IllegalArgumentError from e
-
 			try:
 				latest_vault	= self.get_latest_remote_vault_file(vault_id)
-				remote_version	= _get_version_from_vault_name(latest_vault.name)
 			except NoVaultSyncDataError as e:
 				raise IllegalArgumentError from e
 
-			if local_version == remote_version:
-				# No changes, update local sync data if out of date and return
-				if self.sync_data[vault_id].last_synced_version != local_version:
-					self.sync_data[vault_id].last_synced_version = local_version
-					self.write_sync_data_to_disk()
+			decision, local_version, remote_version = self._decide_sync_action(
+				vault_id=vault_id,
+				latest_vault=latest_vault
+			)
 
-				return
-
-			if local_version != last_synced and remote_version != last_synced:
-				# Both local and remote have changed independently -> conflict!
+			if decision is SyncActions.CONFLICT:
 				raise SyncConflictError
 
-			if local_version == last_synced:
-				# Remote has changed -> pull
+			if decision is SyncActions.PULL:
 				self._pull_vault(
 					vault_id=vault_id,
 					vault_path=vault_path,
@@ -190,13 +183,53 @@ class SyncManager:
 					remote_version=remote_version
 				)
 
+			if decision is SyncActions.NO_OP:
+				self._update_sync_data_if_necessary(
+					vault_id=vault_id,
+					local_version=local_version
+				)
+
+
 
 	def push_vault(
 		self,
 		vault_id	: str,
 		vault_path	: str
 	):
-		pass
+		"""
+			Raises:
+				IllegalArgumentError:		If vault_id is not associated with any sync data
+				SyncConflictError:			If both remote and local have changed independently
+				CloudBackendError:			If uploading the vault to cloud fails
+				OSError:					If writing sync data to disk fails
+		"""
+		with self.lock:
+			try:
+				latest_vault	= self.get_latest_remote_vault_file(vault_id)
+			except NoVaultSyncDataError as e:
+				raise IllegalArgumentError from e
+
+			decision, local_version, remote_version = self._decide_sync_action(
+				vault_id=vault_id,
+				latest_vault=latest_vault
+			)
+
+			if decision is SyncActions.CONFLICT:
+				raise SyncConflictError
+
+			if decision is SyncActions.PUSH:
+				self._push_vault(
+					vault_id=vault_id,
+					vault_path=vault_path,
+					vault_file=latest_vault,
+					local_version=local_version
+				)
+
+			if decision is SyncActions.NO_OP:
+				self._update_sync_data_if_necessary(
+					vault_id=vault_id,
+					local_version=local_version
+				)
 
 	def sync_vault(
 		self,
@@ -207,8 +240,56 @@ class SyncManager:
 			Compares local and remote vault versions
 				- pushes local vault to remote if remote is outdated
 				- pulls from remote if local is outdated
+
+			Args:
+				vault_id:	Vault's id
+				vault_path:	Path of the vault *file*
+
+			Raises:
+				IllegalArgumentError:			If vault_id is not associated with any sync data
+				RemoteVaultNotFoundError:		No synced vault file found in cloud
+				SyncConflictError:				If both remote and local have changed independently
+				CloudBackendError:				If the cloud requests did not succeed
+				CloudVaultAuthenticityError:	If cloud vault is not authentic
+				OSError:						If writing the downloaded vault to disk fails, or
+													if writing sync_data to disk fails
 		"""
-		pass
+		with self.lock:
+			try:
+				latest_vault	= self.get_latest_remote_vault_file(vault_id)
+			except NoVaultSyncDataError as e:
+				raise IllegalArgumentError from e
+
+			decision, local_version, remote_version = self._decide_sync_action(
+				vault_id=vault_id,
+				latest_vault=latest_vault
+			)
+
+			if decision is SyncActions.CONFLICT:
+				raise SyncConflictError
+
+			if decision is SyncActions.PULL:
+				return self._pull_vault(
+					vault_id=vault_id,
+					vault_path=vault_path,
+					vault_file=latest_vault,
+					remote_version=remote_version
+				)
+
+			if decision is SyncActions.PUSH:
+				return self._push_vault(
+					vault_id=vault_id,
+					vault_path=vault_path,
+					vault_file=latest_vault,
+					local_version=local_version
+				)
+
+			if decision is SyncActions.NO_OP:
+				self._update_sync_data_if_necessary(
+					vault_id=vault_id,
+					local_version=local_version
+				)
+
 
 	def init_vault_sync(
 		self,
@@ -410,6 +491,46 @@ class SyncManager:
 		except HttpError as deletion_error:
 			raise CloudBackendError from deletion_error
 
+	def _decide_sync_action(
+		self,
+		vault_id		: str,
+		latest_vault	: RemoteFile
+	) -> tuple[SyncActions, str, str]:
+		"""
+			Compares local version with remote version and decides on sync action: push, pull, conflict or no_op
+
+			Returns:
+				decision(SyncActions):		NO_OP | PULL | PUSH | CONFLICT
+				local_version:				UUID of local vault
+				remote_version:				UUID of remote vault
+			Raises:
+				IllegalArgumentError:	If vault_id is not associated with any sync data
+		"""
+		with self.lock:
+			local_version	= self.get_local_version(vault_id)
+
+			try:
+				last_synced = self.sync_data[vault_id].last_synced_version
+			except KeyError as e:
+				raise IllegalArgumentError from e
+
+			remote_version	= _get_version_from_vault_name(latest_vault.name)
+
+			if local_version == remote_version:
+				# No changes, update local sync data if out of date and return
+				decision = SyncActions.NO_OP
+			elif local_version == last_synced:
+				# Remote has changed -> pull
+				decision = SyncActions.PULL
+			elif remote_version == last_synced:
+				# Local has changed -> push
+				decision = SyncActions.PUSH
+			else:
+				# Both local and remote have changed independently -> conflict!
+				decision = SyncActions.CONFLICT
+
+			return decision, local_version, remote_version
+
 	def _pull_vault(
 		self,
 		vault_id		: str,
@@ -443,8 +564,50 @@ class SyncManager:
 
 		io.move_file(str(download_path), vault_path)
 
-		self.sync_data[vault_id].last_synced_version = remote_version
-		self.write_sync_data_to_disk()
+		self._update_sync_data_if_necessary(
+			vault_id=vault_id,
+			local_version=remote_version
+		)
+
+	def _push_vault(
+		self,
+		vault_id		: str,
+		vault_path		: str,
+		vault_file		: RemoteFile,
+		local_version	: str
+	) -> None:
+		"""
+			Raises:
+				CloudBackendError:			If uploading the vault to cloud fails
+				OSError:					If writing sync data to disk fails
+		"""
+		try:
+			self.backend.update_file(
+				file=vault_file,
+				source=Path(vault_path),
+				name=f"latest_{local_version}.vault"
+			)
+		except HttpError as e:
+			raise CloudBackendError from e
+
+		self._update_sync_data_if_necessary(
+			vault_id=vault_id,
+			local_version=local_version
+		)
+
+	def _update_sync_data_if_necessary(
+		self,
+		vault_id		: str,
+		local_version	: str
+	) -> None:
+		"""
+			Raises:
+				OSError:	If writing sync_data to disk fails
+		"""
+		with self.lock:
+			if self.sync_data[vault_id].last_synced_version != local_version:
+				self.sync_data[vault_id].last_synced_version = local_version
+				self.write_sync_data_to_disk()
 
 	@staticmethod
 	def get_fresh_version() -> str:
