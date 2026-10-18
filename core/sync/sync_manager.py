@@ -1,6 +1,4 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from enum import Enum
 from threading import RLock
 from pathlib import Path
 from collections.abc import Callable
@@ -12,7 +10,11 @@ from core.sync.backend import CloudBackend, RemoteFile, RemoteFolder
 from core.sync.google_drive.backend import GoogleDriveBackend
 import core.sync.google_drive.desktop_auth as desktop_auth
 
-from core.etc.types import sync_data_t, vault_sync_data_t
+from core.etc.types import (
+	sync_data_t,
+	VaultSyncData,
+	SyncActions,
+)
 from storage.constants import VAULT_ENDING
 from core.sync.errors import (
 	ClientCredentialsNotFoundError,
@@ -61,55 +63,6 @@ from core.etc.errors import IllegalArgumentError
 		=> where backup vault only replaced with vault files that were just opened successfully
 			and latest.vault is updated every sync operation.
 """
-
-@dataclass
-class VaultSyncData:
-	remote_folder_id	: str
-	last_synced_version	: str | None
-
-	def to_dict(self) -> vault_sync_data_t:
-		return {
-			"remote_folder_id"		: self.remote_folder_id,
-			"last_synced_version"	: self.last_synced_version
-		}
-
-	@staticmethod
-	def from_dict(data: dict[str, str | None]) -> VaultSyncData:
-		"""
-			Raises:
-				IllegalArgumentError: If data is not of the shape
-					{
-						"remote_folder_id"		: str
-						"last_synced_version"	: str | None
-					}
-		"""
-		if not isinstance(data, dict):
-			raise IllegalArgumentError
-
-		try:
-			remote_folder_id	= data["remote_folder_id"]
-			last_synced_version	= data["last_synced_version"]
-		except KeyError:
-			raise IllegalArgumentError
-
-		if not (
-			isinstance(remote_folder_id, str)
-			and (
-				isinstance(last_synced_version, str) or last_synced_version is None
-			)
-		):
-			raise IllegalArgumentError
-
-		return VaultSyncData(
-			remote_folder_id=remote_folder_id,
-			last_synced_version=last_synced_version
-		)
-
-class SyncActions(Enum):
-	PULL 		= 1
-	PUSH 		= 2
-	CONFLICT	= 3
-	NO_OP		= 4
 
 class SyncManager:
 	def __init__(
