@@ -6,6 +6,7 @@ from uuid import uuid4, UUID
 
 import storage.io as io
 from core.sync.backend import CloudBackend, RemoteFile, RemoteFolder
+from core.sync.sync_callbacks import SyncCallbacks
 
 from core.sync.google_drive.backend import GoogleDriveBackend
 import core.sync.google_drive.desktop_auth as desktop_auth
@@ -70,9 +71,7 @@ class SyncManager:
 		backend					: CloudBackend,
 		download_path			: Path,
 		sync_data				: dict[str, VaultSyncData],
-		sync_data_writeback		: Callable[[sync_data_t], None],
-		local_version_getter	: Callable[[str], str],
-		vault_auth_checker		: Callable[[str], bool],
+		sync_callbacks			: SyncCallbacks,
 		lock					: RLock
 	) -> None:
 		"""
@@ -88,9 +87,9 @@ class SyncManager:
 		self.backend				= backend
 		self.download_path			= download_path
 		self.sync_data				= sync_data
-		self._sync_data_writeback	= sync_data_writeback
-		self.local_version_getter	= local_version_getter
-		self.vault_auth_checker		= vault_auth_checker
+		self._sync_data_writeback	= sync_callbacks.sync_data_writeback
+		self.local_version_getter	= sync_callbacks.local_version_getter
+		self.vault_auth_checker		= sync_callbacks.vault_auth_checker
 		self.lock					= lock
 
 	def pull_vault(
@@ -596,9 +595,7 @@ class SyncManager:
 		token_path				: str,
 		download_path			: str,
 		sync_data				: sync_data_t,
-		sync_data_writeback		: Callable[[sync_data_t], None],
-		local_version_getter	: Callable[[str], str],
-		vault_auth_checker		: Callable[[str], bool],
+		sync_callbacks			: SyncCallbacks,
 		sync_lock				: RLock,
 	) -> SyncManager:
 		"""
@@ -652,9 +649,7 @@ class SyncManager:
 			backend=backend,
 			download_path=path,
 			sync_data=sync_data_dict,
-			sync_data_writeback=sync_data_writeback,
-			local_version_getter=local_version_getter,
-			vault_auth_checker=vault_auth_checker,
+			sync_callbacks=sync_callbacks,
 			lock=sync_lock
 		)
 
