@@ -23,6 +23,7 @@ from core.etc.errors import IllegalArgumentError
 from core.etc.types import VaultSyncData, SyncActions
 from core.sync.sync_manager import (
 	SyncManager,
+	SyncCallbacks,
 	_get_version_from_vault_name,
 	_is_valid_version,
 	_file_has_valid_latest_format,
@@ -69,13 +70,17 @@ class SyncManagerTestCase(TestCase):
 			)
 		}
 
+		callbacks = SyncCallbacks(
+			sync_data_writeback=self.writeback,
+			local_version_getter=self.local_version_getter,
+			vault_auth_checker=self.vault_auth_checker,
+		)
+
 		self.manager = SyncManager(
 			backend=self.backend,
 			download_path=self.download_path,
 			sync_data=self.sync_data,
-			sync_data_writeback=self.writeback,
-			local_version_getter=self.local_version_getter,
-			vault_auth_checker=self.vault_auth_checker,
+			sync_callbacks=callbacks,
 			lock=self.lock,
 		)
 
@@ -871,14 +876,17 @@ class SyncManagerTestCase(TestCase):
 			missing_credentials = Path(tmp) / "missing.json"
 
 			with self.assertRaises(ClientCredentialsNotFoundError):
+				callbacks = SyncCallbacks(
+					sync_data_writeback=self.writeback,
+					local_version_getter=self.local_version_getter,
+					vault_auth_checker=self.vault_auth_checker,
+				)
 				SyncManager.from_google_drive_token(
 					client_credentials_path=str(missing_credentials),
 					token_path=str(Path(tmp) / "token.json"),
 					download_path=str(Path(tmp) / "downloads"),
 					sync_data={},
-					sync_data_writeback=self.writeback,
-					local_version_getter=self.local_version_getter,
-					vault_auth_checker=self.vault_auth_checker,
+					sync_callbacks=callbacks,
 					sync_lock=self.lock,
 				)
 
@@ -910,14 +918,17 @@ class SyncManagerTestCase(TestCase):
 					return_value=backend,
 				) as backend_cls,
 			):
+				callbacks = SyncCallbacks(
+					sync_data_writeback=self.writeback,
+					local_version_getter=self.local_version_getter,
+					vault_auth_checker=self.vault_auth_checker,
+				)
 				manager = SyncManager.from_google_drive_token(
 					client_credentials_path=str(credentials_path),
 					token_path=str(token_path),
 					download_path=str(download_path),
 					sync_data=raw_sync_data,
-					sync_data_writeback=self.writeback,
-					local_version_getter=self.local_version_getter,
-					vault_auth_checker=self.vault_auth_checker,
+					sync_callbacks=callbacks,
 					sync_lock=self.lock,
 				)
 
@@ -958,6 +969,11 @@ class SyncManagerTestCase(TestCase):
 				patch.object(sync_manager_module, "GoogleDriveBackend"),
 			):
 				with self.assertRaises(IllegalArgumentError):
+					callbacks = SyncCallbacks(
+						sync_data_writeback=self.writeback,
+						local_version_getter=self.local_version_getter,
+						vault_auth_checker=self.vault_auth_checker,
+					)
 					SyncManager.from_google_drive_token(
 						client_credentials_path=str(credentials_path),
 						token_path=str(tmp_path / "token.json"),
@@ -968,9 +984,7 @@ class SyncManagerTestCase(TestCase):
 								# missing last_synced_version
 							}
 						},
-						sync_data_writeback=self.writeback,
-						local_version_getter=self.local_version_getter,
-						vault_auth_checker=self.vault_auth_checker,
+						sync_callbacks=callbacks,
 						sync_lock=self.lock,
 					)
 

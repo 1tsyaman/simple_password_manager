@@ -11,8 +11,7 @@ from core.sync.backend import RemoteFolder
 from core.sync.errors import SyncConflictError
 from core.sync.google_drive.backend import GoogleDriveBackend
 import core.sync.google_drive.desktop_auth as desktop_auth
-from core.sync.sync_manager import SyncManager
-
+from core.sync.sync_manager import SyncManager, SyncCallbacks
 
 CLIENT_FILE = Path(
 	os.environ.get(
@@ -79,13 +78,17 @@ class TestSyncManagerGoogleDriveIntegration(unittest.TestCase):
 
 		self.persisted_sync_data = None
 
+		callbacks = SyncCallbacks(
+			sync_data_writeback=self._sync_data_writeback,
+			local_version_getter=self._local_version_getter,
+			vault_auth_checker=self._vault_auth_checker,
+		)
+
 		self.manager = SyncManager(
 			backend=self.backend,
 			download_path=self.download_path,
 			sync_data={},
-			sync_data_writeback=self._sync_data_writeback,
-			local_version_getter=self._local_version_getter,
-			vault_auth_checker=self._vault_auth_checker,
+			sync_callbacks=callbacks,
 			lock=RLock()
 		)
 
@@ -182,14 +185,18 @@ class TestSyncManagerGoogleDriveIntegration(unittest.TestCase):
 	def test_factory_uses_real_desktop_auth_and_backend(self):
 		factory_download_path = self.tmp_path / "factory_downloads"
 
+		callbacks = SyncCallbacks(
+			sync_data_writeback=lambda _: None,
+			local_version_getter=self._local_version_getter,
+			vault_auth_checker=self._vault_auth_checker,
+		)
+
 		manager = SyncManager.from_google_drive_token(
 			client_credentials_path=str(CLIENT_FILE),
 			token_path=str(TOKEN_FILE),
 			download_path=str(factory_download_path),
 			sync_data={},
-			sync_data_writeback=lambda _: None,
-			local_version_getter=self._local_version_getter,
-			vault_auth_checker=self._vault_auth_checker,
+			sync_callbacks=callbacks,
 			sync_lock=RLock()
 		)
 
