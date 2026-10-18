@@ -25,6 +25,9 @@ class NoVaultSyncDataError(Exception):
 class VaultSyncDataExistsError(Exception):
 	pass
 
+class CloudConnectionError(Exception):
+	pass
+
 class SyncConflictError(Exception):
 	"""Raised if both remote and local have changed"""
 

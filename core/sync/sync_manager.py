@@ -109,6 +109,7 @@ class SyncManager:
 				RemoteVaultNotFoundError:		No synced vault file found in cloud
 				SyncConflictError:				If both remote and local have changed independently
 				CloudBackendError:				If the cloud requests did not succeed
+				CloudConnectionError:			Failed to establish connection to cloud server
 				CloudVaultAuthenticityError:	If cloud vault is not authentic
 				OSError:						If writing the downloaded vault to disk fails or
 													if writing sync_data to disk fails
@@ -152,6 +153,7 @@ class SyncManager:
 				RemoteVaultNotFoundError:	No synced vault file found in cloud
 				SyncConflictError:			If both remote and local have changed independently
 				CloudBackendError:			If uploading the vault to cloud fails
+				CloudConnectionError:		Failed to establish connection to cloud server
 				OSError:					If writing sync data to disk fails
 		"""
 		with self.lock:
@@ -201,6 +203,7 @@ class SyncManager:
 				RemoteVaultNotFoundError:		No synced vault file found in cloud
 				SyncConflictError:				If both remote and local have changed independently
 				CloudBackendError:				If the cloud requests did not succeed
+				CloudConnectionError:			Failed to establish connection to cloud server
 				CloudVaultAuthenticityError:	If cloud vault is not authentic
 				OSError:						If writing the downloaded vault to disk fails, or
 													if writing sync_data to disk fails
@@ -254,8 +257,10 @@ class SyncManager:
 				vault_id:					Id of the vault
 				vault_path:					Path of the vault *file*
 			Raises:
+				CloudConnectionError:		Failed to establish connection to cloud server
 				VaultSyncDataExistsError:	If vault_id is already in the sync data
 				CloudBackendError:			If the backend fails to create the remote folder or upload the vault
+				CloudConnectionError:		Failed to establish connection to cloud server
 				SyncRollbackError:			If the operation, as well as the rollback
 												of remote state fails
 				OSError:					If writing sync_data to disk fails
@@ -314,6 +319,7 @@ class SyncManager:
 			Raises:
 				IllegalArgumentError:	If vault_id is not associated with any sync data
 				CloudBackendError:		If the backend fails to delete the remote folder
+				CloudConnectionError:	Failed to establish connection to cloud server
 				SyncRollbackError:		If remote folder deletion fails, but rolling back
 											on-disk sync data also fails
 				OSError:				If writing sync_data to disk fails
@@ -357,6 +363,7 @@ class SyncManager:
 				NoVaultSyncDataError:		No VaultSyncData object found for vault_id
 				RemoteVaultNotFoundError:	No synced vault file found in cloud
 				CloudBackendError:			If the cloud requests do not succeed
+				CloudConnectionError:		Failed to establish connection to cloud server
 		"""
 		try:
 			folder_id = self.sync_data[vault_id].remote_folder_id
@@ -390,6 +397,7 @@ class SyncManager:
 				NoVaultSyncDataError:		No VaultSyncData object found for vault_id
 				RemoteVaultNotFoundError:	No synced vault file found in cloud
 				CloudBackendError:			If the cloud requests do not succeed
+				CloudConnectionError:		Failed to establish connection to cloud server
 		"""
 		return _get_version_from_vault_name(
 			self.get_latest_remote_vault_file(vault_id).name
@@ -421,6 +429,7 @@ class SyncManager:
 		"""
 			Raises:
 				CloudBackendError:			If the cloud requests do not succeed
+				CloudConnectionError:		Failed to establish connection to cloud server
 				RemoteVaultNotFoundError:	No synced vault folder found in cloud
 		"""
 		try:
@@ -450,7 +459,8 @@ class SyncManager:
 				- Deletes the remote folder, if created
 				- Removes vault data from self.sync_data, if added
 			Raises:
-				CloudBackendError:	If cloud folder deletion fails
+				CloudBackendError:		If cloud folder deletion fails
+				CloudConnectionError:	Failed to establish connection to cloud server
 				
 		"""
 		self.sync_data.pop(vault_id, None)	# returns 'None' instead of raising KeyError
@@ -514,6 +524,7 @@ class SyncManager:
 				IllegalArgumentError:			If vault_id is not associated with any sync data
 				RemoteVaultNotFoundError:		No synced vault file found in cloud
 				CloudBackendError:				If the cloud requests did not succeed
+				CloudConnectionError:			Failed to establish connection to cloud server
 				CloudVaultAuthenticityError:	If cloud vault is not authentic
 				OSError:						If writing the downloaded vault to disk fails
 		"""
@@ -555,6 +566,7 @@ class SyncManager:
 		"""
 			Raises:
 				CloudBackendError:			If uploading the vault to cloud fails
+				CloudConnectionError:		Failed to establish connection to cloud server
 				OSError:					If writing sync data to disk fails
 		"""
 		try:
@@ -616,6 +628,7 @@ class SyncManager:
 				ClientCredentialsNotFoundError:	Client credentials path does not exist
 				AuthDeniedError:				Authentication Denied
 				AuthTimeoutError:				Authentication timedout
+				CloudConnectionError:			Failed to establish connection to cloud server
 				CloudBackendError:				Failed to build Google Drive drive
 				IllegalArgumentError:			If sync_data values are not of the shape
 													{

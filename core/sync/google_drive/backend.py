@@ -1,6 +1,8 @@
 from pathlib import Path
 from datetime import datetime
 
+from httplib2.error import HttpLib2Error
+
 from googleapiclient.discovery import build, MutualTLSChannelError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 import googleapiclient.errors as googleErrors
@@ -9,6 +11,7 @@ import storage.io as io
 from core.sync.backend import RemoteFile, RemoteFolder, CloudBackend
 from core.sync.errors import (
 	CloudBackendError,
+	CloudConnectionError,
 	HttpError,
 )
 from core.etc.errors import (
@@ -126,6 +129,8 @@ class GoogleDriveBackend(CloudBackend):
 			)
 		except googleErrors.HttpError as e:
 			raise HttpError(e)
+		except HttpLib2Error as e:
+			raise CloudConnectionError from e
 
 	def upload_file(
 		self,
@@ -160,7 +165,8 @@ class GoogleDriveBackend(CloudBackend):
 
 		except googleErrors.HttpError as e:
 			raise HttpError(e)
-
+		except HttpLib2Error as e:
+			raise CloudConnectionError from e
 
 	def download_file(
 		self,
@@ -186,6 +192,8 @@ class GoogleDriveBackend(CloudBackend):
 
 		except googleErrors.HttpError as e:
 			raise HttpError(e)
+		except HttpLib2Error as e:
+			raise CloudConnectionError from e
 
 	def download_folder(
 		self,
@@ -256,7 +264,8 @@ class GoogleDriveBackend(CloudBackend):
 
 		except googleErrors.HttpError as e:
 			raise HttpError(e)
-
+		except HttpLib2Error as e:
+			raise CloudConnectionError from e
 
 	def delete_file(
 		self,
@@ -334,6 +343,8 @@ class GoogleDriveBackend(CloudBackend):
 
 		except googleErrors.HttpError as e:
 			raise HttpError(e)
+		except HttpLib2Error as e:
+			raise CloudConnectionError from e
 
 		return ls
 
@@ -365,6 +376,8 @@ class GoogleDriveBackend(CloudBackend):
 			).execute()
 		except googleErrors.HttpError as e:
 			raise HttpError(e)
+		except HttpLib2Error as e:
+			raise CloudConnectionError from e
 
 	@staticmethod
 	def _format_time(time: str) -> datetime:

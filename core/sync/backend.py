@@ -31,6 +31,7 @@ class CloudBackend(ABC):
 
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
 
@@ -44,6 +45,7 @@ class CloudBackend(ABC):
 
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
 
@@ -56,6 +58,7 @@ class CloudBackend(ABC):
 		"""
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
 
@@ -68,6 +71,7 @@ class CloudBackend(ABC):
 		"""
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
 
@@ -80,6 +84,7 @@ class CloudBackend(ABC):
 		"""
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
 
@@ -95,6 +100,7 @@ class CloudBackend(ABC):
 
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
 
@@ -108,6 +114,7 @@ class CloudBackend(ABC):
 		"""
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 				IOError
 		"""
 		pass
@@ -123,6 +130,7 @@ class CloudBackend(ABC):
 
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 				IOError
 		"""
 		tmp_path = destination.with_name(destination.name + ".tmp")
@@ -157,6 +165,7 @@ class CloudBackend(ABC):
 
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 				IOError
 		"""
 
@@ -186,6 +195,7 @@ class CloudBackend(ABC):
 		"""
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
 
@@ -200,6 +210,7 @@ class CloudBackend(ABC):
 
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
 
@@ -210,5 +221,6 @@ class CloudBackend(ABC):
 
 			Raises:
 				HttpError(status)
+				CloudConnectionError
 		"""
 		pass
