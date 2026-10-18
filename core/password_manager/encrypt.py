@@ -80,15 +80,18 @@ def __encrypt_data(
 
 	return encrypted, nonce
 
-"""
-	@raises:
-		- FileNotFoundError(path) [OSError]
-		- VaultFormatError
-		- OSError
-"""
+
 def get_salt_from_vault(
 	file_path: str
 ) -> bytes:
+	"""
+		Grabs the salt from file_json*["Vault"]["salt"]*, **not** file_json*["HMAC"]["Salt"]*
+
+		Raises:
+			FileNotFoundError(path):
+			VaultFormatError:
+			OSError:
+	"""
 	path = Path(file_path)
 
 	if not path.exists():

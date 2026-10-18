@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from threading import RLock	# Allows the thread that acquired it first to aquire it again
 from typing import Any
+from datetime import datetime, timezone
 
 from storage.constants import VAULT_ENDING
 from core.password_manager.encrypt import get_salt_from_vault, atomic_write
@@ -9,6 +10,8 @@ from core.password_manager.keys import derive_master_key, derive_subkey, get_ran
 from core.password_manager.pwd_manager import PwdManager
 from core.settings.settings import Settings
 from core.password_manager.passwords import password_satisfies_explicit_conditions
+from core.sync.sync_manager import SyncManager
+from core.sync.sync_callbacks import SyncCallbacks
 from core.etc.authenticate import encode_data, is_authentic, generate_tag
 from core.etc.errors import (
 	PasswordError,
@@ -74,6 +77,8 @@ class VaultSession:
 	# Guards the reads/writes on the vault file and in-memory keys/salt
 	lock		: RLock
 
+	VAULT_FILE_KEYS = ["Vault", "Settings", "Metadata", "HMAC"]
+
 	"""
 		@raises:
 			- FileNotFoundError(path) [OSError]
@@ -104,9 +109,11 @@ class VaultSession:
 		self.json = {
 			"Vault"		: {},
 			"Settings"	: {},
+			"Metadata"	: self._get_fresh_metadata(),
 			"HMAC"		: {
 				"Salt"			: bytes(0).hex(),
-				"Settings Hash"	: bytes(0).hex()
+				"Settings Hash"	: bytes(0).hex(),
+				"Metadata Hash"	: bytes(0).hex()
 			},
 		}
 
@@ -116,9 +123,6 @@ class VaultSession:
 			atomic_write(self.json, Path(self.vault_path), indent=4)
 			self.salt = get_random_salt()
 		else:
-			if self._vault_has_old_format():
-				self._convert_vault_to_new_format()
-
 			self.salt = get_salt_from_vault(self.vault_path)
 
 		self.json["HMAC"]["Salt"] = self.salt.hex()
@@ -132,6 +136,10 @@ class VaultSession:
 		self.vault_key	= self._derive_vault_key(master_key)
 		self.auth_key 	= self._derive_auth_key(master_key)
 		self.lock 		= RLock()
+
+		# Defered until auth_key is derived
+		if not new_vault and self._vault_has_old_format():
+			self._convert_vault_to_new_format()
 
 	"""
 		@raises:
@@ -401,6 +409,9 @@ class VaultSession:
 		self,
 		data: Any
 	) -> bytes:
+		"""
+			Uses self.auth_key to hmac the provided data
+		"""
 		data_bytes = encode_data(data)
 
 		with self.lock:
@@ -437,7 +448,7 @@ class VaultSession:
 
 	def _is_valid_vault_file(self) -> bool:
 		keys = set(self.json.keys())
-		return keys == {"Vault", "Settings", "HMAC"}		\
+		return keys == {*self.VAULT_FILE_KEYS}		\
 				and "Settings Hash" in self.json["HMAC"]
 
 	"""
@@ -505,14 +516,26 @@ class VaultSession:
 		settings_hash			= hmac.pop("Hash")
 		hmac["Settings Hash"]	= settings_hash
 
+		metadata		= self._get_fresh_metadata()
+		metadata_hash	= self.get_hash(metadata)
+		hmac["Metadata Hash"] = metadata_hash.hex()
+
 		new_vault = {
 			"Vault"		: vault_file["Vault"],
 			"Settings"	: settings,
+			"Metadata"	: metadata,
 			"HMAC"		: hmac
 		}
 		self.json = new_vault
 
 		atomic_write(new_vault, Path(self.vault_path), indent=4)
+
+	def _get_fresh_metadata(self) -> dict[str, str]:
+		return {
+			"id"			: SyncManager.get_fresh_version(),
+			"version"		: SyncManager.get_fresh_version(),
+			"last_modified"	: self.get_current_time_str()
+		}
 
 	"""
 		@raises:
@@ -529,6 +552,14 @@ class VaultSession:
 			return Settings.get_theme_from_json(json)
 		except:
 			raise InvalidVaultFile
+
+	@staticmethod
+	def get_current_time_str() -> str:
+		return datetime.now(timezone.utc).isoformat()
+
+	@staticmethod
+	def get_datetime_from_str(time: str) -> datetime:
+		return datetime.fromisoformat(time)
 
 	@staticmethod
 	def _derive_vault_key(master_key: bytes) -> bytes:
