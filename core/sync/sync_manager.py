@@ -189,8 +189,6 @@ class SyncManager:
 					local_version=local_version
 				)
 
-
-
 	def push_vault(
 		self,
 		vault_id	: str,
@@ -199,6 +197,7 @@ class SyncManager:
 		"""
 			Raises:
 				IllegalArgumentError:		If vault_id is not associated with any sync data
+				RemoteVaultNotFoundError:	No synced vault file found in cloud
 				SyncConflictError:			If both remote and local have changed independently
 				CloudBackendError:			If uploading the vault to cloud fails
 				OSError:					If writing sync data to disk fails
@@ -293,30 +292,53 @@ class SyncManager:
 
 	def init_vault_sync(
 		self,
-		vault_id	: str
+		vault_id	: str,
+		vault_path	: str
 	) -> None:
 		"""
-			Creates a remote folder for the vault and initializes the sync vault data
-				for the vault's id. Holds self.lock
+			Creates a remote folder for the vault, pushes the vault to it 
+				and initializes the sync vault data for the vault's id. Holds self.lock
 			Args:
 				vault_id:					Id of the vault
+				vault_path:					Path of the vault *file*
 			Raises:
 				VaultSyncDataExistsError:	If vault_id is already in the sync data
-				CloudBackendError:			If the backend fails to create the remote folder
+				CloudBackendError:			If the backend fails to create the remote folder or upload the vault
+				SyncRollbackError:			If the operation, as well as the rollback
+												of remote state fails
 				OSError:					If writing sync_data to disk fails
 		"""
 		with self.lock:
 			if vault_id in self.sync_data.keys():
 				raise VaultSyncDataExistsError
 
+			local_version = self.get_local_version(vault_id)
+
 			try:
 				remote_folder = self.backend.create_folder(vault_id)
 			except HttpError:	# TODO: break down this based on http statuses
 				raise CloudBackendError
 
+			try:
+				self.backend.upload_file(
+					remote_name=f"latest_{local_version}{VAULT_ENDING}",
+					source=Path(vault_path),
+					parent=remote_folder
+				)
+			except HttpError as creation_error:	# TODO: break down this based on http statuses
+				try:
+					self._cleanup_vault_init(
+						vault_id=vault_id,
+						remote_folder=remote_folder
+					)
+				except CloudBackendError as rollback_error:
+					raise SyncRollbackError from rollback_error
+
+				raise CloudBackendError from creation_error
+
 			self.sync_data[vault_id] = VaultSyncData(
 				remote_folder_id=remote_folder.remote_id,
-				last_synced_version=None
+				last_synced_version=local_version
 			)
 
 			try:
@@ -325,7 +347,7 @@ class SyncManager:
 				try:
 					self._cleanup_vault_init(
 						vault_id=vault_id,
-						remote_folder_id=remote_folder.remote_id
+						remote_folder=remote_folder
 					)
 				except CloudBackendError as deletion_error:
 					raise SyncRollbackError from deletion_error
@@ -468,8 +490,8 @@ class SyncManager:
 
 	def _cleanup_vault_init(
 		self,
-		vault_id			: str,
-		remote_folder_id	: str
+		vault_id		: str,
+		remote_folder	: RemoteFolder
 	) -> None:
 		"""
 			Rolls back changes made when attempting to init vault sync
@@ -479,14 +501,11 @@ class SyncManager:
 				CloudBackendError:	If cloud folder deletion fails
 				
 		"""
-		self.sync_data.pop(vault_id)
-		
+		self.sync_data.pop(vault_id, None)	# returns 'None' instead of raising KeyError
+
 		try:
 			self.backend.delete_folder_recursive(
-				RemoteFolder(
-					remote_id=remote_folder_id,
-					name=vault_id
-				)
+				remote_folder
 			)
 		except HttpError as deletion_error:
 			raise CloudBackendError from deletion_error
@@ -560,6 +579,11 @@ class SyncManager:
 
 		if not self.vault_auth_checker(vault_id):
 			# Downloaded vault failed the authentication test
+			try:
+				io.delete_file(str(download_path))
+			except OSError as e:
+				pass
+
 			raise CloudVaultAuthenticityError
 
 		io.move_file(str(download_path), vault_path)
@@ -585,7 +609,7 @@ class SyncManager:
 			self.backend.update_file(
 				file=vault_file,
 				source=Path(vault_path),
-				name=f"latest_{local_version}.vault"
+				name=f"latest_{local_version}{VAULT_ENDING}"
 			)
 		except HttpError as e:
 			raise CloudBackendError from e
