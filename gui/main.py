@@ -1,8 +1,19 @@
 from time import time
 
-from kivy.clock import Clock
+from kivy.config import Config
 from kivy.utils import platform
+
+"""
+	Disable widnow resizing for desktop. This should happen before
+		any other kivy import
+"""
+if platform != "android":
+	Config.set("graphics", "width", "500")
+	Config.set("graphics", "height", "650")
+	Config.set("graphics", "resizable", "0")
+
 from kivy.core.window import Window
+from kivy.clock import Clock
 
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.dialog import MDDialog
@@ -12,7 +23,6 @@ from kivymd.uix.screen import MDScreen
 
 from gui.screens.screen_manager import AppScreenManager
 
-from core.pwd_manager import PwdManager
 
 APP_NAME = "Simple Password Manager"
 INACTIVITY_TIMEOUT_DURATION = 60	# seconds
